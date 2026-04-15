@@ -1,17 +1,15 @@
-// ── Supabase config — fill these in after creating your project ──
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
-// ── Constants ────────────────────────────────────────────────────
-const COLORS = ["#378ADD","#1D9E75","#D85A30","#7F77DD","#D4537E","#BA7517","#0F6E56","#993C1D"];
+const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
-const ROUND_BG = ["","#E6F1FB","#EAF3DE","#FAEEDA","#FBEAF0"];
-const ROUND_FG = ["","#185FA5","#3B6D11","#854F0B","#993556"];
+const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.2)","rgba(153,53,86,.2)"];
+const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
+const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
 const ALL_TABS = ['standings','manage-names','draft','waiver','rosters','scoring'];
 const LEAGUE_ID = 'nba-2026';
 
-// ── Teams ────────────────────────────────────────────────────────
 const TEAMS = [
   {id:"OKC",name:"Thunder"},{id:"HOU",name:"Rockets"},{id:"LAL",name:"Lakers"},
   {id:"DEN",name:"Nuggets"},{id:"MEM",name:"Grizzlies"},{id:"GSW",name:"Warriors"},
@@ -21,7 +19,6 @@ const TEAMS = [
   {id:"ORL",name:"Magic"},
 ];
 
-// ── Players ──────────────────────────────────────────────────────
 const PLAYERS = [
   {id:1,name:"Shai Gilgeous-Alexander",pos:"PG",team:"OKC",ppg:32.7,rpg:5.1,apg:6.4,spg:2.0,bpg:1.1,fgpct:.535,fgapg:19.2,ftpct:.888,ftapg:8.9,topg:2.5,ffpg:.02,tfpg:.18},
   {id:2,name:"Chet Holmgren",pos:"C/PF",team:"OKC",ppg:17.4,rpg:8.2,apg:2.1,spg:.8,bpg:2.3,fgpct:.512,fgapg:11.8,ftpct:.820,ftapg:3.1,topg:1.4,ffpg:.01,tfpg:.10},
@@ -57,7 +54,7 @@ const PLAYERS = [
   {id:32,name:"Franz Wagner",pos:"SF/SG",team:"ORL",ppg:21.6,rpg:5.7,apg:4.8,spg:1.1,bpg:.4,fgpct:.476,fgapg:16.2,ftpct:.812,ftapg:4.6,topg:2.2,ffpg:.01,tfpg:.08},
 ];
 
-// ── Scoring helpers ───────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────
 function espnScore(p){return p.ppg+p.rpg+p.apg+p.spg+p.bpg-p.fgapg*(1-p.fgpct)-p.ftapg*(1-p.ftpct)-p.topg-p.ffpg-p.tfpg;}
 function espnBD(p){const fgmi=p.fgapg*(1-p.fgpct),ftmi=p.ftapg*(1-p.ftpct),pos=p.ppg+p.rpg+p.apg+p.spg+p.bpg,neg=fgmi+ftmi+p.topg+p.ffpg+p.tfpg;return{pos:+pos.toFixed(1),neg:+neg.toFixed(1),net:+(pos-neg).toFixed(1)};}
 function getTeam(id){return S.teams.find(t=>t.id===id)||{id,name:id,eliminated:false,survivedRounds:0};}
@@ -75,13 +72,10 @@ function draftedIds(){return Object.values(S.rosters).flat();}
 function availablePlayers(){const tk=draftedIds();return PLAYERS.filter(p=>!tk.includes(p.id)&&!getTeam(p.team).eliminated);}
 function waiverPlayers(){const tk=draftedIds();return PLAYERS.filter(p=>!tk.includes(p.id)&&getTeam(p.team).eliminated);}
 
-// ── Supabase client (loaded via CDN in index.html) ────────────────
+// ── Supabase ──────────────────────────────────────────────────────
 let db = null;
 function initSupabase(){
-  if(SUPABASE_URL === 'YOUR_SUPABASE_URL'){
-    console.warn('Supabase not configured — running in offline mode');
-    return false;
-  }
+  if(SUPABASE_URL==='YOUR_SUPABASE_URL') return false;
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return true;
 }
@@ -89,92 +83,108 @@ function initSupabase(){
 // ── State ─────────────────────────────────────────────────────────
 let S = null;
 let isCommissioner = false;
-let currentManagerId = null; // which manager this device is
+let currentManagerId = null;
 let teamFilter = null;
 let tempMgrs = [{name:"",color:COLORS[0]},{name:"",color:COLORS[1]},{name:"",color:COLORS[2]},{name:"",color:COLORS[3]}];
 
 // ── Persistence ───────────────────────────────────────────────────
 async function saveState(){
   if(!S) return;
-  const payload = {
-    id: LEAGUE_ID,
-    state: JSON.stringify(S),
-    updated_at: new Date().toISOString()
-  };
-  if(db){
-    await db.from('leagues').upsert(payload);
-  } else {
-    localStorage.setItem('nba_playoff_2026_state', JSON.stringify(S));
-  }
+  const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
+  if(db){ await db.from('leagues').upsert(payload); }
+  else { try{localStorage.setItem('nba_playoff_2026',JSON.stringify(S));}catch(e){} }
 }
 
 async function loadState(){
   if(db){
-    const {data, error} = await db.from('leagues').select('state').eq('id', LEAGUE_ID).single();
-    if(data && data.state){
-      S = JSON.parse(data.state);
-      return true;
-    }
+    const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
+    if(data?.state){ S=JSON.parse(data.state); return true; }
     return false;
   } else {
-    const raw = localStorage.getItem('nba_playoff_2026_state');
-    if(raw){ S = JSON.parse(raw); return true; }
+    try{ const raw=localStorage.getItem('nba_playoff_2026'); if(raw){S=JSON.parse(raw);return true;} }catch(e){}
     return false;
   }
 }
 
-// Poll for updates every 30s so all viewers see fresh data
 function startPolling(){
   setInterval(async()=>{
-    if(!db || !S) return;
-    const {data} = await db.from('leagues').select('state,updated_at').eq('id', LEAGUE_ID).single();
-    if(data && data.state){
-      const fresh = JSON.parse(data.state);
-      if(JSON.stringify(fresh) !== JSON.stringify(S)){
-        S = fresh;
-        render();
-      }
+    if(!db||!S) return;
+    const {data} = await db.from('leagues').select('state,updated_at').eq('id',LEAGUE_ID).single();
+    if(data?.state){
+      const fresh=JSON.parse(data.state);
+      if(JSON.stringify(fresh)!==JSON.stringify(S)){ S=fresh; render(); }
     }
-  }, 30000);
+  }, 20000);
 }
 
-// ── Commissioner auth ─────────────────────────────────────────────
+// ── Live scores ───────────────────────────────────────────────────
+async function fetchScores(){
+  try{
+    const today = new Date().toISOString().split('T')[0].replace(/-/g,'/');
+    const url = `https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const games = data?.scoreboard?.games || [];
+    if(!games.length){
+      document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">NO GAMES TODAY — CHECK BACK GAME NIGHT</span></div>`;
+      return;
+    }
+    // Duplicate for seamless loop
+    const html = [...games, ...games].map(g=>{
+      const home = g.homeTeam, away = g.awayTeam;
+      const status = g.gameStatusText || '';
+      const isLive = g.gameStatus === 2;
+      const isFinal = g.gameStatus === 3;
+      const statusHtml = isLive
+        ? `<span class="score-live">LIVE</span> <span style="font-size:13px;color:var(--text2)">${status}</span>`
+        : isFinal ? `<span class="score-final">FINAL</span>`
+        : `<span style="font-size:13px;color:var(--text3)">${status}</span>`;
+      return `<div class="score-item">
+        ${statusHtml}
+        <span class="score-team">${away.teamTricode}</span>
+        <span class="score-pts" style="${isFinal&&away.score>home.score?'color:var(--accent2)':''}">${away.score||0}</span>
+        <span class="score-vs">—</span>
+        <span class="score-pts" style="${isFinal&&home.score>away.score?'color:var(--accent2)':''}">${home.score||0}</span>
+        <span class="score-team">${home.teamTricode}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('scores-content').className = 'scores-bar-inner';
+    document.getElementById('scores-content').innerHTML = html;
+  } catch(e){
+    document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">SCORES UNAVAILABLE</span></div>`;
+  }
+}
+
+// ── Commissioner ──────────────────────────────────────────────────
 function tryCommLogin(){
   const input = document.getElementById('comm-login-input').value;
-  if(input === S.commPassword){
-    isCommissioner = true;
+  if(input===S.commPassword){
+    isCommissioner=true;
     document.getElementById('comm-login-bar').classList.add('hidden');
     document.getElementById('comm-active-bar').classList.remove('hidden');
     render();
   } else {
-    document.getElementById('comm-login-input').style.borderColor = '#c0392b';
-    setTimeout(()=>document.getElementById('comm-login-input').style.borderColor = '#ddd', 1500);
+    document.getElementById('comm-login-input').style.borderColor='var(--red)';
+    setTimeout(()=>document.getElementById('comm-login-input').style.borderColor='var(--border)',1500);
   }
 }
 function lockComm(){
-  isCommissioner = false;
+  isCommissioner=false;
   document.getElementById('comm-active-bar').classList.add('hidden');
   document.getElementById('comm-login-bar').classList.remove('hidden');
   render();
 }
 
-// ── Setup ─────────────────────────────────────────────────────────
-function renderSetup(){
-  document.getElementById('name-inputs').innerHTML = tempMgrs.map((m,i)=>`
-    <div class="name-input-row">
-      <div class="avatar" style="background:${m.color}22;color:${m.color}">${i+1}</div>
-      <input type="text" placeholder="Manager ${i+1}" value="${m.name}" oninput="tempMgrs[${i}].name=this.value"/>
-    </div>`).join('');
-  document.getElementById('btn-add').disabled = tempMgrs.length >= 8;
-  document.getElementById('btn-rem').disabled = tempMgrs.length <= 2;
+function confirmReset(){
+  if(confirm('⚠ RESET LEAGUE?\n\nThis will wipe all draft picks, rosters, and game state. Use this for testing before the real draft.\n\nAre you sure?')){
+    resetLeague();
+  }
 }
-function addManager(){if(tempMgrs.length>=8)return;tempMgrs.push({name:"",color:COLORS[tempMgrs.length%COLORS.length]});renderSetup();}
-function removeManager(){if(tempMgrs.length<=2)return;tempMgrs.pop();renderSetup();}
 
-async function startLeague(){
-  const pw = document.getElementById('comm-password').value.trim();
-  if(!pw){ alert('Please set a commissioner password.'); return; }
-  const mgrs = tempMgrs.map((m,i)=>({id:i,name:m.name.trim()||`Manager ${i+1}`,color:m.color,initials:initials(m.name.trim()||`Manager ${i+1}`)}));
+async function resetLeague(){
+  const pw = S.commPassword;
+  const mgrs = S.managers.map((m,i)=>({id:i,name:m.name,color:m.color,initials:m.initials}));
+  TEAMS.forEach(t=>{t.eliminated=false;t.survivedRounds=0;});
   S = {
     managers: mgrs,
     commPassword: pw,
@@ -184,28 +194,55 @@ async function startLeague(){
     injured: Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     waiverAdds: Object.fromEntries(mgrs.map(m=>[m.id,0])),
     round: 1,
-    teams: TEAMS.map(t=>({...t, eliminated:false, survivedRounds:0})),
+    teams: TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
-  isCommissioner = true;
+  document.getElementById('round-sel').value = 1;
+  document.getElementById('m-round').textContent = 'R1';
+  await saveState();
+  render();
+  alert('✓ LEAGUE RESET — ready for the real draft!');
+}
+
+// ── Setup ─────────────────────────────────────────────────────────
+function renderSetup(){
+  document.getElementById('name-inputs').innerHTML = tempMgrs.map((m,i)=>`
+    <div class="name-input-row">
+      <div class="avatar" style="border-color:${m.color};color:${m.color}">${i+1}</div>
+      <input type="text" placeholder="MANAGER ${i+1}" value="${m.name}" oninput="tempMgrs[${i}].name=this.value"/>
+    </div>`).join('');
+  document.getElementById('btn-add').disabled = tempMgrs.length>=8;
+  document.getElementById('btn-rem').disabled = tempMgrs.length<=2;
+}
+function addManager(){if(tempMgrs.length>=8)return;tempMgrs.push({name:"",color:COLORS[tempMgrs.length%COLORS.length]});renderSetup();}
+function removeManager(){if(tempMgrs.length<=2)return;tempMgrs.pop();renderSetup();}
+
+async function startLeague(){
+  const pw = document.getElementById('comm-password').value.trim();
+  if(!pw){ alert('SET A COMMISSIONER PASSWORD FIRST'); return; }
+  const mgrs = tempMgrs.map((m,i)=>({id:i,name:m.name.trim()||`MANAGER ${i+1}`,color:m.color,initials:initials(m.name.trim()||`MANAGER ${i+1}`)}));
+  S = {
+    managers:mgrs, commPassword:pw,
+    snakeOrder:buildSnake(mgrs.length,ROSTER_SIZE), draftIdx:0,
+    rosters:Object.fromEntries(mgrs.map(m=>[m.id,[]])),
+    injured:Object.fromEntries(mgrs.map(m=>[m.id,[]])),
+    waiverAdds:Object.fromEntries(mgrs.map(m=>[m.id,0])),
+    round:1, teams:TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
+  };
+  isCommissioner=true;
   await saveState();
   showMainScreen();
 }
 
+// ── Manager picker ────────────────────────────────────────────────
 function showMainScreen(){
   document.getElementById('setup-screen').classList.add('hidden');
-
-  // If manager not yet chosen, show picker first
-  if(currentManagerId === null && !isCommissioner){
-    showManagerPicker();
-    return;
-  }
-
+  if(currentManagerId===null&&!isCommissioner){ showManagerPicker(); return; }
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('league-sub').textContent = `2026 Playoffs · ${S.managers.length} managers · ${ROSTER_SIZE} picks each`;
+  document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
   document.getElementById('m-mgrs').textContent = S.managers.length;
-  document.getElementById('round-sel').value = S.round || 1;
-  document.getElementById('m-round').textContent = 'R' + (S.round||1);
+  document.getElementById('round-sel').value = S.round||1;
+  document.getElementById('m-round').textContent = 'R'+(S.round||1);
   if(isCommissioner){
     document.getElementById('comm-active-bar').classList.remove('hidden');
     document.getElementById('comm-login-bar').classList.add('hidden');
@@ -215,6 +252,8 @@ function showMainScreen(){
   }
   render();
   startPolling();
+  fetchScores();
+  setInterval(fetchScores, 60000);
 }
 
 function showManagerPicker(){
@@ -223,307 +262,298 @@ function showManagerPicker(){
   const picker = document.getElementById('manager-picker');
   picker.classList.remove('hidden');
   picker.innerHTML = `
-    <div style="max-width:400px;margin:3rem auto;padding:0 1rem">
+    <div style="max-width:420px;margin:2rem auto;padding:0 1rem">
       <div class="topbar" style="margin-bottom:1.5rem">
         <div>
-          <div class="topbar-title">🏀 NBA Playoff Fantasy</div>
-          <div class="topbar-sub">2026 Playoffs</div>
+          <div class="topbar-title">🏀 NBA PLAYOFF FANTASY</div>
+          <div class="topbar-sub">2026 PLAYOFFS</div>
         </div>
       </div>
-      <div class="card">
-        <div class="section-title">Who are you?</div>
-        <p style="font-size:13px;color:#888;margin-bottom:1rem">Pick your name to join the draft. You'll only be able to pick when it's your turn.</p>
-        <div style="display:flex;flex-direction:column;gap:8px" id="mgr-pick-list">
+      <div class="card card-accent">
+        <div class="section-title">► WHO ARE YOU?</div>
+        <p style="font-size:15px;color:var(--text2);margin-bottom:1rem">SELECT YOUR NAME TO JOIN THE DRAFT. YOU CAN ONLY PICK ON YOUR TURN.</p>
+        <div id="mgr-pick-list">
           ${S.managers.map(m=>`
-            <button onclick="selectManager(${m.id})" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e8e8e8;border-radius:10px;background:#fff;cursor:pointer;text-align:left;width:100%;transition:all .15s" onmouseover="this.style.background='#f8f8f6'" onmouseout="this.style.background='#fff'">
-              <div class="avatar" style="background:${m.color}22;color:${m.color}">${m.initials}</div>
-              <span style="font-size:15px;font-weight:600;color:#1a1a1a">${m.name}</span>
+            <button class="mgr-pick-btn" onclick="selectManager(${m.id})">
+              <div class="avatar" style="border-color:${m.color};color:${m.color}">${m.initials}</div>
+              <span>${m.name}</span>
             </button>
           `).join('')}
         </div>
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f0">
-          <button onclick="selectManager('viewer')" style="width:100%;padding:8px;font-size:13px;color:#888;border:none;background:none;cursor:pointer">👀 Just watching (view only)</button>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);text-align:center">
+          <button onclick="selectManager('viewer')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-family:'VT323',monospace;font-size:16px">👀 JUST WATCHING (VIEW ONLY)</button>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 function selectManager(id){
   currentManagerId = id;
-  // Save to sessionStorage so refresh keeps you logged in
   try{ sessionStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('league-sub').textContent = `2026 Playoffs · ${S.managers.length} managers · ${ROSTER_SIZE} picks each`;
+  document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
   document.getElementById('m-mgrs').textContent = S.managers.length;
-  document.getElementById('round-sel').value = S.round || 1;
-  document.getElementById('m-round').textContent = 'R' + (S.round||1);
+  document.getElementById('round-sel').value = S.round||1;
+  document.getElementById('m-round').textContent = 'R'+(S.round||1);
   document.getElementById('comm-login-bar').classList.remove('hidden');
   document.getElementById('comm-active-bar').classList.add('hidden');
   render();
   startPolling();
+  fetchScores();
+  setInterval(fetchScores, 60000);
 }
 
 // ── Actions ───────────────────────────────────────────────────────
-async function renameMgr(id, val){
-  const m = S.managers.find(x=>x.id===id);
-  if(!m) return;
-  const t = val.trim();
-  if(t){ m.name=t; m.initials=initials(t); }
+async function renameMgr(id,val){
+  const m=S.managers.find(x=>x.id===id); if(!m) return;
+  const t=val.trim(); if(t){m.name=t;m.initials=initials(t);}
   await saveState(); render();
 }
-
-async function setRound(r){
-  S.round=r;
-  document.getElementById('m-round').textContent='R'+r;
-  await saveState(); render();
-}
-
+async function setRound(r){S.round=r;document.getElementById('m-round').textContent='R'+r;await saveState();render();}
 async function randomizeDraft(){
-  if(!isCommissioner){ alert('Commissioner access required.'); return; }
-  const n=S.managers.length;
-  const idx=[...Array(n).keys()].sort(()=>Math.random()-.5);
-  const old=[...S.managers];
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  const n=S.managers.length,idx=[...Array(n).keys()].sort(()=>Math.random()-.5),old=[...S.managers];
   S.managers=idx.map((i,ni)=>({...old[i],id:ni}));
   S.rosters=Object.fromEntries(S.managers.map(m=>[m.id,[]]));
   S.injured=Object.fromEntries(S.managers.map(m=>[m.id,[]]));
   S.waiverAdds=Object.fromEntries(S.managers.map(m=>[m.id,0]));
-  S.draftIdx=0; S.snakeOrder=buildSnake(n,ROSTER_SIZE);
-  await saveState(); render();
+  S.draftIdx=0;S.snakeOrder=buildSnake(n,ROSTER_SIZE);
+  await saveState();render();
 }
-
 async function draftPlayer(pid){
   if(S.draftIdx>=S.snakeOrder.length) return;
-  const onClockId = S.snakeOrder[S.draftIdx];
-  // Only allow the manager whose turn it is (or commissioner)
-  if(!isCommissioner && currentManagerId !== onClockId){
-    alert("It's not your pick yet!"); return;
-  }
-  S.rosters[onClockId].push(pid);
-  S.draftIdx++;
+  const onClockId=S.snakeOrder[S.draftIdx];
+  if(!isCommissioner&&currentManagerId!==onClockId){alert("IT'S NOT YOUR PICK YET!");return;}
+  S.rosters[onClockId].push(pid); S.draftIdx++;
   await saveState(); render();
 }
-
-async function addFromWaiver(pid, mid){
-  if(waiverSlotsOpen(mid)<=0){ alert(`${S.managers[mid].name} has no open waiver slots.`); return; }
-  S.rosters[mid].push(pid);
-  S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+async function addFromWaiver(pid,mid){
+  if(waiverSlotsOpen(mid)<=0){alert(`${S.managers[mid].name} HAS NO OPEN WAIVER SLOTS`);return;}
+  S.rosters[mid].push(pid); S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
   await saveState(); render();
 }
-
-async function markInjured(mid, pid){
-  if(!isCommissioner){ alert('Commissioner access required.'); return; }
-  if(!(S.injured[mid]||[]).includes(pid)){ if(!S.injured[mid]) S.injured[mid]=[]; S.injured[mid].push(pid); }
-  await saveState(); render();
+async function markInjured(mid,pid){
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!(S.injured[mid]||[]).includes(pid)){if(!S.injured[mid])S.injured[mid]=[];S.injured[mid].push(pid);}
+  await saveState();render();
 }
-
-async function clearInjury(mid, pid){
-  if(!isCommissioner){ alert('Commissioner access required.'); return; }
+async function clearInjury(mid,pid){
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
   S.injured[mid]=(S.injured[mid]||[]).filter(x=>x!==pid);
-  await saveState(); render();
+  await saveState();render();
 }
-
 async function toggleElim(tid){
-  if(!isCommissioner){ alert('Commissioner access required.'); return; }
-  const t=S.teams.find(x=>x.id===tid);
-  t.eliminated=!t.eliminated;
-  await saveState(); render();
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  const t=S.teams.find(x=>x.id===tid); t.eliminated=!t.eliminated;
+  await saveState();render();
 }
-
-async function setSurvivedRounds(tid, r){
-  if(!isCommissioner){ alert('Commissioner access required.'); return; }
+async function setSurvivedRounds(tid,r){
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
   S.teams.find(x=>x.id===tid).survivedRounds=parseInt(r);
-  await saveState(); render();
+  await saveState();render();
 }
 
-// ── UI helpers ────────────────────────────────────────────────────
+// ── UI ────────────────────────────────────────────────────────────
 function showTab(name){
-  ALL_TABS.forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
-  document.querySelectorAll('.tab').forEach((el,i)=>{
-    el.classList.toggle('active', ['standings','draft','waiver','rosters','scoring'][i]===name);
-  });
+  ALL_TABS.forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden',t!==name));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['standings','draft','waiver','rosters','scoring'][i]===name));
 }
 
-// ── Render ────────────────────────────────────────────────────────
 function render(){
-  renderStandings();
-  renderNameEdit();
-  renderDraft();
-  renderWaiver();
-  renderRosters();
-  renderScoring();
-  document.getElementById('m-avail').textContent = waiverPlayers().length;
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();
+  document.getElementById('m-avail').textContent=waiverPlayers().length;
 }
 
 function renderStandings(){
-  const sorted = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
-  document.getElementById('standings-list').innerHTML = sorted.map((m,i)=>{
-    const stat=managerStatScore(m.id), bonus=managerBonusScore(m.id), total=managerTotal(m.id);
-    const count=S.rosters[m.id].length, slotsOpen=waiverSlotsOpen(m.id);
+  const sorted=[...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  document.getElementById('standings-list').innerHTML=sorted.map((m,i)=>{
+    const stat=managerStatScore(m.id),bonus=managerBonusScore(m.id),total=managerTotal(m.id);
+    const count=S.rosters[m.id].length,slotsOpen=waiverSlotsOpen(m.id);
     const sp=total>0?Math.round((stat/total)*100):50;
-    const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'';
+    const rankClass=i===0?'r1':i===1?'r2':i===2?'r3':'';
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     return `<div class="player-row" style="flex-wrap:wrap">
-      <span class="rank-num ${rankClass}">${i+1}</span>
-      <div class="avatar" style="background:${m.color}22;color:${m.color}">${m.initials}</div>
+      <span class="rank-num ${rankClass}">${medal||i+1}</span>
+      <div class="avatar" style="border-color:${m.color};color:${m.color}">${m.initials}</div>
       <div style="flex:1;min-width:100px">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:14px;font-weight:600">${m.name}</span>
-          <button class="btn-ghost" onclick="showTab('manage-names')" title="Edit names">✏️</button>
-          ${slotsOpen>0?`<span class="badge" style="background:#e8f8ee;color:#1d7a3a">${slotsOpen} waiver slot${slotsOpen>1?'s':''} open</span>`:''}
+          <span style="font-size:18px;font-weight:600;color:var(--text)">${m.name}</span>
+          <button class="btn-ghost" onclick="showTab('manage-names')" title="Edit">✏</button>
+          ${slotsOpen>0?`<span class="badge badge-active" style="font-size:12px">${slotsOpen} WAIVER${slotsOpen>1?'S':''}</span>`:''}
         </div>
-        <div style="font-size:12px;color:#888;margin-top:1px">${count}/${ROSTER_SIZE} players · <span style="color:#185FA5">${stat} stat</span>${bonus>0?` + <span style="color:#1D9E75">${bonus} bonus</span>`:''}</div>
+        <div style="font-size:14px;color:var(--text2);margin-top:2px">${count}/${ROSTER_SIZE} · <span style="color:#4a9eff">${stat} STAT</span>${bonus>0?` + <span style="color:var(--green)">${bonus} BONUS</span>`:''}</div>
         <div class="score-bar">
           <div class="score-seg-stat" style="width:${sp}%"></div>
           <div class="score-seg-bonus" style="width:${100-sp}%"></div>
         </div>
       </div>
-      <div style="font-size:24px;font-weight:700">${total}<span style="font-size:12px;color:#aaa;margin-left:3px">pts</span></div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:var(--accent2)">${total}<span style="font-size:9px;color:var(--text3);margin-left:4px">PTS</span></div>
     </div>`;
   }).join('');
 }
 
 function renderNameEdit(){
-  document.getElementById('name-edit-list').innerHTML = S.managers.map(m=>`
+  document.getElementById('name-edit-list').innerHTML=S.managers.map(m=>`
     <div class="name-input-row" style="margin-bottom:10px">
-      <div class="avatar" style="background:${m.color}22;color:${m.color}">${m.initials}</div>
-      <input type="text" style="width:220px" value="${m.name}"
+      <div class="avatar" style="border-color:${m.color};color:${m.color}">${m.initials}</div>
+      <input type="text" style="width:240px" value="${m.name}"
         onchange="renameMgr(${m.id},this.value)"
         onkeydown="if(event.key==='Enter')renameMgr(${m.id},this.value)"
-        placeholder="Name or nickname"/>
+        placeholder="NAME OR NICKNAME"/>
     </div>`).join('');
 }
 
 function renderDraft(){
-  const done = S.draftIdx >= S.snakeOrder.length;
-  const onClockId = done ? null : S.snakeOrder[S.draftIdx];
-  const onClockMgr = done ? null : S.managers[onClockId];
-  const isMyTurn = !done && (isCommissioner || currentManagerId === onClockId);
+  const done=S.draftIdx>=S.snakeOrder.length;
+  const onClockId=done?null:S.snakeOrder[S.draftIdx];
+  const onClockMgr=done?null:S.managers.find(m=>m.id===onClockId);
+  const isMyTurn=!done&&(isCommissioner||currentManagerId===onClockId);
 
-  // Notice bar
-  let noticeHtml = '';
+  let noticeHtml='';
   if(done){
-    noticeHtml = `<div class="success-box">Draft complete! Head to Rosters to see all teams.</div>`;
-  } else if(isMyTurn && !isCommissioner){
-    noticeHtml = `<div class="success-box" style="background:#e8f8ee;border-color:#a8e6c0">🟢 <strong>It's your pick, ${onClockMgr.name}!</strong> Pick #${S.draftIdx+1} of ${S.snakeOrder.length} — choose a player below.</div>`;
+    noticeHtml=`<div class="success-box">✓ DRAFT COMPLETE — CHECK ROSTERS TO SEE ALL TEAMS</div>`;
+  } else if(isMyTurn&&!isCommissioner){
+    noticeHtml=`<div class="success-box">🟢 YOUR PICK, ${onClockMgr.name}! — PICK #${S.draftIdx+1} OF ${S.snakeOrder.length}</div>`;
   } else {
-    noticeHtml = `<div class="notice">⏳ Waiting on <strong>${onClockMgr.name}</strong> — Pick #${S.draftIdx+1} of ${S.snakeOrder.length}</div>`;
+    noticeHtml=`<div class="notice">⏳ WAITING ON ${onClockMgr?.name||'...'} — PICK #${S.draftIdx+1} OF ${S.snakeOrder.length}</div>`;
   }
-  document.getElementById('draft-notice').innerHTML = noticeHtml;
+  document.getElementById('draft-notice').innerHTML=noticeHtml;
+  document.getElementById('btn-randomize').disabled=!isCommissioner||S.draftIdx>0;
 
-  document.getElementById('btn-randomize').disabled = !isCommissioner || S.draftIdx > 0;
-
-  document.getElementById('draft-order-list').innerHTML = S.snakeOrder.map((mid,i)=>{
-    const m=S.managers[mid], filled=i<S.draftIdx, current=i===S.draftIdx&&!done;
+  document.getElementById('draft-order-list').innerHTML=S.snakeOrder.map((mid,i)=>{
+    const m=S.managers.find(x=>x.id===mid),filled=i<S.draftIdx,current=i===S.draftIdx&&!done;
     const before=S.snakeOrder.slice(0,i).filter(x=>x===mid).length;
     const p=filled?getPlayer(S.rosters[mid][before]):null;
     return `<div class="pick-slot ${filled?'filled':''} ${current?'current':''}">
-      <span style="font-size:10px;color:#bbb;min-width:22px">#${i+1}</span>
-      <div class="avatar" style="background:${m.color}22;color:${m.color};width:22px;height:22px;font-size:9px">${m.initials}</div>
-      <span style="font-size:12px;${current?'color:#1a56db;font-weight:600':filled?'':'color:#bbb'}">${filled&&p?p.name:current?'On the clock…':m.name}</span>
+      <span style="font-size:11px;color:var(--text3);min-width:24px">#${i+1}</span>
+      <div class="avatar" style="border-color:${m.color};color:${m.color};width:22px;height:22px;font-size:8px">${m.initials}</div>
+      <span style="font-size:14px;${current?'color:var(--accent2);font-weight:600':filled?'color:var(--text)':'color:var(--text3)'}">${filled&&p?p.name:current?'ON THE CLOCK…':m.name}</span>
     </div>`;
   }).join('');
 
-  document.getElementById('team-filters').innerHTML =
-    `<span class="team-chip ${!teamFilter?'sel':''}" onclick="teamFilter=null;render()">All</span>` +
+  document.getElementById('team-filters').innerHTML=
+    `<span class="team-chip ${!teamFilter?'sel':''}" onclick="teamFilter=null;render()">ALL</span>`+
     S.teams.map(t=>`<span class="team-chip ${t.eliminated?'elim':''} ${teamFilter===t.id?'sel':''}" onclick="${t.eliminated?'':'teamFilter=\''+t.id+'\';render()'}">${t.id}</span>`).join('');
 
-  let avail = availablePlayers().sort((a,b)=>espnScore(b)-espnScore(a));
-  if(teamFilter) avail = avail.filter(p=>p.team===teamFilter);
+  let avail=availablePlayers().sort((a,b)=>espnScore(b)-espnScore(a));
+  if(teamFilter) avail=avail.filter(p=>p.team===teamFilter);
 
-  document.getElementById('draft-pool').innerHTML = done
-    ? '<div style="text-align:center;padding:1.5rem;color:#aaa;font-size:14px">Draft is complete.</div>'
-    : avail.slice(0,20).map(p=>{
-        const t=getTeam(p.team), bd=espnBD(p);
-        const canPick = isMyTurn;
-        return `<div class="player-row" style="${canPick?'':'opacity:.5'}">
+  const takenIds=draftedIds();
+  const pickMap={};
+  S.snakeOrder.slice(0,S.draftIdx).forEach((mid,i)=>{
+    const before=S.snakeOrder.slice(0,i).filter(x=>x===mid).length;
+    const pid=S.rosters[mid][before];
+    if(pid) pickMap[pid]={pickNum:i+1,mid};
+  });
+
+  const availHtml=done?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">DRAFT IS COMPLETE</div>':avail.slice(0,20).map(p=>{
+    const t=getTeam(p.team),bd=espnBD(p);
+    return `<div class="player-row" style="${isMyTurn?'':'opacity:.45'}">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:600;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span></div>
+        <div style="font-size:13px;color:var(--text2)">${t.name} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span></div>
+      </div>
+      <span style="font-size:15px;font-weight:600;margin-right:8px;${bd.net>=0?'color:var(--green)':'color:var(--red)'}">${bd.net>0?'+':''}${bd.net}</span>
+      <button class="btn btn-sm btn-primary" onclick="draftPlayer(${p.id})" ${isMyTurn?'':'disabled style="opacity:.3;cursor:not-allowed"'}>PICK</button>
+    </div>`;
+  }).join('');
+
+  const draftedHtml=takenIds.length?`
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+      <div class="section-title" style="margin-bottom:.5rem">► ALREADY DRAFTED (${takenIds.length})</div>
+      ${takenIds.map(pid=>{
+        const p=getPlayer(pid),t=getTeam(p.team),info=pickMap[pid];
+        const m=info?S.managers.find(x=>x.id===info.mid):null;
+        return `<div class="player-row" style="opacity:.6">
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${p.name} <span class="pos-badge">${p.pos}</span></div>
-            <div style="font-size:11px;color:#888">${t.name} · <span class="pos">+${bd.pos}</span> <span class="neg">−${bd.neg}</span></div>
+            <div style="font-size:14px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span></div>
+            <div style="font-size:13px;color:var(--text3)">${t.name}</div>
           </div>
-          <span style="font-size:13px;font-weight:600;margin-right:8px;${bd.net>=0?'color:#1d7a3a':'color:#c0392b'}">${bd.net>0?'+':''}${bd.net}</span>
-          <button class="btn btn-sm btn-primary" onclick="draftPlayer(${p.id})" ${canPick?'':'disabled style="opacity:.4;cursor:not-allowed"'}>Pick</button>
+          ${m?`<div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="border-color:${m.color};color:${m.color};width:22px;height:22px;font-size:8px">${m.initials}</div>
+            <span style="font-size:13px;color:var(--text2)">${m.name} <span style="color:var(--text3)">#${info.pickNum}</span></span>
+          </div>`:''}
         </div>`;
-      }).join('');
+      }).join('')}
+    </div>`:'';
+
+  document.getElementById('draft-pool').innerHTML=availHtml+draftedHtml;
 }
 
 function renderWaiver(){
-  const avail = waiverPlayers().sort((a,b)=>espnScore(b)-espnScore(a));
-  const elimNames = S.teams.filter(t=>t.eliminated).map(t=>t.name).join(', ');
-  const slots = S.managers.map(m=>({m,open:waiverSlotsOpen(m.id)})).filter(x=>x.open>0);
-  document.getElementById('waiver-header').innerHTML = !elimNames
-    ? `<div class="notice">No teams eliminated yet. Waivers open once a team is eliminated or a player is injured.</div>`
-    : `<div class="info-box">Eliminated: ${elimNames}.<br>Open slots: ${slots.length?slots.map(x=>`<strong>${x.m.name}</strong> (${x.open})`).join(', '):'None — all slots used.'}</div>`;
-  document.getElementById('waiver-list').innerHTML = !avail.length
-    ? '<div style="text-align:center;padding:1.5rem;color:#aaa;font-size:14px">No waiver players available yet.</div>'
-    : avail.map(p=>{
-        const t=getTeam(p.team), bd=espnBD(p);
-        return `<div class="player-row">
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${p.name} <span class="pos-badge">${p.pos}</span> <span class="badge badge-elim">Eliminated</span></div>
-            <div style="font-size:11px;color:#888">${t.name} · <span class="pos">+${bd.pos}</span> <span class="neg">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
-          </div>
-          <select id="wm-${p.id}" style="margin-right:8px">${S.managers.map(m=>`<option value="${m.id}">${m.name} (${waiverSlotsOpen(m.id)} slot${waiverSlotsOpen(m.id)!==1?'s':''})</option>`).join('')}</select>
-          <button class="btn btn-sm btn-primary" onclick="addFromWaiver(${p.id},parseInt(document.getElementById('wm-${p.id}').value))">Add</button>
-        </div>`;
-      }).join('');
+  const avail=waiverPlayers().sort((a,b)=>espnScore(b)-espnScore(a));
+  const elimNames=S.teams.filter(t=>t.eliminated).map(t=>t.name).join(', ');
+  const slots=S.managers.map(m=>({m,open:waiverSlotsOpen(m.id)})).filter(x=>x.open>0);
+  document.getElementById('waiver-header').innerHTML=!elimNames
+    ?`<div class="notice">NO TEAMS ELIMINATED YET. WAIVERS OPEN ONCE A TEAM IS OUT.</div>`
+    :`<div class="info-box">ELIMINATED: ${elimNames}<br>OPEN SLOTS: ${slots.length?slots.map(x=>`${x.m.name} (${x.open})`).join(' · '):'NONE'}</div>`;
+  document.getElementById('waiver-list').innerHTML=!avail.length
+    ?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">NO WAIVER PLAYERS AVAILABLE YET</div>'
+    :avail.map(p=>{
+      const t=getTeam(p.team),bd=espnBD(p);
+      return `<div class="player-row">
+        <div style="flex:1">
+          <div style="font-size:15px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span> <span class="badge badge-elim">ELIM</span></div>
+          <div style="font-size:13px;color:var(--text2)">${t.name} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
+        </div>
+        <select id="wm-${p.id}" style="margin-right:8px">${S.managers.map(m=>`<option value="${m.id}">${m.name} (${waiverSlotsOpen(m.id)})</option>`).join('')}</select>
+        <button class="btn btn-sm btn-primary" onclick="addFromWaiver(${p.id},parseInt(document.getElementById('wm-${p.id}').value))">ADD</button>
+      </div>`;
+    }).join('');
 }
 
 function renderRosters(){
-  const commNote = isCommissioner
-    ? `<div class="commissioner-bar" style="margin-bottom:1rem"><span style="font-size:16px">🔓</span><span>Commissioner mode — tap teams to eliminate, set rounds survived, mark injuries</span></div>`
-    : `<div class="notice">View-only mode. Commissioner controls are locked.</div>`;
-  document.getElementById('rosters-comm-notice').innerHTML = commNote;
+  document.getElementById('rosters-comm-notice').innerHTML=isCommissioner
+    ?`<div class="commissioner-bar">🔓 <span style="font-family:'Press Start 2P',monospace;font-size:9px">COMMISSIONER MODE — MANAGE TEAMS &amp; INJURIES BELOW</span></div>`
+    :`<div class="notice">VIEW-ONLY MODE — COMMISSIONER CONTROLS LOCKED</div>`;
 
-  document.getElementById('rosters-list').innerHTML = S.managers.map(m=>{
-    const players = S.rosters[m.id].map(pid=>getPlayer(pid));
-    const slotsOpen = waiverSlotsOpen(m.id);
+  document.getElementById('rosters-list').innerHTML=S.managers.map(m=>{
+    const players=S.rosters[m.id].map(pid=>getPlayer(pid)),slotsOpen=waiverSlotsOpen(m.id);
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.875rem;flex-wrap:wrap">
-        <div class="avatar" style="background:${m.color}22;color:${m.color}">${m.initials}</div>
+        <div class="avatar" style="border-color:${m.color};color:${m.color}">${m.initials}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-weight:600;font-size:15px">${m.name}</span>
-            <button class="btn-ghost" onclick="showTab('manage-names')">✏️</button>
+            <span style="font-size:18px;color:var(--text)">${m.name}</span>
+            <button class="btn-ghost" onclick="showTab('manage-names')">✏</button>
           </div>
-          <div style="font-size:11px;color:#888">${players.length}/${ROSTER_SIZE} players${slotsOpen>0?` · <span style="color:#1d7a3a;font-weight:600">${slotsOpen} waiver slot${slotsOpen!==1?'s':''} open</span>`:''}</div>
+          <div style="font-size:14px;color:var(--text2)">${players.length}/${ROSTER_SIZE}${slotsOpen>0?` · <span style="color:var(--green)">${slotsOpen} WAIVER SLOT${slotsOpen!==1?'S':''} OPEN</span>`:''}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:18px;font-weight:700">${managerTotal(m.id)} pts</div>
-          <div style="font-size:11px;color:#888">${managerStatScore(m.id)} stat${managerBonusScore(m.id)>0?` + <span style="color:#1D9E75">${managerBonusScore(m.id)} bonus</span>`:''}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:14px;color:var(--accent2)">${managerTotal(m.id)}</div>
+          <div style="font-size:13px;color:var(--text2)">${managerStatScore(m.id)} STAT${managerBonusScore(m.id)>0?` + <span style="color:var(--green)">${managerBonusScore(m.id)} BONUS</span>`:''}</div>
         </div>
       </div>
-      ${players.length ? players.map(p=>{
-        const t=getTeam(p.team), bd=espnBD(p), bonus=bonusForPlayer(p.id);
-        const inj=(S.injured[m.id]||[]).includes(p.id), sr=t.survivedRounds||0;
-        const rbg=ROUND_BG[Math.min(sr,4)], rfg=ROUND_FG[Math.min(sr,4)];
+      ${players.length?players.map(p=>{
+        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id),inj=(S.injured[m.id]||[]).includes(p.id),sr=t.survivedRounds||0;
         return `<div class="player-row">
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${p.name} <span class="pos-badge">${p.pos}</span>
-              ${t.eliminated?'<span class="badge badge-elim">Elim</span>':inj?'<span class="badge badge-inj">Injured</span>':'<span class="badge badge-active">Active</span>'}
-              ${bonus>0?`<span class="badge" style="background:${rbg};color:${rfg}">+${bonus}</span>`:''}
+            <div style="font-size:14px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>
+              ${t.eliminated?'<span class="badge badge-elim">ELIM</span>':inj?'<span class="badge badge-inj">INJ</span>':'<span class="badge badge-active">ACTIVE</span>'}
+              ${bonus>0?`<span class="badge" style="background:${ROUND_BG[Math.min(sr,4)]};color:${ROUND_FG[Math.min(sr,4)]};border-color:${ROUND_BORDER[Math.min(sr,4)]}">+${bonus}</span>`:''}
             </div>
-            <div style="font-size:11px;color:#888;margin-top:2px">${t.name} · <span class="pos">+${bd.pos}</span> <span class="neg">−${bd.neg}</span> = ${bd.net>0?'+':''}${bd.net}/gm</div>
+            <div style="font-size:13px;color:var(--text2)">${t.name} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = ${bd.net>0?'+':''}${bd.net}/GM</div>
           </div>
           ${isCommissioner?`<div style="display:flex;gap:4px;flex-shrink:0">
-            ${!t.eliminated&&!inj?`<button class="btn btn-sm btn-warn" onclick="markInjured(${m.id},${p.id})" title="Mark injured">🤕</button>`:''}
-            ${inj?`<button class="btn btn-sm" onclick="clearInjury(${m.id},${p.id})">✓ Healthy</button>`:''}
+            ${!t.eliminated&&!inj?`<button class="btn btn-sm btn-warn" onclick="markInjured(${m.id},${p.id})">🤕</button>`:''}
+            ${inj?`<button class="btn btn-sm" onclick="clearInjury(${m.id},${p.id})" style="color:var(--green);border-color:var(--green)">✓ HEALTHY</button>`:''}
           </div>`:''}
         </div>`;
-      }).join('') : '<div style="font-size:13px;color:#aaa;padding:6px 0">No players drafted yet.</div>'}
+      }).join(''):'<div style="font-size:15px;color:var(--text3);padding:6px 0">NO PLAYERS DRAFTED YET</div>'}
       ${isCommissioner?`
-      <div style="margin-top:.875rem;padding-top:.875rem;border-top:1px solid #f0f0f0">
-        <div class="section-title" style="margin-bottom:.5rem">Teams — tap to eliminate · set rounds survived</div>
+      <div style="margin-top:.875rem;padding-top:.875rem;border-top:1px solid var(--border)">
+        <div class="section-title" style="margin-bottom:.5rem">TEAMS — TAP TO ELIMINATE · SET ROUNDS SURVIVED</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">
           ${S.teams.map(t=>`<div style="display:inline-flex;align-items:center;gap:3px">
             <span class="team-chip ${t.eliminated?'elim':''}" style="margin:0" onclick="toggleElim('${t.id}')">${t.id}</span>
-            ${!t.eliminated?`<select style="padding:2px 4px;font-size:10px" onchange="setSurvivedRounds('${t.id}',this.value)">
+            ${!t.eliminated?`<select style="padding:2px 4px;font-size:11px" onchange="setSurvivedRounds('${t.id}',this.value)">
               <option value="0" ${(t.survivedRounds||0)===0?'selected':''}>R0</option>
               <option value="1" ${(t.survivedRounds||0)===1?'selected':''}>R1✓</option>
               <option value="2" ${(t.survivedRounds||0)===2?'selected':''}>R2✓</option>
               <option value="3" ${(t.survivedRounds||0)===3?'selected':''}>R3✓</option>
               <option value="4" ${(t.survivedRounds||0)===4?'selected':''}>R4✓</option>
-            </select>`:'<span style="font-size:10px;color:#c0392b">out</span>'}
+            </select>`:'<span style="font-size:11px;color:var(--red)">OUT</span>'}
           </div>`).join('')}
         </div>
       </div>`:''}
@@ -532,49 +562,38 @@ function renderRosters(){
 }
 
 function renderScoring(){
-  document.getElementById('scoring-breakdown').innerHTML = S.managers.map(m=>{
-    const players = S.rosters[m.id].map(pid=>getPlayer(pid));
-    return `<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #f0f0f0">
+  document.getElementById('scoring-breakdown').innerHTML=S.managers.map(m=>{
+    const players=S.rosters[m.id].map(pid=>getPlayer(pid));
+    return `<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <div class="avatar" style="background:${m.color}22;color:${m.color};width:26px;height:26px;font-size:10px">${m.initials}</div>
-        <span style="font-weight:600;font-size:14px">${m.name}</span>
-        <span style="font-size:14px;font-weight:700;margin-left:auto">${managerTotal(m.id)} pts</span>
+        <div class="avatar" style="border-color:${m.color};color:${m.color};width:26px;height:26px;font-size:8px">${m.initials}</div>
+        <span style="font-size:17px;color:var(--text)">${m.name}</span>
+        <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:var(--accent2);margin-left:auto">${managerTotal(m.id)} PTS</span>
       </div>
-      ${players.length ? players.map(p=>{
-        const t=getTeam(p.team), bd=espnBD(p), bonus=bonusForPlayer(p.id), inactive=isInactive(m.id,p.id);
-        return `<div style="font-size:12px;padding:4px 0 4px 34px;border-bottom:1px solid #f8f8f8">
+      ${players.length?players.map(p=>{
+        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id),inactive=isInactive(m.id,p.id);
+        return `<div style="font-size:13px;padding:4px 0 4px 34px;border-bottom:1px solid var(--bg2)">
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <span style="flex:1;font-weight:600">${p.name} <span class="pos-badge">${p.pos}</span>${inactive?` <span style="color:#c0392b;font-size:10px">(inactive)</span>`:''}</span>
-            <span class="pos">+${bd.pos}</span><span class="neg">−${bd.neg}</span>
-            ${bonus>0?`<span style="color:#1D9E75;font-weight:600">+${bonus}B</span>`:''}
-            <span style="font-weight:700">${inactive?bonus:(bd.net+bonus).toFixed(1)}</span>
+            <span style="flex:1;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${inactive?` <span style="color:var(--red);font-size:12px">(INACTIVE)</span>`:''}</span>
+            <span style="color:var(--green)">+${bd.pos}</span><span style="color:var(--red)">−${bd.neg}</span>
+            ${bonus>0?`<span style="color:var(--green)">+${bonus}B</span>`:''}
+            <span style="color:var(--accent2);font-weight:bold">${inactive?bonus:(bd.net+bonus).toFixed(1)}</span>
           </div>
         </div>`;
-      }).join('') : '<div style="font-size:12px;color:#aaa;padding-left:34px">No players drafted.</div>'}
+      }).join(''):'<div style="font-size:14px;color:var(--text3);padding-left:34px">NO PLAYERS DRAFTED</div>'}
     </div>`;
   }).join('');
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot(){
-  const hasDB = initSupabase();
-
-  // Restore manager selection from session
-  try{
-    const saved = sessionStorage.getItem('nba_mgr_2026');
-    if(saved !== null) currentManagerId = saved === 'viewer' ? 'viewer' : parseInt(saved);
-  }catch(e){}
-
-  const hasState = await loadState();
-  document.getElementById('loading-overlay').style.display = 'none';
-  document.getElementById('app-root').style.display = 'block';
+  initSupabase();
+  try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
+  const hasState=await loadState();
+  document.getElementById('loading-overlay').style.display='none';
+  document.getElementById('app-root').style.display='block';
   if(hasState){
-    // If manager not yet picked this session, show picker
-    if(currentManagerId === null){
-      showManagerPicker();
-    } else {
-      showMainScreen();
-    }
+    currentManagerId===null?showManagerPicker():showMainScreen();
   } else {
     document.getElementById('setup-screen').classList.remove('hidden');
     renderSetup();
