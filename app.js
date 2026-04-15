@@ -89,6 +89,7 @@ function initSupabase(){
 // ── State ─────────────────────────────────────────────────────────
 let S = null;
 let isCommissioner = false;
+let currentManagerId = null; // which manager this device is
 let teamFilter = null;
 let tempMgrs = [{name:"",color:COLORS[0]},{name:"",color:COLORS[1]},{name:"",color:COLORS[2]},{name:"",color:COLORS[3]}];
 
@@ -192,6 +193,14 @@ async function startLeague(){
 
 function showMainScreen(){
   document.getElementById('setup-screen').classList.add('hidden');
+
+  // If manager not yet chosen, show picker first
+  if(currentManagerId === null && !isCommissioner){
+    showManagerPicker();
+    return;
+  }
+
+  document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
   document.getElementById('league-sub').textContent = `2026 Playoffs · ${S.managers.length} managers · ${ROSTER_SIZE} picks each`;
   document.getElementById('m-mgrs').textContent = S.managers.length;
@@ -204,6 +213,54 @@ function showMainScreen(){
     document.getElementById('comm-login-bar').classList.remove('hidden');
     document.getElementById('comm-active-bar').classList.add('hidden');
   }
+  render();
+  startPolling();
+}
+
+function showManagerPicker(){
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('main-screen').classList.add('hidden');
+  const picker = document.getElementById('manager-picker');
+  picker.classList.remove('hidden');
+  picker.innerHTML = `
+    <div style="max-width:400px;margin:3rem auto;padding:0 1rem">
+      <div class="topbar" style="margin-bottom:1.5rem">
+        <div>
+          <div class="topbar-title">🏀 NBA Playoff Fantasy</div>
+          <div class="topbar-sub">2026 Playoffs</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">Who are you?</div>
+        <p style="font-size:13px;color:#888;margin-bottom:1rem">Pick your name to join the draft. You'll only be able to pick when it's your turn.</p>
+        <div style="display:flex;flex-direction:column;gap:8px" id="mgr-pick-list">
+          ${S.managers.map(m=>`
+            <button onclick="selectManager(${m.id})" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e8e8e8;border-radius:10px;background:#fff;cursor:pointer;text-align:left;width:100%;transition:all .15s" onmouseover="this.style.background='#f8f8f6'" onmouseout="this.style.background='#fff'">
+              <div class="avatar" style="background:${m.color}22;color:${m.color}">${m.initials}</div>
+              <span style="font-size:15px;font-weight:600;color:#1a1a1a">${m.name}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f0">
+          <button onclick="selectManager('viewer')" style="width:100%;padding:8px;font-size:13px;color:#888;border:none;background:none;cursor:pointer">👀 Just watching (view only)</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectManager(id){
+  currentManagerId = id;
+  // Save to sessionStorage so refresh keeps you logged in
+  try{ sessionStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
+  document.getElementById('manager-picker').classList.add('hidden');
+  document.getElementById('main-screen').classList.remove('hidden');
+  document.getElementById('league-sub').textContent = `2026 Playoffs · ${S.managers.length} managers · ${ROSTER_SIZE} picks each`;
+  document.getElementById('m-mgrs').textContent = S.managers.length;
+  document.getElementById('round-sel').value = S.round || 1;
+  document.getElementById('m-round').textContent = 'R' + (S.round||1);
+  document.getElementById('comm-login-bar').classList.remove('hidden');
+  document.getElementById('comm-active-bar').classList.add('hidden');
   render();
   startPolling();
 }
@@ -238,7 +295,12 @@ async function randomizeDraft(){
 
 async function draftPlayer(pid){
   if(S.draftIdx>=S.snakeOrder.length) return;
-  S.rosters[S.snakeOrder[S.draftIdx]].push(pid);
+  const onClockId = S.snakeOrder[S.draftIdx];
+  // Only allow the manager whose turn it is (or commissioner)
+  if(!isCommissioner && currentManagerId !== onClockId){
+    alert("It's not your pick yet!"); return;
+  }
+  S.rosters[onClockId].push(pid);
   S.draftIdx++;
   await saveState(); render();
 }
@@ -334,9 +396,20 @@ function renderNameEdit(){
 
 function renderDraft(){
   const done = S.draftIdx >= S.snakeOrder.length;
-  document.getElementById('draft-notice').textContent = done
-    ? 'Draft complete! Head to Rosters to see all teams.'
-    : `Pick #${S.draftIdx+1} of ${S.snakeOrder.length} — ${S.managers[S.snakeOrder[S.draftIdx]].name} is on the clock.`;
+  const onClockId = done ? null : S.snakeOrder[S.draftIdx];
+  const onClockMgr = done ? null : S.managers[onClockId];
+  const isMyTurn = !done && (isCommissioner || currentManagerId === onClockId);
+
+  // Notice bar
+  let noticeHtml = '';
+  if(done){
+    noticeHtml = `<div class="success-box">Draft complete! Head to Rosters to see all teams.</div>`;
+  } else if(isMyTurn && !isCommissioner){
+    noticeHtml = `<div class="success-box" style="background:#e8f8ee;border-color:#a8e6c0">🟢 <strong>It's your pick, ${onClockMgr.name}!</strong> Pick #${S.draftIdx+1} of ${S.snakeOrder.length} — choose a player below.</div>`;
+  } else {
+    noticeHtml = `<div class="notice">⏳ Waiting on <strong>${onClockMgr.name}</strong> — Pick #${S.draftIdx+1} of ${S.snakeOrder.length}</div>`;
+  }
+  document.getElementById('draft-notice').innerHTML = noticeHtml;
 
   document.getElementById('btn-randomize').disabled = !isCommissioner || S.draftIdx > 0;
 
@@ -357,17 +430,19 @@ function renderDraft(){
 
   let avail = availablePlayers().sort((a,b)=>espnScore(b)-espnScore(a));
   if(teamFilter) avail = avail.filter(p=>p.team===teamFilter);
+
   document.getElementById('draft-pool').innerHTML = done
     ? '<div style="text-align:center;padding:1.5rem;color:#aaa;font-size:14px">Draft is complete.</div>'
     : avail.slice(0,20).map(p=>{
         const t=getTeam(p.team), bd=espnBD(p);
-        return `<div class="player-row">
+        const canPick = isMyTurn;
+        return `<div class="player-row" style="${canPick?'':'opacity:.5'}">
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600">${p.name} <span class="pos-badge">${p.pos}</span></div>
             <div style="font-size:11px;color:#888">${t.name} · <span class="pos">+${bd.pos}</span> <span class="neg">−${bd.neg}</span></div>
           </div>
           <span style="font-size:13px;font-weight:600;margin-right:8px;${bd.net>=0?'color:#1d7a3a':'color:#c0392b'}">${bd.net>0?'+':''}${bd.net}</span>
-          <button class="btn btn-sm btn-primary" onclick="draftPlayer(${p.id})">Pick</button>
+          <button class="btn btn-sm btn-primary" onclick="draftPlayer(${p.id})" ${canPick?'':'disabled style="opacity:.4;cursor:not-allowed"'}>Pick</button>
         </div>`;
       }).join('');
 }
@@ -483,11 +558,23 @@ function renderScoring(){
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot(){
   const hasDB = initSupabase();
+
+  // Restore manager selection from session
+  try{
+    const saved = sessionStorage.getItem('nba_mgr_2026');
+    if(saved !== null) currentManagerId = saved === 'viewer' ? 'viewer' : parseInt(saved);
+  }catch(e){}
+
   const hasState = await loadState();
   document.getElementById('loading-overlay').style.display = 'none';
   document.getElementById('app-root').style.display = 'block';
   if(hasState){
-    showMainScreen();
+    // If manager not yet picked this session, show picker
+    if(currentManagerId === null){
+      showManagerPicker();
+    } else {
+      showMainScreen();
+    }
   } else {
     document.getElementById('setup-screen').classList.remove('hidden');
     renderSetup();
