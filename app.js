@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -825,7 +825,7 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();
   document.getElementById('m-avail').textContent=waiverPlayers().length;
 }
 
@@ -1192,6 +1192,166 @@ function renderScoring(){
       }).join(''):'<div style="font-size:14px;color:var(--text3);padding-left:34px">NO PLAYERS DRAFTED</div>'}
     </div>`;
   }).join('');
+}
+
+
+// ── Bracket ───────────────────────────────────────────────────────
+function renderBracket(){
+  const el = document.getElementById('bracket-section');
+  if(!el) return;
+
+  // Build team status lookup from S.teams
+  const teamMap = {};
+  (S.teams||[]).forEach(t=>teamMap[t.id]=t);
+
+  // 2026 bracket structure — update seeds as play-in resolves
+  // West: OKC(1) SAS(2) DEN(3) LAL(4) HOU(5) MIN(6) POR(7) W8-TBD(8)
+  // East: DET(1) BOS(2) NYK(3) CLE(4) TOR(5) ATL(6) PHI(7) ORL(8)
+  const W = [
+    {seed:1,id:'OKC',name:'Thunder'},
+    {seed:2,id:'SAS',name:'Spurs'},
+    {seed:3,id:'DEN',name:'Nuggets'},
+    {seed:4,id:'LAL',name:'Lakers'},
+    {seed:5,id:'HOU',name:'Rockets'},
+    {seed:6,id:'MIN',name:'T-Wolves'},
+    {seed:7,id:'POR',name:'Blazers'},
+    {seed:8,id:'LAC',name:'W8'},
+  ];
+  const E = [
+    {seed:1,id:'DET',name:'Pistons'},
+    {seed:2,id:'BOS',name:'Celtics'},
+    {seed:3,id:'NYK',name:'Knicks'},
+    {seed:4,id:'CLE',name:'Cavaliers'},
+    {seed:5,id:'TOR',name:'Raptors'},
+    {seed:6,id:'ATL',name:'Hawks'},
+    {seed:7,id:'PHI',name:'76ers'},
+    {seed:8,id:'ORL',name:'Magic'},
+  ];
+
+  // First round matchups: 1v8, 4v5, 3v6, 2v7
+  const r1pairs = [[0,7],[3,4],[2,5],[1,6]]; // indices into seed array
+
+  function teamStatus(id){
+    const t = teamMap[id];
+    if(!t) return 'active';
+    if(t.eliminated) return 'eliminated';
+    if((t.survivedRounds||0)>=1) return 'winner';
+    return 'active';
+  }
+
+  function teamAdvanced(id, rounds){
+    const t = teamMap[id];
+    return t && (t.survivedRounds||0) >= rounds && !t.eliminated;
+  }
+
+  function bTeam(team, rounds){
+    if(!team) return `<div class="b-team tbd"><span class="b-seed">?</span> TBD</div>`;
+    const t = teamMap[team.id];
+    const elim = t && t.eliminated;
+    const survived = t ? (t.survivedRounds||0) : 0;
+    const isWinner = survived >= rounds && !elim;
+    return `<div class="b-team ${elim?'eliminated':isWinner?'winner':''}">
+      <span class="b-seed">${team.seed}</span>${team.name}
+    </div>`;
+  }
+
+  // Determine R2 teams (survived R1)
+  function r2teams(conf){
+    const arr = conf === 'W' ? W : E;
+    return r1pairs.map(([a,b])=>{
+      const ta = arr[a], tb = arr[b];
+      const aWon = teamAdvanced(ta.id,1);
+      const bWon = teamAdvanced(tb.id,1);
+      if(aWon) return ta;
+      if(bWon) return tb;
+      return null; // TBD
+    });
+  }
+
+  // R3 teams (survived R2)
+  function r3teams(conf){
+    const r2 = r2teams(conf);
+    const pairs = [[0,1],[2,3]];
+    return pairs.map(([a,b])=>{
+      const ta=r2[a], tb=r2[b];
+      if(!ta||!tb) return null;
+      if(teamAdvanced(ta.id,2)) return ta;
+      if(teamAdvanced(tb.id,2)) return tb;
+      return null;
+    });
+  }
+
+  // Finals teams (survived R3)
+  function finalsTeam(conf){
+    const r3 = r3teams(conf);
+    for(const t of r3){
+      if(t && teamAdvanced(t.id,3)) return t;
+    }
+    return null;
+  }
+
+  // Champion
+  function champion(){
+    const wf = finalsTeam('W'), ef = finalsTeam('E');
+    if(wf && teamAdvanced(wf.id,4)) return wf;
+    if(ef && teamAdvanced(ef.id,4)) return ef;
+    return null;
+  }
+
+  function col(label, matchups){
+    return `<div class="bracket-col">
+      <div class="bracket-col-label">${label}</div>
+      ${matchups.join('')}
+    </div>`;
+  }
+
+  function matchup(t1, t2, rounds){
+    return `<div class="b-matchup">${bTeam(t1,rounds)}${bTeam(t2,rounds)}</div>`;
+  }
+
+  // ── West R1 ──
+  const wr1 = r1pairs.map(([a,b])=>matchup(W[a],W[b],1));
+  // ── East R1 ──
+  const er1 = r1pairs.map(([a,b])=>matchup(E[a],E[b],1));
+  // ── West R2 ──
+  const wr2t = r2teams('W');
+  const wr2 = [[0,1],[2,3]].map(([a,b])=>matchup(wr2t[a],wr2t[b],2));
+  // ── East R2 ──
+  const er2t = r2teams('E');
+  const er2 = [[0,1],[2,3]].map(([a,b])=>matchup(er2t[a],er2t[b],2));
+  // ── Conf Finals ──
+  const wr3t = r3teams('W');
+  const wr3 = [matchup(wr3t[0],wr3t[1],3)];
+  const er3t = r3teams('E');
+  const er3 = [matchup(er3t[0],er3t[1],3)];
+  // ── Finals ──
+  const wf = finalsTeam('W'), ef = finalsTeam('E');
+  const finals = [matchup(wf,ef,4)];
+  // ── Champion ──
+  const champ = champion();
+
+  el.innerHTML = `<div class="bracket-wrap">
+    <div class="bracket-title">
+      <span>🏆 2026 PLAYOFF BRACKET</span>
+      <span style="font-size:8px;color:var(--text3)">UPDATE VIA COMMISSIONER CONTROLS</span>
+    </div>
+    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);margin-bottom:6px;letter-spacing:.06em">— WEST —</div>
+    <div class="bracket-grid" style="margin-bottom:.75rem">
+      ${col('R1',wr1)}
+      ${col('SEMIS',wr2)}
+      ${col('CONF FINALS',wr3)}
+      <div class="bracket-col" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div class="b-champion">
+          <div class="b-trophy">${champ?'🏆':'🏀'}</div>
+          <div class="b-champ-name">${champ?champ.name.toUpperCase()+'\nCHAMPION':'FINALS\nTBD'}</div>
+        </div>
+      </div>
+      ${col('CONF FINALS',er3)}
+      ${col('SEMIS',er2)}
+      ${col('R1',er1)}
+    </div>
+    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);margin-bottom:6px;letter-spacing:.06em">— EAST —</div>
+  </div>`;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
