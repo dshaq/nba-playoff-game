@@ -711,7 +711,7 @@ function showManagerPicker(){
           <div style="font-size:16px;color:var(--text2);line-height:2">
             🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time.<br>
             📊 <span style="color:var(--accent3)">EARN POINTS</span> — stats daily (PTS+REB+AST+STL+BLK minus misses &amp; TOs) + bonuses when your players survive each round (+5 / +10 / +20 / +50).<br>
-            🔄 <span style="color:var(--accent3)">WAIVERS</span> — team eliminated? Claim a free agent. Priority order. Claims drop at midnight.
+            🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens only when your player's team is eliminated or they're injured — no voluntary drops. Submit claims and they process nightly by priority order.
           </div>
         </div>
       </div>
