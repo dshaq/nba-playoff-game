@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -373,6 +373,7 @@ let S = null;
 let isCommissioner = false;
 let currentManagerId = null;
 let teamFilter = null;
+let waiverTeamFilter = null;
 let tempMgrs = [{name:"",color:COLORS[0]},{name:"",color:COLORS[1]},{name:"",color:COLORS[2]},{name:"",color:COLORS[3]}];
 
 // ── Persistence ───────────────────────────────────────────────────
@@ -1023,7 +1024,16 @@ function renderWaiver(){
   }
 
   // ── Player list ──
-  const avail=waiverPlayers().sort((a,b)=>{
+  // ── Team filter chips ──
+  const waiverTeamsInPool = [...new Set(waiverPlayers().map(p=>p.team))];
+  const filterChipsHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.75rem">
+    <span class="team-chip ${!waiverTeamFilter?'sel':''}" onclick="waiverTeamFilter=null;render()">ALL</span>
+    ${S.teams.filter(t=>waiverTeamsInPool.includes(t.id)).map(t=>`
+      <span class="team-chip ${t.eliminated?'elim':''} ${waiverTeamFilter===t.id?'sel':''}"
+        onclick="waiverTeamFilter='${t.id}';render()">${t.id}</span>`).join('')}
+  </div>`;
+
+  const avail=waiverPlayers().filter(p=>!waiverTeamFilter||p.team===waiverTeamFilter).sort((a,b)=>{
     const ae=getTeam(a.team).eliminated?1:0,be=getTeam(b.team).eliminated?1:0;
     if(ae!==be) return ae-be;
     // Claimed players first within each group
@@ -1084,7 +1094,7 @@ function renderWaiver(){
     </div>`;
   }
   document.getElementById('waiver-header').innerHTML=headerHtml;
-  document.getElementById('waiver-list').innerHTML=priorityHtml+myClaimHtml+`<div class="card"><div class="section-title">► ALL AVAILABLE PLAYERS</div>${listHtml}</div>`;
+  document.getElementById('waiver-list').innerHTML=priorityHtml+myClaimHtml+`<div class="card"><div class="section-title">► ALL AVAILABLE PLAYERS</div>${filterChipsHtml}${listHtml}</div>`;
 }
 
 function renderRosters(){
