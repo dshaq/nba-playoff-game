@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -473,14 +473,18 @@ async function resetLeague(){
   const pw = S.commPassword;
   const mgrs = S.managers.map((m,i)=>({id:i,name:m.name,color:m.color,initials:m.initials}));
   TEAMS.forEach(t=>{t.eliminated=false;t.survivedRounds=0;});
+  const snakeOrderR = buildSnake(mgrs.length, ROSTER_SIZE);
+  const waiverPriorityR = [...snakeOrderR.slice(0,mgrs.length)].reverse();
   S = {
     managers: mgrs,
     commPassword: pw,
-    snakeOrder: buildSnake(mgrs.length, ROSTER_SIZE),
+    snakeOrder: snakeOrderR,
     draftIdx: 0,
     rosters: Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     injured: Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     waiverAdds: Object.fromEntries(mgrs.map(m=>[m.id,0])),
+    waiverPriority: waiverPriorityR,
+    waiverClaims: {},
     round: 1,
     teams: TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
@@ -509,12 +513,18 @@ async function startLeague(){
   if(!pw){ alert('SET A COMMISSIONER PASSWORD FIRST'); return; }
   const shuffled = [...tempMgrs].sort(()=>Math.random()-.5);
   const mgrs = shuffled.map((m,i)=>({id:i,name:m.name.trim()||`MANAGER ${i+1}`,color:m.color,initials:initials(m.name.trim()||`MANAGER ${i+1}`)}));
+  const snakeOrder = buildSnake(mgrs.length,ROSTER_SIZE);
+  // Waiver priority = reverse of first-round draft order (last pick = first waiver priority)
+  const firstRound = snakeOrder.slice(0, mgrs.length);
+  const waiverPriority = [...firstRound].reverse();
   S = {
     managers:mgrs, commPassword:pw,
-    snakeOrder:buildSnake(mgrs.length,ROSTER_SIZE), draftIdx:0,
+    snakeOrder, draftIdx:0,
     rosters:Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     injured:Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     waiverAdds:Object.fromEntries(mgrs.map(m=>[m.id,0])),
+    waiverPriority,
+    waiverClaims:{},
     round:1, teams:TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
   isCommissioner=true;
@@ -617,6 +627,106 @@ async function draftPlayer(pid){
   S.rosters[onClockId].push(pid); S.draftIdx++;
   await saveState(); render();
 }
+// ── Waiver claim system ────────────────────────────────────────────
+function getWaiverPriority(){return S.waiverPriority||[];}
+
+function managerPriorityRank(mid){
+  const p=getWaiverPriority();
+  const idx=p.indexOf(mid);
+  return idx===-1?999:idx;
+}
+
+function managerActiveClaim(mid){
+  if(!S.waiverClaims) return null;
+  for(const [pid,claim] of Object.entries(S.waiverClaims)){
+    if(claim.managerId===mid) return {pid:parseInt(pid),...claim};
+  }
+  return null;
+}
+
+async function submitClaim(pid,mid){
+  if(waiverSlotsOpen(mid)<=0){alert('YOU HAVE NO OPEN WAIVER SLOTS');return;}
+  // Check if manager already has an active claim
+  const existing = managerActiveClaim(mid);
+  if(existing && existing.pid!==pid){
+    // Replace existing claim
+    delete S.waiverClaims[existing.pid];
+  }
+  if(!S.waiverClaims) S.waiverClaims={};
+  const m = S.managers.find(x=>x.id===mid);
+  S.waiverClaims[pid] = {
+    managerId: mid,
+    managerName: m.name,
+    managerColor: m.color,
+    managerInitials: m.initials,
+    submittedAt: new Date().toISOString(),
+  };
+  await saveState(); render();
+}
+
+async function cancelClaim(pid,mid){
+  if(S.waiverClaims && S.waiverClaims[pid] && S.waiverClaims[pid].managerId===mid){
+    delete S.waiverClaims[pid];
+    await saveState(); render();
+  }
+}
+
+async function processWaiverClaims(){
+  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!S.waiverClaims||Object.keys(S.waiverClaims).length===0){
+    alert('NO PENDING CLAIMS TO PROCESS');return;
+  }
+  if(!confirm('PROCESS ALL WAIVER CLAIMS NOW?\n\nHigher priority managers win ties. This cannot be undone.')) return;
+
+  const priority = getWaiverPriority();
+  const results = [];
+  const claimedPids = new Set();
+  const managersWhoWon = new Set();
+
+  // Sort claims by manager priority
+  const claimEntries = Object.entries(S.waiverClaims).map(([pid,claim])=>({pid:parseInt(pid),...claim}));
+
+  // Process in priority order
+  for(const mid of priority){
+    const claim = claimEntries.find(c=>c.managerId===mid);
+    if(!claim) continue;
+    if(claimedPids.has(claim.pid)){
+      // Player already taken — claim fails, manager keeps priority
+      results.push({mid, name:claim.managerName, pid:claim.pid, won:false});
+      continue;
+    }
+    if(waiverSlotsOpen(mid)<=0){
+      results.push({mid, name:claim.managerName, pid:claim.pid, won:false, reason:'NO SLOT'});
+      continue;
+    }
+    // Claim succeeds
+    S.rosters[mid].push(claim.pid);
+    S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+    claimedPids.add(claim.pid);
+    managersWhoWon.add(mid);
+    results.push({mid, name:claim.managerName, pid:claim.pid, won:true});
+  }
+
+  // Drop winners to bottom of priority, preserve losers' positions
+  const winners = priority.filter(mid=>managersWhoWon.has(mid));
+  const nonWinners = priority.filter(mid=>!managersWhoWon.has(mid));
+  S.waiverPriority = [...nonWinners, ...winners];
+
+  // Clear all processed claims
+  S.waiverClaims = {};
+
+  await saveState(); render();
+
+  // Show results
+  const msg = results.map(r=>{
+    const p = getPlayer(r.pid);
+    return r.won
+      ? `✓ ${r.name} gets ${p?p.name:'?'}`
+      : `✗ ${r.name} loses claim on ${p?p.name:'?'}${r.reason?' ('+r.reason+')':''}`;
+  }).join('\n');
+  alert('WAIVER RESULTS:\n\n'+msg);
+}
+
 async function addFromWaiver(pid,mid){
   if(waiverSlotsOpen(mid)<=0){alert(`${S.managers[mid].name} HAS NO OPEN WAIVER SLOTS`);return;}
   S.rosters[mid].push(pid); S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
@@ -795,30 +905,129 @@ function renderDraft(){
 }
 
 function renderWaiver(){
-  const avail=waiverPlayers().sort((a,b)=>espnScore(b)-espnScore(a));
   const elimNames=S.teams.filter(t=>t.eliminated).map(t=>t.name).join(', ');
   const slots=S.managers.map(m=>({m,open:waiverSlotsOpen(m.id)})).filter(x=>x.open>0);
-  document.getElementById('waiver-header').innerHTML=!elimNames
-    ?`<div class="notice">NO TEAMS ELIMINATED YET. WAIVERS OPEN ONCE A TEAM IS OUT.</div>`
-    :`<div class="info-box">ELIMINATED: ${elimNames}<br>OPEN SLOTS: ${slots.length?slots.map(x=>`${x.m.name} (${x.open})`).join(' · '):'NONE'}</div>`;
-  document.getElementById('waiver-list').innerHTML=!avail.length
-    ?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">NO WAIVER PLAYERS AVAILABLE YET</div>'
-    :avail.sort((a,b)=>{
-        const ae=getTeam(a.team).eliminated?1:0, be=getTeam(b.team).eliminated?1:0;
-        if(ae!==be) return ae-be;
-        return espnScore(b)-espnScore(a);
-      }).map(p=>{
-      const t=getTeam(p.team),bd=espnBD(p);
-      const elim=t.eliminated;
-      return `<div class="player-row" style="${elim?'opacity:.6':''}">
+  const claims=S.waiverClaims||{};
+  const myId=currentManagerId;
+  const myClaim=managerActiveClaim(myId==='viewer'?-1:myId);
+  const mySlots=myId!==null&&myId!=='viewer'?waiverSlotsOpen(myId):0;
+  const priority=getWaiverPriority();
+
+  // ── Header ──
+  let headerHtml='';
+  if(!elimNames){
+    headerHtml=`<div class="notice">NO TEAMS ELIMINATED YET. WAIVERS OPEN ONCE A TEAM IS OUT OR A PLAYER IS INJURED.</div>`;
+  } else {
+    const pendingCount=Object.keys(claims).length;
+    headerHtml=`<div class="info-box" style="margin-bottom:.75rem">
+      ELIMINATED: ${elimNames}<br>
+      OPEN SLOTS: ${slots.length?slots.map(x=>`<strong>${x.m.name}</strong> (${x.open})`).join(' · '):'NONE — all slots filled'}<br>
+      PENDING CLAIMS: ${pendingCount>0?`<strong style="color:var(--accent2)">${pendingCount} claim${pendingCount>1?'s':''} queued</strong>`:'none yet'}
+    </div>`;
+  }
+
+  // ── Waiver priority order ──
+  const priorityHtml=`<div class="card" style="margin-bottom:1rem">
+    <div class="section-title" style="margin-bottom:.5rem">► WAIVER PRIORITY ORDER</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      ${priority.map((mid,i)=>{
+        const m=S.managers.find(x=>x.id===mid);
+        if(!m) return '';
+        const isMe=mid===myId;
+        return `<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid ${isMe?'var(--accent2)':'var(--border)'};background:${isMe?'rgba(245,166,35,.1)':'var(--bg2)'}">
+          <span style="font-size:11px;color:var(--text3)">#${i+1}</span>
+          <div class="avatar" style="border-color:${m.color};color:${m.color};width:20px;height:20px;font-size:8px">${m.initials}</div>
+          <span style="font-size:13px;color:${isMe?'var(--accent2)':'var(--text)'}">${m.name}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    ${isCommissioner?`<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="font-size:13px;color:var(--text2);flex:1">Claims process automatically at midnight EST — or process manually now:</div>
+      <button class="btn btn-sm" style="color:var(--accent2);border-color:var(--accent2)" onclick="processWaiverClaims()">⚡ PROCESS CLAIMS NOW</button>
+    </div>`:''}
+  </div>`;
+
+  // ── My active claim ──
+  let myClaimHtml='';
+  if(myId!==null&&myId!=='viewer'&&myClaim){
+    const cp=getPlayer(myClaim.pid);
+    myClaimHtml=`<div class="card" style="margin-bottom:1rem;border-color:var(--accent2)">
+      <div class="section-title" style="margin-bottom:.5rem;color:var(--accent2)">► YOUR ACTIVE CLAIM</div>
+      <div style="display:flex;align-items:center;gap:10px">
         <div style="flex:1">
-          <div style="font-size:15px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${elim?' <span class="badge badge-elim">ELIM</span>':''}</div>
-          <div style="font-size:13px;color:var(--text2)">${t.name}${elim?' (eliminated)':''} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
+          <div style="font-size:15px;color:var(--text)">${cp?cp.name:'Unknown'} <span class="pos-badge">${cp?cp.pos:''}</span></div>
+          <div style="font-size:12px;color:var(--text3)">Submitted ${new Date(myClaim.submittedAt).toLocaleTimeString()}</div>
         </div>
-        <select id="wm-${p.id}" style="margin-right:8px">${S.managers.map(m=>`<option value="${m.id}">${m.name} (${waiverSlotsOpen(m.id)})</option>`).join('')}</select>
-        <button class="btn btn-sm btn-primary" onclick="addFromWaiver(${p.id},parseInt(document.getElementById('wm-${p.id}').value))">ADD</button>
+        <button class="btn btn-sm btn-danger" onclick="cancelClaim(${myClaim.pid},${myId})">CANCEL</button>
+      </div>
+    </div>`;
+  }
+
+  // ── Player list ──
+  const avail=waiverPlayers().sort((a,b)=>{
+    const ae=getTeam(a.team).eliminated?1:0,be=getTeam(b.team).eliminated?1:0;
+    if(ae!==be) return ae-be;
+    // Claimed players first within each group
+    const ac=claims[a.id]?0:1,bc=claims[b.id]?0:1;
+    if(ac!==bc) return ac-bc;
+    return espnScore(b)-espnScore(a);
+  });
+
+  const listHtml=!avail.length
+    ?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">NO UNDRAFTED PLAYERS AVAILABLE</div>'
+    :avail.map(p=>{
+      const t=getTeam(p.team),bd=espnBD(p),elim=t.eliminated;
+      const claim=claims[p.id];
+      const isMyClaim=claim&&claim.managerId===myId;
+      const canClaim=myId!==null&&myId!=='viewer'&&mySlots>0&&!isMyClaim;
+      const hasMyClaim=!!myClaim;
+
+      let claimSection='';
+      if(claim){
+        const claimM=S.managers.find(x=>x.id===claim.managerId);
+        claimSection=`<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <div class="avatar" style="border-color:${claim.managerColor};color:${claim.managerColor};width:18px;height:18px;font-size:7px">${claim.managerInitials}</div>
+          <span style="font-size:12px;color:var(--accent2)">CLAIMED BY ${claim.managerName.toUpperCase()}</span>
+          ${isMyClaim?`<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`:''}
+        </div>`;
+      }
+
+      const actionBtn = myId===null||myId==='viewer' ? '' :
+        isMyClaim
+          ? `<button class="btn btn-sm btn-danger" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`
+          : canClaim&&!hasMyClaim
+            ? `<button class="btn btn-sm btn-primary" onclick="submitClaim(${p.id},${myId})">CLAIM</button>`
+            : canClaim&&hasMyClaim
+              ? `<button class="btn btn-sm" style="color:var(--gold);border-color:var(--gold)" onclick="submitClaim(${p.id},${myId})" title="Replace your current claim">SWITCH</button>`
+              : mySlots<=0
+                ? `<span style="font-size:11px;color:var(--text3)">NO SLOT</span>`
+                : '';
+
+      return `<div class="player-row" style="${elim?'opacity:.55':''}${claim&&!isMyClaim?';background:rgba(245,166,35,.05)':''}">
+        <div style="flex:1">
+          <div style="font-size:14px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${elim?' <span class="badge badge-elim">ELIM</span>':''}</div>
+          <div style="font-size:12px;color:var(--text2)">${t.name}${elim?' (eliminated)':''} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
+          ${claimSection}
+        </div>
+        ${actionBtn}
       </div>`;
     }).join('');
+
+  // ── Last results banner ──
+  if(S.lastWaiverResults && S.lastWaiverResults.results && S.lastWaiverResults.results.length){
+    const lr=S.lastWaiverResults;
+    const time=new Date(lr.processedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const summary=lr.results.map(r=>{
+      const p=getPlayer(r.pid);
+      return r.won?`✓ ${r.name} → ${p?p.name:'?'}`:`✗ ${r.name} lost ${p?p.name:'?'}`;
+    }).join(' · ');
+    headerHtml+=`<div class="success-box" style="margin-bottom:.75rem;font-size:13px">
+      LAST PROCESSED: ${time}<br>${summary}
+      <button class="btn btn-sm" style="margin-top:6px;font-size:11px" onclick="S.lastWaiverResults=null;saveState();render()">DISMISS</button>
+    </div>`;
+  }
+  document.getElementById('waiver-header').innerHTML=headerHtml;
+  document.getElementById('waiver-list').innerHTML=priorityHtml+myClaimHtml+`<div class="card"><div class="section-title">► ALL AVAILABLE PLAYERS</div>${listHtml}</div>`;
 }
 
 function renderRosters(){
@@ -919,3 +1128,4 @@ async function boot(){
 }
 
 boot();
+// This is a placeholder - actual waiver logic will be injected via patch
