@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -574,6 +574,56 @@ function showManagerPicker(){
         <div>
           <div class="topbar-title">🏀 NBA PLAYOFF FANTASY</div>
           <div class="topbar-sub">2026 PLAYOFFS</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:.875rem">
+        <!-- Big pizza guy -->
+        <div style="flex-shrink:0;filter:drop-shadow(3px 3px 0 #000)">
+          <svg width="90" height="104" viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated">
+            <rect x="4" y="52" width="56" height="12" rx="6" fill="#d4884a"/>
+            <rect x="4" y="52" width="56" height="5" fill="#c47030"/>
+            <circle cx="12" cy="56" r="2" fill="#e8a060" opacity=".6"/>
+            <circle cx="22" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
+            <circle cx="32" cy="57" r="2" fill="#e8a060" opacity=".6"/>
+            <circle cx="42" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
+            <circle cx="52" cy="56" r="2" fill="#e8a060" opacity=".6"/>
+            <polygon points="32,4 58,52 6,52" fill="#f5a623"/>
+            <polygon points="32,10 54,50 10,50" fill="#ffdd55"/>
+            <polygon points="32,8 56,51 8,51" fill="none" stroke="#e05020" stroke-width="1.5"/>
+            <circle cx="32" cy="34" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+            <circle cx="32" cy="34" r="2" fill="#dd3030" opacity=".5"/>
+            <circle cx="22" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+            <circle cx="22" cy="43" r="2" fill="#dd3030" opacity=".5"/>
+            <circle cx="42" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+            <circle cx="42" cy="43" r="2" fill="#dd3030" opacity=".5"/>
+            <circle cx="27" cy="22" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+            <circle cx="39" cy="27" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+            <ellipse cx="18" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
+            <ellipse cx="46" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
+            <rect x="15" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
+            <rect x="30" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
+            <line x1="28" y1="18" x2="30" y2="18" stroke="#444" stroke-width="1.5"/>
+            <rect x="16" y="15" width="4" height="2" fill="#555" rx="1"/>
+            <rect x="31" y="15" width="4" height="2" fill="#555" rx="1"/>
+            <path d="M21 26 Q32 34 43 26" stroke="#cc6600" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <circle cx="54" cy="62" r="8" fill="#e07020" stroke="#222" stroke-width="1.5"/>
+            <line x1="46" y1="62" x2="62" y2="62" stroke="#222" stroke-width="1"/>
+            <line x1="54" y1="54" x2="54" y2="70" stroke="#222" stroke-width="1"/>
+            <path d="M47 56 Q54 60 61 56" stroke="#222" stroke-width="1" fill="none"/>
+            <path d="M47 68 Q54 64 61 68" stroke="#222" stroke-width="1" fill="none"/>
+            <line x1="46" y1="48" x2="50" y2="57" stroke="#e8952a" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <!-- Speech bubble -->
+        <div style="position:relative;flex:1;background:var(--panel2);border:2px solid var(--accent3);padding:12px 14px;">
+          <!-- Bubble tail pointing left toward pizza guy -->
+          <div style="position:absolute;left:-10px;top:24px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:10px solid var(--accent3)"></div>
+          <div style="position:absolute;left:-7px;top:26px;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:8px solid var(--panel2)"></div>
+          <div style="font-size:16px;color:var(--text2);line-height:2">
+            🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time.<br>
+            📊 <span style="color:var(--accent3)">EARN POINTS</span> — stats daily (PTS+REB+AST+STL+BLK minus misses &amp; TOs) + bonuses when your players survive each round (+5 / +10 / +20 / +50).<br>
+            🔄 <span style="color:var(--accent3)">WAIVERS</span> — team eliminated? Claim a free agent. Priority order. Claims drop at midnight.
+          </div>
         </div>
       </div>
       <div class="card card-accent">
