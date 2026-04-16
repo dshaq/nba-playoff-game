@@ -1164,12 +1164,15 @@ function renderWaiver(){
 
   // ── Player list ──
   // ── Team filter chips ──
-  const waiverTeamsInPool = [...new Set(waiverPlayers().map(p=>p.team))];
+  // Build chips directly from undrafted players — never depends on S.teams being up to date
+  const waiverTeamsInPool = [...new Set(waiverPlayers().map(p=>p.team))].sort();
   const filterChipsHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.75rem">
     <span class="team-chip ${!waiverTeamFilter?'sel':''}" onclick="waiverTeamFilter=null;render()">ALL</span>
-    ${S.teams.filter(t=>waiverTeamsInPool.includes(t.id)).map(t=>`
-      <span class="team-chip ${t.eliminated?'elim':''} ${waiverTeamFilter===t.id?'sel':''}"
-        onclick="waiverTeamFilter='${t.id}';render()">${t.id}</span>`).join('')}
+    ${waiverTeamsInPool.map(tid=>{
+      const t = getTeam(tid);
+      return `<span class="team-chip ${t.eliminated?'elim':''} ${waiverTeamFilter===tid?'sel':''}"
+        onclick="waiverTeamFilter='${tid}';render()">${tid}</span>`;
+    }).join('')}
   </div>`;
 
   const avail=waiverPlayers().filter(p=>!waiverTeamFilter||p.team===waiverTeamFilter).sort((a,b)=>{
