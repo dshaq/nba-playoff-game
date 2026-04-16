@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -578,6 +578,7 @@ function showMainScreen(){
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
+  startChatPolling();
 }
 
 function showManagerPicker(){
@@ -677,6 +678,7 @@ function selectManager(id){
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
+  startChatPolling();
 }
 
 // ── Actions ───────────────────────────────────────────────────────
@@ -1426,6 +1428,156 @@ function renderBracket(){
     </div>
     <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);margin-bottom:6px;letter-spacing:.06em">— EAST —</div>
   </div>`;
+}
+
+
+// ── Chat System ────────────────────────────────────────────────
+const CHAT_REACTIONS = ['🔥','💀','👀','🏀','😂'];
+let chatOpen = false;
+let chatPollingInterval = null;
+let lastChatCount = 0;
+
+function toggleChat(){
+  chatOpen = !chatOpen;
+  document.getElementById('chat-panel').style.display = chatOpen ? 'flex' : 'none';
+  document.getElementById('chat-bubble').style.display = chatOpen ? 'none' : 'flex';
+  if(chatOpen){ renderChat(); document.getElementById('chat-input').focus(); }
+}
+
+async function sendChat(){
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  const name = currentManagerId !== null && currentManagerId !== 'viewer' && S
+    ? (S.managers.find(m=>m.id===currentManagerId)?.name || 'VIEWER')
+    : 'VIEWER';
+  const avatarIdx = S && currentManagerId !== null && currentManagerId !== 'viewer'
+    ? ((S.avatars&&S.avatars[currentManagerId]!==undefined)?S.avatars[currentManagerId]:currentManagerId%8)
+    : 0;
+  const entry = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    managerId: currentManagerId,
+    name,
+    avatarIdx,
+    msg,
+    ts: new Date().toISOString(),
+    reactions: {}
+  };
+  // Load, append, save
+  const chatState = await loadChatState();
+  chatState.push(entry);
+  // Keep last 200 messages
+  if(chatState.length > 200) chatState.splice(0, chatState.length - 200);
+  await saveChatState(chatState);
+  input.value = '';
+  renderChat();
+}
+
+async function deleteChat(id){
+  if(!isCommissioner){ alert('COMMISSIONER ACCESS REQUIRED'); return; }
+  const chatState = await loadChatState();
+  const filtered = chatState.filter(e=>e.id!==id);
+  await saveChatState(filtered);
+  renderChat();
+}
+
+async function reactToChat(id, emoji){
+  const chatState = await loadChatState();
+  const entry = chatState.find(e=>e.id===id);
+  if(!entry) return;
+  if(!entry.reactions) entry.reactions = {};
+  if(!entry.reactions[emoji]) entry.reactions[emoji] = [];
+  const uid = String(currentManagerId);
+  const idx = entry.reactions[emoji].indexOf(uid);
+  if(idx>-1) entry.reactions[emoji].splice(idx,1);
+  else entry.reactions[emoji].push(uid);
+  await saveChatState(chatState);
+  renderChat();
+}
+
+const CHAT_KEY = 'nba-2026-chat';
+
+async function loadChatState(){
+  if(!db) return [];
+  try{
+    const {data} = await db.from('leagues').select('state').eq('id', CHAT_KEY).single();
+    if(data?.state) return JSON.parse(data.state);
+  }catch(e){}
+  return [];
+}
+
+async function saveChatState(msgs){
+  if(!db) return;
+  await db.from('leagues').upsert({
+    id: CHAT_KEY,
+    state: JSON.stringify(msgs),
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function pollChat(){
+  if(!chatOpen) return;
+  const msgs = await loadChatState();
+  if(msgs.length !== lastChatCount){
+    lastChatCount = msgs.length;
+    renderChatMessages(msgs);
+  }
+  // Update unread badge
+  if(!chatOpen && msgs.length > lastChatCount){
+    const badge = document.getElementById('chat-unread');
+    if(badge) badge.style.display = 'flex';
+  }
+}
+
+async function renderChat(){
+  const msgs = await loadChatState();
+  lastChatCount = msgs.length;
+  renderChatMessages(msgs);
+}
+
+function renderChatMessages(msgs){
+  const list = document.getElementById('chat-messages');
+  if(!list) return;
+  if(!msgs.length){
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:15px">NO MESSAGES YET.<br>BE THE FIRST TO TALK TRASH 🏀</div>';
+    return;
+  }
+  list.innerHTML = msgs.map(e=>{
+    const t = AVATAR_THEMES[e.avatarIdx] || AVATAR_THEMES[0];
+    const time = new Date(e.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const myUid = String(currentManagerId);
+    const reactionHtml = CHAT_REACTIONS.map(emoji=>{
+      const users = (e.reactions&&e.reactions[emoji]) || [];
+      const count = users.length;
+      const isMine = users.includes(myUid);
+      return count>0||true ? `<button onclick="reactToChat('${e.id}','${emoji}')"
+        style="padding:2px 7px;font-size:13px;border:1px solid ${isMine?'var(--accent3)':'var(--border)'};
+        background:${isMine?'rgba(255,204,0,.15)':'var(--bg2)'};cursor:pointer;color:${isMine?'var(--accent3)':'var(--text3)'};
+        font-family:'VT323',monospace;display:inline-flex;align-items:center;gap:3px">
+        ${emoji}${count>0?`<span style="font-size:12px">${count}</span>`:''}
+      </button>` : '';
+    }).join('');
+    const canDelete = isCommissioner;
+    return `<div style="padding:10px 0;border-bottom:1px solid rgba(26,74,122,.4)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="width:24px;height:24px;border:2px solid ${t.c1};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">
+          ${makeBallSVG(t,22)}
+        </div>
+        <span style="font-size:14px;color:${t.c1};font-family:'Press Start 2P',monospace;font-size:7px">${e.name}</span>
+        <span style="font-size:12px;color:var(--text3);margin-left:auto">${time}</span>
+        ${canDelete?`<button onclick="deleteChat('${e.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 4px" title="Delete">✕</button>`:''}
+      </div>
+      <div style="font-size:17px;color:var(--text);padding-left:32px;line-height:1.5;word-break:break-word">${e.msg}</div>
+      <div style="padding-left:32px;margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${reactionHtml}</div>
+    </div>`;
+  }).reverse().join(''); // newest first... actually newest at bottom
+  // Scroll to bottom
+  list.scrollTop = list.scrollHeight;
+}
+
+function startChatPolling(){
+  if(chatPollingInterval) clearInterval(chatPollingInterval);
+  chatPollingInterval = setInterval(pollChat, 8000);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
