@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -431,61 +431,79 @@ function startPolling(){
 
 // ── Live scores ───────────────────────────────────────────────────
 async function fetchScores(){
-  try{
-    // Fetch today
-    const todayUrl = `https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json`;
-    const res = await fetch(todayUrl);
-    const data = await res.json();
-    const games = data?.scoreboard?.games || [];
+  let todayGames = [];
+  let yGames = [];
 
-    // Fetch yesterday's finals
+  // Today
+  try{
+    const res = await fetch('https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json');
+    const data = await res.json();
+    todayGames = (data?.scoreboard?.games||[]).map(g=>({...g,_day:'today'}));
+  }catch(e){}
+
+  // Yesterday — try stats.nba.com scoreboard API
+  try{
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate()-1);
-    const yStr = yesterday.toISOString().split('T')[0].replace(/-/g,'');
-    let yGames = [];
-    try{
-      const yUrl = `https://cdn.nba.com/static/json/liveData/scoreboard/scoreboard_${yStr}.json`;
-      const yRes = await fetch(yUrl);
-      const yData = await yRes.json();
-      yGames = (yData?.scoreboard?.games||[]).filter(g=>g.gameStatus===3);
-    }catch(e){}
-
-    const allGames = [
-      ...games.map(g=>({...g,_day:'today'})),
-      ...yGames.map(g=>({...g,_day:'yesterday'}))
-    ];
-
-    if(!allGames.length){
-      document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">NO GAMES — PLAYOFFS START APR 18</span></div>`;
-      return;
+    const mm = String(yesterday.getMonth()+1).padStart(2,'0');
+    const dd = String(yesterday.getDate()).padStart(2,'0');
+    const yyyy = yesterday.getFullYear();
+    const yUrl = `https://stats.nba.com/stats/scoreboardv2?DayOffset=0&LeagueID=00&gameDate=${mm}%2F${dd}%2F${yyyy}`;
+    const yRes = await fetch(yUrl, {headers:{'Accept':'application/json','Referer':'https://www.nba.com/'}});
+    const yData = await yRes.json();
+    // Parse the stats.nba format (row sets)
+    const lineScore = yData?.resultSets?.find(r=>r.name==='LineScore');
+    const header = yData?.resultSets?.find(r=>r.name==='GameHeader');
+    if(lineScore && header){
+      const hIdx = {gameId:header.headers.indexOf('GAME_ID'), status:header.headers.indexOf('GAME_STATUS_ID'), statusText:header.headers.indexOf('GAME_STATUS_TEXT')};
+      const lIdx = {gameId:lineScore.headers.indexOf('GAME_ID'), tricode:lineScore.headers.indexOf('TEAM_ABBREVIATION'), pts:lineScore.headers.indexOf('PTS')};
+      const gameMap = {};
+      header.rowSet.forEach(r=>{
+        gameMap[r[hIdx.gameId]]={status:r[hIdx.status],statusText:r[hIdx.statusText],teams:[]};
+      });
+      lineScore.rowSet.forEach(r=>{
+        if(gameMap[r[lIdx.gameId]]) gameMap[r[lIdx.gameId]].teams.push({tricode:r[lIdx.tricode],pts:r[lIdx.pts]});
+      });
+      yGames = Object.entries(gameMap)
+        .filter(([,g])=>g.status===3&&g.teams.length===2)
+        .map(([id,g])=>({
+          _day:'yesterday', gameStatus:3, gameStatusText:g.statusText,
+          awayTeam:{teamTricode:g.teams[0].tricode, score:g.teams[0].pts||0},
+          homeTeam:{teamTricode:g.teams[1].tricode, score:g.teams[1].pts||0}
+        }));
     }
+  }catch(e){}
 
-    const renderGame = g => {
-      const home=g.homeTeam, away=g.awayTeam;
-      const status=g.gameStatusText||'';
-      const isLive=g.gameStatus===2, isFinal=g.gameStatus===3;
-      const isYday=g._day==='yesterday';
-      const statusHtml = isLive
-        ? `<span class="score-live">LIVE</span> <span style="font-size:13px;color:var(--text2)">${status}</span>`
-        : isFinal
-          ? `<span class="score-final">${isYday?'LAST NIGHT':'FINAL'}</span>`
-          : `<span style="font-size:13px;color:var(--text3)">${status}</span>`;
-      return `<div class="score-item">
-        ${statusHtml}
-        <span class="score-team">${away.teamTricode}</span>
-        <span class="score-pts" style="${isFinal&&away.score>home.score?'color:var(--accent2)':''}">${away.score||0}</span>
-        <span class="score-vs">—</span>
-        <span class="score-pts" style="${isFinal&&home.score>away.score?'color:var(--accent2)':''}">${home.score||0}</span>
-        <span class="score-team">${home.teamTricode}</span>
-      </div>`;
-    };
+  const allGames = [...todayGames, ...yGames];
 
-    const html = [...allGames,...allGames].map(renderGame).join('');
-    document.getElementById('scores-content').className = 'scores-bar-inner';
-    document.getElementById('scores-content').innerHTML = html;
-  }catch(e){
-    document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">SCORES UNAVAILABLE</span></div>`;
+  if(!allGames.length){
+    document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">NO GAMES TODAY — PLAYOFFS BEGIN APR 18 🏀</span></div>`;
+    return;
   }
+
+  const renderGame = g => {
+    const home=g.homeTeam, away=g.awayTeam;
+    const status=g.gameStatusText||'';
+    const isLive=g.gameStatus===2, isFinal=g.gameStatus===3;
+    const isYday=g._day==='yesterday';
+    const statusHtml = isLive
+      ? `<span class="score-live">LIVE</span> <span style="font-size:13px;color:var(--text2)">${status}</span>`
+      : isFinal
+        ? `<span class="score-final">${isYday?'LAST NIGHT':'FINAL'}</span>`
+        : `<span style="font-size:13px;color:var(--text3)">${status}</span>`;
+    return `<div class="score-item">
+      ${statusHtml}
+      <span class="score-team">${away.teamTricode}</span>
+      <span class="score-pts" style="${isFinal&&away.score>home.score?'color:var(--accent2)':''}">${away.score||0}</span>
+      <span class="score-vs">—</span>
+      <span class="score-pts" style="${isFinal&&home.score>away.score?'color:var(--accent2)':''}">${home.score||0}</span>
+      <span class="score-team">${home.teamTricode}</span>
+    </div>`;
+  };
+
+  const html = [...allGames,...allGames].map(renderGame).join('');
+  document.getElementById('scores-content').className = 'scores-bar-inner';
+  document.getElementById('scores-content').innerHTML = html;
 }
 
 // ── Commissioner ──────────────────────────────────────────────────
