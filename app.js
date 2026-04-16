@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -1047,7 +1047,8 @@ function renderWaiver(){
     const ae=getTeam(a.team).eliminated?1:0,be=getTeam(b.team).eliminated?1:0;
     if(ae!==be) return ae-be;
     // Claimed players first within each group
-    const ac=claims[a.id]?0:1,bc=claims[b.id]?0:1;
+    const ac=(S.waiverClaims||[]).some(c=>c.pid===a.id)?0:1;
+    const bc=(S.waiverClaims||[]).some(c=>c.pid===b.id)?0:1;
     if(ac!==bc) return ac-bc;
     return espnScore(b)-espnScore(a);
   });
