@@ -10,18 +10,20 @@ const ROSTER_SIZE = 8;
 const ALL_TABS = ['standings','manage-names','draft','waiver','rosters','scoring'];
 const LEAGUE_ID = 'nba-2026';
 
-// 2026 NBA Playoff Teams (confirmed + W8 TBD Apr 17: LAC vs GSW)
+// 2026 NBA Playoff Teams
+// Confirmed: POR(W7), PHI(E7) | TBD tonight Apr 17: PHX vs GSW (W8), ORL vs CHA (E8)
+// Eliminated: LAC, MIA
 const TEAMS = [
   {id:"OKC",name:"Thunder",seed:"W1"},{id:"SAS",name:"Spurs",seed:"W2"},
   {id:"DEN",name:"Nuggets",seed:"W3"},{id:"LAL",name:"Lakers",seed:"W4"},
   {id:"HOU",name:"Rockets",seed:"W5"},{id:"MIN",name:"Timberwolves",seed:"W6"},
   {id:"POR",name:"Trail Blazers",seed:"W7"},
-  {id:"LAC",name:"Clippers",seed:"W8*"},{id:"GSW",name:"Warriors",seed:"W8*"},
+  {id:"GSW",name:"Warriors",seed:"W8*"},{id:"PHX",name:"Suns",seed:"W8*"},
   {id:"DET",name:"Pistons",seed:"E1"},{id:"BOS",name:"Celtics",seed:"E2"},
   {id:"NYK",name:"Knicks",seed:"E3"},{id:"CLE",name:"Cavaliers",seed:"E4"},
   {id:"TOR",name:"Raptors",seed:"E5"},{id:"ATL",name:"Hawks",seed:"E6"},
-  {id:"PHI",name:"76ers",seed:"E7"},{id:"ORL",name:"Magic",seed:"E8"},
-  {id:"CHA",name:"Hornets",seed:"E9"},
+  {id:"PHI",name:"76ers",seed:"E7"},
+  {id:"ORL",name:"Magic",seed:"E8*"},{id:"CHA",name:"Hornets",seed:"E8*"},
 ];
 
 const PLAYERS = [
