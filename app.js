@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -803,12 +803,17 @@ function renderWaiver(){
     :`<div class="info-box">ELIMINATED: ${elimNames}<br>OPEN SLOTS: ${slots.length?slots.map(x=>`${x.m.name} (${x.open})`).join(' · '):'NONE'}</div>`;
   document.getElementById('waiver-list').innerHTML=!avail.length
     ?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">NO WAIVER PLAYERS AVAILABLE YET</div>'
-    :avail.map(p=>{
+    :avail.sort((a,b)=>{
+        const ae=getTeam(a.team).eliminated?1:0, be=getTeam(b.team).eliminated?1:0;
+        if(ae!==be) return ae-be;
+        return espnScore(b)-espnScore(a);
+      }).map(p=>{
       const t=getTeam(p.team),bd=espnBD(p);
-      return `<div class="player-row">
+      const elim=t.eliminated;
+      return `<div class="player-row" style="${elim?'opacity:.6':''}">
         <div style="flex:1">
-          <div style="font-size:15px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span> <span class="badge badge-elim">ELIM</span></div>
-          <div style="font-size:13px;color:var(--text2)">${t.name} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
+          <div style="font-size:15px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${elim?' <span class="badge badge-elim">ELIM</span>':''}</div>
+          <div style="font-size:13px;color:var(--text2)">${t.name}${elim?' (eliminated)':''} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
         </div>
         <select id="wm-${p.id}" style="margin-right:8px">${S.managers.map(m=>`<option value="${m.id}">${m.name} (${waiverSlotsOpen(m.id)})</option>`).join('')}</select>
         <button class="btn btn-sm btn-primary" onclick="addFromWaiver(${p.id},parseInt(document.getElementById('wm-${p.id}').value))">ADD</button>
