@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -525,7 +525,7 @@ async function startLeague(){
     injured:Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     waiverAdds:Object.fromEntries(mgrs.map(m=>[m.id,0])),
     waiverPriority,
-    waiverClaims:{},
+    waiverClaims:[],
     round:1, teams:TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
   isCommissioner=true;
@@ -647,14 +647,13 @@ function managerActiveClaim(mid){
 
 function managerClaimsCount(mid){
   if(!S.waiverClaims) return 0;
-  return Object.values(S.waiverClaims).filter(c=>c.managerId===mid).length;
+  return S.waiverClaims.filter(c=>c.managerId===mid).length;
 }
 
 function managerAllClaims(mid){
   if(!S.waiverClaims) return [];
-  return Object.entries(S.waiverClaims)
-    .filter(([,c])=>c.managerId===mid)
-    .map(([pid,c])=>({pid:parseInt(pid),...c}))
+  return S.waiverClaims
+    .filter(c=>c.managerId===mid)
     .sort((a,b)=>new Date(a.submittedAt)-new Date(b.submittedAt));
 }
 
@@ -668,26 +667,26 @@ async function submitClaim(pid,mid){
     return;
   }
   // Check not already claiming this player
-  if(S.waiverClaims&&S.waiverClaims[pid]&&S.waiverClaims[pid].managerId===mid){
+  if(!S.waiverClaims) S.waiverClaims=[];
+  if(S.waiverClaims.find(c=>c.pid===pid&&c.managerId===mid)){
     alert('YOU ALREADY HAVE A CLAIM ON THIS PLAYER');return;
   }
-  if(!S.waiverClaims) S.waiverClaims={};
   const m = S.managers.find(x=>x.id===mid);
-  S.waiverClaims[pid] = {
+  S.waiverClaims.push({
+    pid,
     managerId: mid,
     managerName: m.name,
     managerColor: m.color,
     managerInitials: m.initials,
     submittedAt: new Date().toISOString(),
-  };
+  });
   await saveState(); render();
 }
 
 async function cancelClaim(pid,mid){
-  if(S.waiverClaims && S.waiverClaims[pid] && S.waiverClaims[pid].managerId===mid){
-    delete S.waiverClaims[pid];
-    await saveState(); render();
-  }
+  if(!S.waiverClaims) return;
+  S.waiverClaims = S.waiverClaims.filter(c=>!(c.pid===pid&&c.managerId===mid));
+  await saveState(); render();
 }
 
 async function processWaiverClaims(){
@@ -703,7 +702,7 @@ async function processWaiverClaims(){
   const managersWhoWon = new Set();
 
   // Get all claims sorted by submission time within each manager
-  const claimEntries = Object.entries(S.waiverClaims).map(([pid,claim])=>({pid:parseInt(pid),...claim}));
+  const claimEntries = [...(S.waiverClaims||[])];
 
   // Process round by round: each pass through priority order awards one claim per manager
   // A manager can win multiple claims but drops to bottom after each win
@@ -963,7 +962,8 @@ function renderDraft(){
 function renderWaiver(){
   const elimNames=S.teams.filter(t=>t.eliminated).map(t=>t.name).join(', ');
   const slots=S.managers.map(m=>({m,open:waiverSlotsOpen(m.id)})).filter(x=>x.open>0);
-  const claims=S.waiverClaims||{};
+  const claimsArr=S.waiverClaims||[];
+  const pendingCount=claimsArr.length;
   const myId=currentManagerId;
   const myClaims=managerAllClaims(myId==='viewer'?-1:myId);
   const myClaim=myClaims[0]||null;
@@ -975,7 +975,7 @@ function renderWaiver(){
   if(!elimNames){
     headerHtml=`<div class="notice">NO TEAMS ELIMINATED YET. WAIVERS OPEN ONCE A TEAM IS OUT OR A PLAYER IS INJURED.</div>`;
   } else {
-    const pendingCount=Object.keys(claims).length;
+  
     headerHtml=`<div class="info-box" style="margin-bottom:.75rem">
       ELIMINATED: ${elimNames}<br>
       OPEN SLOTS: ${slots.length?slots.map(x=>`<strong>${x.m.name}</strong> (${x.open})`).join(' · '):'NONE — all slots filled'}<br>
@@ -1046,17 +1046,21 @@ function renderWaiver(){
     ?'<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:16px">NO UNDRAFTED PLAYERS AVAILABLE</div>'
     :avail.map(p=>{
       const t=getTeam(p.team),bd=espnBD(p),elim=t.eliminated;
-      const claim=claims[p.id];
-      const isMyClaim=claim&&claim.managerId===myId;
+      // All managers who claimed this player
+      const playerClaims=(S.waiverClaims||[]).filter(c=>c.pid===p.id).sort((a,b)=>new Date(a.submittedAt)-new Date(b.submittedAt));
+      const claim=playerClaims[0]||null;
+      const isMyClaim=!!(S.waiverClaims||[]).find(c=>c.pid===p.id&&c.managerId===myId);
       const canClaim=myId!==null&&myId!=='viewer'&&mySlots>0&&!isMyClaim;
       const hasMyClaim=!!myClaim;
 
       let claimSection='';
-      if(claim){
-        const claimM=S.managers.find(x=>x.id===claim.managerId);
-        claimSection=`<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <div class="avatar" style="border-color:${claim.managerColor};color:${claim.managerColor};width:18px;height:18px;font-size:7px">${claim.managerInitials}</div>
-          <span style="font-size:12px;color:var(--accent2)">CLAIMED BY ${claim.managerName.toUpperCase()}</span>
+      if(playerClaims.length>0){
+        claimSection=`<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+          ${playerClaims.map(c=>`
+            <div style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:rgba(245,166,35,.1);border:1px solid var(--accent2)">
+              <div class="avatar" style="border-color:${c.managerColor};color:${c.managerColor};width:16px;height:16px;font-size:6px">${c.managerInitials}</div>
+              <span style="font-size:11px;color:var(--accent2)">${c.managerName}</span>
+            </div>`).join('')}
           ${isMyClaim?`<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`:''}
         </div>`;
       }
