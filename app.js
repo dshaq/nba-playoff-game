@@ -966,8 +966,40 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();
   document.getElementById('m-avail').textContent=waiverPlayers().length;
+}
+
+function renderDraftBanner(){
+  const banner = document.getElementById('draft-banner');
+  const inner = document.getElementById('draft-banner-inner');
+  if(!banner || !inner || !S) return;
+
+  const done = S.draftIdx >= S.snakeOrder.length;
+  const draftStarted = S.draftIdx > 0;
+
+  if(done || !S.snakeOrder.length){
+    banner.classList.remove('active');
+    return;
+  }
+
+  const onClockId = S.snakeOrder[S.draftIdx];
+  const onClockMgr = S.managers.find(m=>m.id===onClockId);
+  if(!onClockMgr){ banner.classList.remove('active'); return; }
+
+  const pickNum = S.draftIdx + 1;
+  const total = S.snakeOrder.length;
+  const aColor = getAvatarColor(onClockId);
+
+  // Build repeating marquee content (duplicate for seamless loop)
+  const item = `<span class="draft-banner-item">
+    ⏰ PICK ${pickNum} OF ${total} &nbsp;·&nbsp; ON THE CLOCK:
+    <span class="blink-name" style="color:${aColor}">${onClockMgr.name.toUpperCase()}</span>
+    &nbsp;·&nbsp; GO TO THE DRAFT TAB TO PICK
+  </span><span class="draft-banner-sep">🏀</span>`;
+
+  inner.innerHTML = item.repeat(6);
+  banner.classList.add('active');
 }
 
 function renderStandings(){

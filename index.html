@@ -391,6 +391,53 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ══════════════════════════════════
+   DRAFT BANNER
+══════════════════════════════════ */
+#draft-banner{
+  display:none;
+  background:var(--panel2);
+  border-top:3px solid var(--accent3);
+  border-bottom:3px solid var(--accent3);
+  overflow:hidden;
+  position:relative;
+  margin-bottom:.75rem;
+  height:44px;
+  align-items:center;
+}
+#draft-banner.active{ display:flex; }
+#draft-banner-inner{
+  display:flex;
+  gap:0;
+  animation:draft-scroll 12s linear infinite;
+  white-space:nowrap;
+  align-items:center;
+}
+@keyframes draft-scroll{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+.draft-banner-item{
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  padding:0 40px;
+  font-family:'Press Start 2P',monospace;
+  font-size:11px;
+  color:var(--accent3);
+  text-shadow: 0 0 10px rgba(255,204,0,.5);
+}
+.draft-banner-item .blink-name{
+  color:#fff;
+  animation:name-pulse 1s step-end infinite;
+}
+@keyframes name-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.draft-banner-sep{
+  color:var(--accent2);
+  font-size:16px;
+  padding:0 20px;
+}
+
+/* ══════════════════════════════════
    HIDDEN UTILITY
 ══════════════════════════════════ */
 .hidden{display:none!important}
@@ -588,6 +635,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
         <div id="scores-content" class="scores-loading">LOADING SCORES...</div>
       </div>
     </div>
+  </div>
+
+  <!-- Draft on-clock banner -->
+  <div id="draft-banner">
+    <div id="draft-banner-inner"></div>
   </div>
 
   <!-- Bracket -->
