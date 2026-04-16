@@ -1062,7 +1062,7 @@ function renderDraft(){
     const p=filled?getPlayer(S.rosters[mid][before]):null;
     return `<div class="pick-slot ${filled?'filled':''} ${current?'current':''}">
       <span style="font-size:11px;color:var(--text3);min-width:24px">#${i+1}</span>
-      <div class="avatar" style="border-color:${m.color};color:${m.color};width:22px;height:22px;font-size:8px">${m.initials}</div>
+      <div style="width:28px;height:28px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id)}</div>
       <span style="font-size:14px;${current?'color:var(--accent2);font-weight:600':filled?'color:var(--text)':'color:var(--text3)'}">${filled&&p?p.name:current?'ON THE CLOCK…':m.name}</span>
     </div>`;
   }).join('');
@@ -1106,7 +1106,7 @@ function renderDraft(){
             <div style="font-size:13px;color:var(--text3)">${t.name}</div>
           </div>
           ${m?`<div style="display:flex;align-items:center;gap:6px">
-            <div class="avatar" style="border-color:${m.color};color:${m.color};width:22px;height:22px;font-size:8px">${m.initials}</div>
+            <div style="width:28px;height:28px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id)}</div>
             <span style="font-size:13px;color:var(--text2)">${m.name} <span style="color:var(--text3)">#${info.pickNum}</span></span>
           </div>`:''}
         </div>`;
@@ -1326,7 +1326,7 @@ function renderScoring(){
     const players=S.rosters[m.id].map(pid=>getPlayer(pid));
     return `<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <div class="avatar" style="border-color:${m.color};color:${m.color};width:26px;height:26px;font-size:8px">${m.initials}</div>
+        <div style="width:28px;height:28px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id)}</div>
         <span style="font-size:17px;color:var(--text)">${m.name}</span>
         <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:var(--accent2);margin-left:auto">${managerTotal(m.id)} PTS</span>
       </div>
