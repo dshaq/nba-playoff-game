@@ -409,6 +409,18 @@ function migrateState(){
   if(S && !S.waiverClaims) S.waiverClaims = [];
   if(S && !S.waiverPriority) S.waiverPriority = [];
   if(S && !S.avatars) S.avatars = {};
+  if(S && !S.waiverAcquisitions) S.waiverAcquisitions = {};
+  if(S && !S.playerStats) S.playerStats = {};
+  // Always sync team list from code so adding/removing teams takes effect immediately
+  if(S && S.teams){
+    const savedMap = {};
+    S.teams.forEach(t => savedMap[t.id] = t);
+    S.teams = TEAMS.map(t => ({
+      ...t,
+      eliminated: savedMap[t.id]?.eliminated || false,
+      survivedRounds: savedMap[t.id]?.survivedRounds || 0,
+    }));
+  }
 }
 
 async function loadState(){
