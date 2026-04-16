@@ -1219,7 +1219,7 @@ function renderWaiver(){
         claimSection=`<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
           ${playerClaims.map(c=>`
             <div style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:rgba(245,166,35,.1);border:1px solid var(--accent2)">
-              <div style="width:22px;height:22px;border:1px solid ${getAvatarColor(c.managerId)};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0" title="${c.managerName}">${getAvatar(c.managerId,'sm')}</div>
+              <div style="width:24px;height:24px;border:2px solid ${getAvatarColor(c.managerId)};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0" title="${c.managerName}">${getAvatar(c.managerId,'sm')}</div>
               <span style="font-size:11px;color:var(--accent2)">${c.managerName}</span>
             </div>`).join('')}
           ${isMyClaim?`<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`:''}
@@ -1519,9 +1519,10 @@ function toggleChat(){
   if(chatOpen){
     renderChat();
     document.getElementById('chat-input').focus();
+    // Scroll to TOP so you see oldest messages first (like a chat history)
     setTimeout(()=>{
       const msgs = document.getElementById('chat-messages');
-      if(msgs) msgs.scrollTop = msgs.scrollHeight;
+      if(msgs) msgs.scrollTop = 0;
     }, 150);
   }
 }
@@ -1553,6 +1554,10 @@ async function sendChat(){
   await saveChatState(chatState);
   input.value = '';
   renderChat();
+  setTimeout(()=>{
+    const msgs = document.getElementById('chat-messages');
+    if(msgs) msgs.scrollTop = msgs.scrollHeight;
+  }, 100);
 }
 
 async function deleteChat(id){
@@ -1625,7 +1630,11 @@ function renderChatMessages(msgs){
     return;
   }
   list.innerHTML = msgs.map(e=>{
-    const t = AVATAR_THEMES[e.avatarIdx] || AVATAR_THEMES[0];
+    // Always use current avatar for known managers, fall back to stored avatarIdx
+    const mid = e.managerId;
+    const currentIdx = (S && S.avatars && mid !== null && mid !== 'viewer' && S.avatars[mid] !== undefined)
+      ? S.avatars[mid] : (e.avatarIdx || 0);
+    const t = AVATAR_THEMES[currentIdx] || AVATAR_THEMES[0];
     const time = new Date(e.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     const myUid = String(currentManagerId);
     const reactionHtml = CHAT_REACTIONS.map(emoji=>{
@@ -1653,8 +1662,7 @@ function renderChatMessages(msgs){
       <div style="padding-left:32px;margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${reactionHtml}</div>
     </div>`;
   }).reverse().join(''); // newest first... actually newest at bottom
-  // Scroll to bottom
-  setTimeout(()=>{ list.scrollTop = list.scrollHeight; }, 50);
+  // Don't auto-scroll on render — let user control position
 }
 
 function startChatPolling(){
