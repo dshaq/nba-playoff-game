@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -349,10 +349,26 @@ function getTeam(id){return S.teams.find(t=>t.id===id)||{id,name:id,eliminated:f
 function getPlayer(id){return PLAYERS.find(p=>p.id===id);}
 function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
 function buildSnake(n,picks){const o=[];for(let r=0;r<picks;r++){const row=Array.from({length:n},(_,i)=>i);o.push(...(r%2===0?row:[...row].reverse()));}return o;}
-function bonusForPlayer(pid){const t=getTeam(getPlayer(pid).team);let b=0;for(let r=1;r<=(t.survivedRounds||0);r++)b+=ROUND_BONUS[r];return b;}
+function getAcquiredRound(mid, pid){
+  // Returns the round AFTER which the player was acquired (0 = drafted before playoffs)
+  // Bonuses only count for rounds survived AFTER acquisition
+  if(!S.waiverAcquisitions) return 0;
+  const key = mid+'_'+pid;
+  return S.waiverAcquisitions[key] || 0;
+}
+
+function bonusForPlayer(pid, mid){
+  const t=getTeam(getPlayer(pid).team);
+  const acquiredAfterRound = mid !== undefined ? getAcquiredRound(mid, pid) : 0;
+  let b=0;
+  for(let r=1;r<=(t.survivedRounds||0);r++){
+    if(r > acquiredAfterRound) b+=ROUND_BONUS[r];
+  }
+  return b;
+}
 function isInactive(mid,pid){const t=getTeam(getPlayer(pid).team);return t.eliminated||(S.injured[mid]||[]).includes(pid);}
 function managerStatScore(mid){return +S.rosters[mid].reduce((s,pid)=>isInactive(mid,pid)?s:s+espnScore(getPlayer(pid)),0).toFixed(1);}
-function managerBonusScore(mid){return S.rosters[mid].reduce((s,pid)=>s+bonusForPlayer(pid),0);}
+function managerBonusScore(mid){return S.rosters[mid].reduce((s,pid)=>s+bonusForPlayer(pid,mid),0);}
 function managerTotal(mid){return +(managerStatScore(mid)+managerBonusScore(mid)).toFixed(1);}
 function waiverSlotsForManager(mid){return S.rosters[mid].filter(pid=>getTeam(getPlayer(pid).team).eliminated).length+(S.injured[mid]||[]).length;}
 function waiverSlotsOpen(mid){return Math.max(0,waiverSlotsForManager(mid)-(S.waiverAdds[mid]||0));}
@@ -533,6 +549,7 @@ async function startLeague(){
     waiverAdds:Object.fromEntries(mgrs.map(m=>[m.id,0])),
     waiverPriority,
     waiverClaims:[],
+    waiverAcquisitions:{},
     round:1, teams:TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
   isCommissioner=true;
@@ -843,6 +860,8 @@ async function processWaiverClaims(){
 async function addFromWaiver(pid,mid){
   if(waiverSlotsOpen(mid)<=0){alert(`${S.managers[mid].name} HAS NO OPEN WAIVER SLOTS`);return;}
   S.rosters[mid].push(pid); S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+  if(!S.waiverAcquisitions) S.waiverAcquisitions={};
+  S.waiverAcquisitions[mid+'_'+pid] = S.round||1;
   await saveState(); render();
 }
 async function markInjured(mid,pid){
@@ -1189,11 +1208,12 @@ function renderRosters(){
         </div>
       </div>
       ${players.length?players.map(p=>{
-        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id),inj=(S.injured[m.id]||[]).includes(p.id),sr=t.survivedRounds||0;
+        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id,m.id),inj=(S.injured[m.id]||[]).includes(p.id),sr=t.survivedRounds||0;
         return `<div class="player-row">
           <div style="flex:1">
             <div style="font-size:14px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>
               ${t.eliminated?'<span class="badge badge-elim">ELIM</span>':inj?'<span class="badge badge-inj">INJ</span>':'<span class="badge badge-active">ACTIVE</span>'}
+              ${getAcquiredRound(m.id,p.id)>0?`<span class="badge" style="border-color:var(--accent2);color:var(--accent2);font-size:10px">WAIVER R${getAcquiredRound(m.id,p.id)}+</span>`:''}
               ${bonus>0?`<span class="badge" style="background:${ROUND_BG[Math.min(sr,4)]};color:${ROUND_FG[Math.min(sr,4)]};border-color:${ROUND_BORDER[Math.min(sr,4)]}">+${bonus}</span>`:''}
             </div>
             <div style="font-size:13px;color:var(--text2)">${t.name} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = ${bd.net>0?'+':''}${bd.net}/GM</div>
@@ -1234,7 +1254,7 @@ function renderScoring(){
         <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:var(--accent2);margin-left:auto">${managerTotal(m.id)} PTS</span>
       </div>
       ${players.length?players.map(p=>{
-        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id),inactive=isInactive(m.id,p.id);
+        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id,m.id),inactive=isInactive(m.id,p.id);
         return `<div style="font-size:13px;padding:4px 0 4px 34px;border-bottom:1px solid var(--bg2)">
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <span style="flex:1;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${inactive?` <span style="color:var(--red);font-size:12px">(INACTIVE)</span>`:''}</span>
