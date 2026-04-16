@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -441,37 +441,29 @@ async function fetchScores(){
     todayGames = (data?.scoreboard?.games||[]).map(g=>({...g,_day:'today'}));
   }catch(e){}
 
-  // Yesterday — try stats.nba.com scoreboard API
+  // Yesterday — ESPN public API (no CORS issues)
   try{
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate()-1);
     const mm = String(yesterday.getMonth()+1).padStart(2,'0');
     const dd = String(yesterday.getDate()).padStart(2,'0');
     const yyyy = yesterday.getFullYear();
-    const yUrl = `https://stats.nba.com/stats/scoreboardv2?DayOffset=0&LeagueID=00&gameDate=${mm}%2F${dd}%2F${yyyy}`;
-    const yRes = await fetch(yUrl, {headers:{'Accept':'application/json','Referer':'https://www.nba.com/'}});
+    const yUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${yyyy}${mm}${dd}`;
+    const yRes = await fetch(yUrl);
     const yData = await yRes.json();
-    // Parse the stats.nba format (row sets)
-    const lineScore = yData?.resultSets?.find(r=>r.name==='LineScore');
-    const header = yData?.resultSets?.find(r=>r.name==='GameHeader');
-    if(lineScore && header){
-      const hIdx = {gameId:header.headers.indexOf('GAME_ID'), status:header.headers.indexOf('GAME_STATUS_ID'), statusText:header.headers.indexOf('GAME_STATUS_TEXT')};
-      const lIdx = {gameId:lineScore.headers.indexOf('GAME_ID'), tricode:lineScore.headers.indexOf('TEAM_ABBREVIATION'), pts:lineScore.headers.indexOf('PTS')};
-      const gameMap = {};
-      header.rowSet.forEach(r=>{
-        gameMap[r[hIdx.gameId]]={status:r[hIdx.status],statusText:r[hIdx.statusText],teams:[]};
+    const events = yData?.events || [];
+    yGames = events
+      .filter(e=>e.status?.type?.completed)
+      .map(e=>{
+        const comps = e.competitions?.[0];
+        const away = comps?.competitors?.find(c=>c.homeAway==='away');
+        const home = comps?.competitors?.find(c=>c.homeAway==='home');
+        return {
+          _day:'yesterday', gameStatus:3,
+          awayTeam:{teamTricode:away?.team?.abbreviation||'?', score:parseInt(away?.score)||0},
+          homeTeam:{teamTricode:home?.team?.abbreviation||'?', score:parseInt(home?.score)||0}
+        };
       });
-      lineScore.rowSet.forEach(r=>{
-        if(gameMap[r[lIdx.gameId]]) gameMap[r[lIdx.gameId]].teams.push({tricode:r[lIdx.tricode],pts:r[lIdx.pts]});
-      });
-      yGames = Object.entries(gameMap)
-        .filter(([,g])=>g.status===3&&g.teams.length===2)
-        .map(([id,g])=>({
-          _day:'yesterday', gameStatus:3, gameStatusText:g.statusText,
-          awayTeam:{teamTricode:g.teams[0].tricode, score:g.teams[0].pts||0},
-          homeTeam:{teamTricode:g.teams[1].tricode, score:g.teams[1].pts||0}
-        }));
-    }
   }catch(e){}
 
   const allGames = [...todayGames, ...yGames];
