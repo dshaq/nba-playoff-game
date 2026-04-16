@@ -434,36 +434,50 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 <!-- ── Pizza Mascot ── -->
 <div id="mascot" onclick="mascotClick()" title="Click me!">
-  <svg width="56" height="64" viewBox="0 0 56 64" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated">
-    <!-- Pizza slice body -->
-    <polygon points="28,4 52,52 4,52" fill="#f5a623" stroke="#cc7700" stroke-width="2"/>
-    <!-- Cheese -->
-    <polygon points="28,10 46,48 10,48" fill="#ffdd66"/>
-    <!-- Crust -->
-    <rect x="4" y="50" width="48" height="8" rx="2" fill="#cc8844"/>
-    <!-- Pepperoni spots -->
-    <circle cx="28" cy="22" r="4" fill="#e63030"/>
-    <circle cx="20" cy="34" r="3" fill="#e63030"/>
-    <circle cx="36" cy="34" r="3" fill="#e63030"/>
-    <!-- Eyes (with sunglasses) -->
-    <rect x="17" y="27" width="10" height="6" fill="#111" rx="1"/>
-    <rect x="29" y="27" width="10" height="6" fill="#111" rx="1"/>
-    <rect x="15" y="26" width="14" height="8" fill="none" stroke="#333" stroke-width="1.5" rx="1"/>
-    <rect x="27" y="26" width="14" height="8" fill="none" stroke="#333" stroke-width="1.5" rx="1"/>
-    <line x1="27" y1="29" x2="29" y2="29" stroke="#333" stroke-width="1.5"/>
-    <!-- Shine on glasses -->
-    <rect x="17" y="27" width="3" height="2" fill="#555"/>
-    <rect x="29" y="27" width="3" height="2" fill="#555"/>
-    <!-- Smile -->
-    <path d="M22 40 Q28 45 34 40" stroke="#cc7700" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <!-- Basketball (being dribbled) -->
-    <circle cx="46" cy="56" r="7" fill="#e07020" stroke="#333" stroke-width="1.5"/>
-    <line x1="39" y1="56" x2="53" y2="56" stroke="#333" stroke-width="1"/>
-    <line x1="46" y1="49" x2="46" y2="63" stroke="#333" stroke-width="1"/>
-    <path d="M40 51 Q46 54 52 51" stroke="#333" stroke-width="1" fill="none"/>
-    <path d="M40 61 Q46 58 52 61" stroke="#333" stroke-width="1" fill="none"/>
-    <!-- Arm holding ball -->
-    <line x1="36" y1="44" x2="42" y2="52" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <svg width="64" height="72" viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated">
+    <!-- Crust (wide rounded bottom) -->
+    <rect x="4" y="52" width="56" height="12" rx="6" fill="#d4884a"/>
+    <rect x="4" y="52" width="56" height="5" fill="#c47030"/>
+    <!-- Crust bumps -->
+    <circle cx="12" cy="56" r="2" fill="#e8a060" opacity=".6"/>
+    <circle cx="22" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
+    <circle cx="32" cy="57" r="2" fill="#e8a060" opacity=".6"/>
+    <circle cx="42" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
+    <circle cx="52" cy="56" r="2" fill="#e8a060" opacity=".6"/>
+    <!-- Pizza body (wide slice shape) -->
+    <polygon points="32,4 58,52 6,52" fill="#f5a623"/>
+    <!-- Cheese layer -->
+    <polygon points="32,10 54,50 10,50" fill="#ffdd55"/>
+    <!-- Sauce edge peek -->
+    <polygon points="32,8 56,51 8,51" fill="none" stroke="#e05020" stroke-width="1.5"/>
+    <!-- Pepperoni — scattered naturally, NOT on the forehead -->
+    <circle cx="32" cy="34" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+    <circle cx="32" cy="34" r="2" fill="#dd3030" opacity=".5"/>
+    <circle cx="22" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+    <circle cx="22" cy="43" r="2" fill="#dd3030" opacity=".5"/>
+    <circle cx="42" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+    <circle cx="42" cy="43" r="2" fill="#dd3030" opacity=".5"/>
+    <circle cx="27" cy="22" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+    <circle cx="39" cy="27" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
+    <!-- Cheese drips at bottom -->
+    <ellipse cx="18" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
+    <ellipse cx="46" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
+    <!-- Sunglasses -->
+    <rect x="15" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
+    <rect x="30" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
+    <line x1="28" y1="18" x2="30" y2="18" stroke="#444" stroke-width="1.5"/>
+    <rect x="16" y="15" width="4" height="2" fill="#555" rx="1"/>
+    <rect x="31" y="15" width="4" height="2" fill="#555" rx="1"/>
+    <!-- Big smile -->
+    <path d="M21 26 Q32 34 43 26" stroke="#cc6600" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Basketball -->
+    <circle cx="54" cy="62" r="8" fill="#e07020" stroke="#222" stroke-width="1.5"/>
+    <line x1="46" y1="62" x2="62" y2="62" stroke="#222" stroke-width="1"/>
+    <line x1="54" y1="54" x2="54" y2="70" stroke="#222" stroke-width="1"/>
+    <path d="M47 56 Q54 60 61 56" stroke="#222" stroke-width="1" fill="none"/>
+    <path d="M47 68 Q54 64 61 68" stroke="#222" stroke-width="1" fill="none"/>
+    <!-- Arm -->
+    <line x1="46" y1="48" x2="50" y2="57" stroke="#e8952a" stroke-width="4" stroke-linecap="round"/>
   </svg>
 </div>
 <div id="mascot-bubble"></div>
