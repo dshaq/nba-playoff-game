@@ -412,7 +412,11 @@ function migrateState(){
   if(S && !S.waiverAcquisitions) S.waiverAcquisitions = {};
   if(S && !S.playerStats) S.playerStats = {};
   // Always sync team list from code so adding/removing teams takes effect immediately
+  let teamsChanged = false;
   if(S && S.teams){
+    const savedIds = new Set(S.teams.map(t=>t.id));
+    const codeIds = new Set(TEAMS.map(t=>t.id));
+    teamsChanged = [...codeIds].some(id=>!savedIds.has(id)) || [...savedIds].some(id=>!codeIds.has(id));
     const savedMap = {};
     S.teams.forEach(t => savedMap[t.id] = t);
     S.teams = TEAMS.map(t => ({
@@ -421,12 +425,13 @@ function migrateState(){
       survivedRounds: savedMap[t.id]?.survivedRounds || 0,
     }));
   }
+  return teamsChanged;
 }
 
 async function loadState(){
   if(db){
     const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
-    if(data?.state){ S=JSON.parse(data.state); migrateState(); return true; }
+    if(data?.state){ S=JSON.parse(data.state); const changed=migrateState(); if(changed) await saveState(); return true; }
     return false;
   } else {
     try{ const raw=localStorage.getItem('nba_playoff_2026'); if(raw){S=JSON.parse(raw); migrateState(); return true;} }catch(e){}
