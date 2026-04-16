@@ -41,7 +41,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* ── CRT vignette ── */
 body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.6) 100%);pointer-events:none;z-index:9997}
 
-.app{max-width:1000px;margin:0 auto;padding:.75rem}
+.app{max-width:1000px;margin:0 auto;padding:.75rem;padding-bottom:60px}
 
 /* ══════════════════════════════════
    TOPBAR — Mega Man title card
@@ -593,23 +593,6 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <!-- Bracket -->
   <div id="bracket-section" style="margin-bottom:.75rem"></div>
 
-  <!-- Commissioner bars -->
-  <div id="comm-login-bar" class="hidden">
-    <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:.75rem">
-      <span style="font-size:15px;color:var(--text2);flex:1">🔒 COMMISSIONER CONTROLS LOCKED</span>
-      <input type="password" id="comm-login-input" placeholder="ENTER PASSWORD" style="width:200px;margin-bottom:0"/>
-      <button class="btn btn-sm btn-primary" onclick="tryCommLogin()">UNLOCK</button>
-    </div>
-  </div>
-  <div id="comm-active-bar" class="hidden">
-    <div class="commissioner-bar">
-      <span>🔓</span>
-      <span style="flex:1;font-family:'Press Start 2P',monospace;font-size:8px">COMMISSIONER MODE ACTIVE</span>
-      <button class="btn btn-sm btn-green" onclick="lockComm()">LOCK</button>
-      <button class="btn btn-sm btn-reset" onclick="confirmReset()">⚠ RESET LEAGUE</button>
-    </div>
-  </div>
-
   <!-- Tab bar -->
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('standings')">STANDINGS</button>
@@ -686,6 +669,15 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- SCORING -->
   <div id="tab-scoring" class="hidden">
+    <div class="card" style="border-left:4px solid var(--accent3)">
+      <div class="section-title">HOW TO PLAY</div>
+      <div style="font-size:16px;color:var(--text2);line-height:2.2">
+        🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time. Order is randomized at league creation.<br>
+        📊 <span style="color:var(--accent3)">EARN POINTS</span> — your players score fantasy points each game based on their real stats. Bonuses stack each round they survive (+5/+10/+20/+50 — max +85 per player).<br>
+        🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens only when your player's team is eliminated or they're injured. No voluntary drops. Submit claims and they process nightly by priority order.<br>
+        🥇 <span style="color:var(--accent3)">WIN</span> — most total fantasy points at the end of the NBA Finals takes the crown.
+      </div>
+    </div>
     <div class="card">
       <div class="section-title">ESPN SCORING RULES</div>
       <table style="width:100%;font-size:17px;border-collapse:collapse">
@@ -763,6 +755,18 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   </div>
 </div>
 
+<!-- Commissioner bars — fixed at bottom -->
+<div id="comm-login-bar" class="hidden" style="position:fixed;bottom:0;left:0;right:0;z-index:9980;padding:.5rem 1rem;background:var(--panel);border-top:2px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span style="font-size:15px;color:var(--text2);flex:1">🔒 COMMISSIONER CONTROLS LOCKED</span>
+  <input type="password" id="comm-login-input" placeholder="ENTER PASSWORD" style="width:180px;margin-bottom:0"/>
+  <button class="btn btn-sm btn-primary" onclick="tryCommLogin()">UNLOCK</button>
+</div>
+<div id="comm-active-bar" class="hidden" style="position:fixed;bottom:0;left:0;right:0;z-index:9980;padding:.5rem 1rem;background:rgba(0,255,136,.06);border-top:2px solid var(--green);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span>🔓</span>
+  <span style="flex:1;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--green)">COMMISSIONER MODE ACTIVE</span>
+  <button class="btn btn-sm btn-green" onclick="lockComm()">LOCK</button>
+  <button class="btn btn-sm btn-reset" onclick="confirmReset()">⚠ RESET LEAGUE</button>
+</div>
 </div><!-- /app -->
 
 <script>
@@ -836,9 +840,21 @@ async function saveAvatar(){
 }
 
 function getAvatar(mid, size='sm'){
-  const idx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % 8);
+  const idx = (S && S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % 8);
   const t = AVATAR_THEMES[idx] || AVATAR_THEMES[0];
-  return size==='lg' ? makeBallSVGLarge(t,52) : makeBallSVG(t,32);
+  // Always render at 100% so the container controls the size
+  if(size==='lg') return makeBallSVGLarge(t,52);
+  // sm: render SVG that fills its container via CSS
+  return `<svg width="100%" height="100%" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
+    <rect width="38" height="38" fill="${t.bg}"/>
+    <circle cx="19" cy="19" r="15" fill="${t.c1}" stroke="${t.c3}" stroke-width="2"/>
+    <line x1="4" y1="19" x2="34" y2="19" stroke="${t.c3}" stroke-width="1.5"/>
+    <line x1="19" y1="4" x2="19" y2="34" stroke="${t.c3}" stroke-width="1.5"/>
+    <path d="M7 11 Q19 16 31 11" stroke="${t.c3}" stroke-width="1.5" fill="none"/>
+    <path d="M7 27 Q19 22 31 27" stroke="${t.c3}" stroke-width="1.5" fill="none"/>
+    <circle cx="19" cy="19" r="3" fill="${t.c2}" opacity=".6"/>
+    <rect x="13" y="13" width="4" height="3" fill="${t.c2}" opacity=".4"/>
+  </svg>`;
 }
 
 function getAvatarColor(mid){

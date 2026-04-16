@@ -1516,7 +1516,14 @@ function toggleChat(){
   chatOpen = !chatOpen;
   document.getElementById('chat-panel').style.display = chatOpen ? 'flex' : 'none';
   document.getElementById('chat-bubble').style.display = chatOpen ? 'none' : 'flex';
-  if(chatOpen){ renderChat(); document.getElementById('chat-input').focus(); }
+  if(chatOpen){
+    renderChat();
+    document.getElementById('chat-input').focus();
+    setTimeout(()=>{
+      const msgs = document.getElementById('chat-messages');
+      if(msgs) msgs.scrollTop = msgs.scrollHeight;
+    }, 150);
+  }
 }
 
 async function sendChat(){
@@ -1647,7 +1654,7 @@ function renderChatMessages(msgs){
     </div>`;
   }).reverse().join(''); // newest first... actually newest at bottom
   // Scroll to bottom
-  list.scrollTop = list.scrollHeight;
+  setTimeout(()=>{ list.scrollTop = list.scrollHeight; }, 50);
 }
 
 function startChatPolling(){
