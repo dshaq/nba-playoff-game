@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -367,7 +367,9 @@ function bonusForPlayer(pid, mid){
   return b;
 }
 function isInactive(mid,pid){const t=getTeam(getPlayer(pid).team);return t.eliminated||(S.injured[mid]||[]).includes(pid);}
-function managerStatScore(mid){return +S.rosters[mid].reduce((s,pid)=>isInactive(mid,pid)?s:s+espnScore(getPlayer(pid)),0).toFixed(1);}
+function managerStatScore(mid){
+  return managerStatScoreAuto(mid);
+}
 function managerBonusScore(mid){return S.rosters[mid].reduce((s,pid)=>s+bonusForPlayer(pid,mid),0);}
 function managerTotal(mid){return +(managerStatScore(mid)+managerBonusScore(mid)).toFixed(1);}
 function waiverSlotsForManager(mid){return S.rosters[mid].filter(pid=>getTeam(getPlayer(pid).team).eliminated).length+(S.injured[mid]||[]).length;}
@@ -610,6 +612,7 @@ function showMainScreen(){
   fetchScores();
   setInterval(fetchScores, 60000);
   startChatPolling();
+  startLiveStatsPolling();
 }
 
 function showManagerPicker(){
@@ -710,6 +713,7 @@ function selectManager(id){
   fetchScores();
   setInterval(fetchScores, 60000);
   startChatPolling();
+  startLiveStatsPolling();
 }
 
 // ── Actions ───────────────────────────────────────────────────────
@@ -1609,6 +1613,178 @@ function renderChatMessages(msgs){
 function startChatPolling(){
   if(chatPollingInterval) clearInterval(chatPollingInterval);
   chatPollingInterval = setInterval(pollChat, 8000);
+}
+
+
+// ── Live Stats System ─────────────────────────────────────────────
+
+const ESPN_TEAM_MAP = {
+  'OKC':'OKC','SA':'SAS','SAS':'SAS','DEN':'DEN','LAL':'LAL','HOU':'HOU',
+  'MIN':'MIN','POR':'POR','LAC':'LAC','GS':'GSW','GSW':'GSW',
+  'DET':'DET','BOS':'BOS','NY':'NYK','NYK':'NYK','CLE':'CLE',
+  'TOR':'TOR','ATL':'ATL','PHI':'PHI','ORL':'ORL','CHA':'CHA',
+  'MIA':'MIA','PHX':'PHX',
+};
+
+function espnTeamToOurs(abbr){ return ESPN_TEAM_MAP[abbr]||abbr; }
+
+// Live stats are stored in memory (not Supabase) — refreshed each poll
+// Completed game stats ARE saved to Supabase via playerStats
+let livePlayerStats = {}; // pid -> {fp, pts, reb, ast, stl, blk, fgm, fga, ftm, fta, to, live, gameId}
+let liveStatsLastUpdate = null;
+let liveStatsPolling = null;
+let liveGamesActive = false;
+
+function parseSplit(s){ const p=String(s||'0-0').split('-'); return [parseInt(p[0])||0,parseInt(p[1])||0]; }
+
+async function fetchGameBoxScore(eventId){
+  const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${eventId}`);
+  const data = await res.json();
+  const boxscore = data?.boxscore;
+  if(!boxscore) return {};
+
+  const stats = {};
+  for(const teamData of (boxscore.players||[])){
+    const ourTeam = espnTeamToOurs(teamData?.team?.abbreviation||'');
+    for(const grp of (teamData.statistics||[])){
+      for(const athlete of (grp.athletes||[])){
+        const name = athlete?.athlete?.displayName||'';
+        const s = athlete?.stats||[];
+        if(!s.length||s[0]==='DNP'||s[0]==='DND') continue;
+
+        const [fgm,fga]=parseSplit(s[1]);
+        const [ftm,fta]=parseSplit(s[3]);
+        const reb=parseInt(s[6])||0, ast=parseInt(s[7])||0;
+        const stl=parseInt(s[8])||0, blk=parseInt(s[9])||0;
+        const to=parseInt(s[10])||0, pts=parseInt(s[13])||0;
+        const fp = pts+reb+ast+stl+blk-(fga-fgm)-(fta-ftm)-to;
+
+        const matched = PLAYERS.find(p=>
+          p.team===ourTeam&&(
+            p.name.toLowerCase()===name.toLowerCase()||
+            name.toLowerCase().includes(p.name.split(' ').pop().toLowerCase())
+          )
+        );
+        if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,name:matched.name};
+      }
+    }
+  }
+  return stats;
+}
+
+async function refreshLiveStats(){
+  try{
+    // Get today + yesterday games
+    const today = new Date();
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+    const fmt = d => d.toISOString().split('T')[0].replace(/-/g,'');
+
+    // Only count stats from playoff games (April 18 onward) — not play-in games
+    const PLAYOFFS_START = '20260418';
+    let allEvents = [];
+    for(const dateStr of [fmt(today), fmt(yesterday)]){
+      if(dateStr < PLAYOFFS_START) continue; // skip play-in dates
+      try{
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
+        const data = await res.json();
+        allEvents = allEvents.concat((data?.events||[]).map(e=>({...e,_dateStr:dateStr})));
+      }catch(e){}
+    }
+
+    const newLive = {};
+    let hasLive = false;
+    let completedToSave = [];
+
+    for(const event of allEvents){
+      const status = event.status?.type;
+      const isLive = !status?.completed && status?.state==='in';
+      const isComplete = status?.completed;
+      if(!isLive && !isComplete) continue;
+
+      // Skip if already saved as completed
+      const alreadySaved = isComplete && S.playerStats &&
+        Object.keys(S.playerStats).some(k=>k.endsWith('_'+event._dateStr) && S.playerStats[k].gameId===event.id);
+
+      try{
+        const gameStats = await fetchGameBoxScore(event.id);
+        for(const [pid, stat] of Object.entries(gameStats)){
+          // Accumulate (player may play multiple games)
+          if(!newLive[pid]) newLive[pid]={fp:0,pts:0,reb:0,ast:0,stl:0,blk:0,to:0,live:isLive,gameId:event.id};
+          newLive[pid].fp  += stat.fp;
+          newLive[pid].pts += stat.pts;
+          newLive[pid].reb += stat.reb;
+          newLive[pid].ast += stat.ast;
+          newLive[pid].stl += stat.stl;
+          newLive[pid].blk += stat.blk;
+          newLive[pid].to  += stat.to;
+          if(isLive) newLive[pid].live = true;
+        }
+        if(isLive) hasLive = true;
+        if(isComplete && !alreadySaved) completedToSave.push({event, stats:gameStats, dateStr:event._dateStr});
+      }catch(e){ console.warn('Box score fetch failed:', event.id); }
+    }
+
+    livePlayerStats = newLive;
+    liveGamesActive = hasLive;
+    liveStatsLastUpdate = new Date();
+
+    // Save completed game stats to Supabase
+    if(completedToSave.length > 0){
+      if(!S.playerStats) S.playerStats={};
+      let changed = false;
+      for(const {event, stats, dateStr} of completedToSave){
+        for(const [pid, stat] of Object.entries(stats)){
+          const key = pid+'_'+dateStr+'_'+event.id;
+          if(!S.playerStats[key]){
+            S.playerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:event.id};
+            changed = true;
+          }
+        }
+      }
+      if(changed) await saveState();
+    }
+
+    render();
+    updateLiveStatsIndicator();
+  }catch(e){ console.warn('refreshLiveStats error:', e); }
+}
+
+function updateLiveStatsIndicator(){
+  const el = document.getElementById('live-stats-indicator');
+  if(!el) return;
+  if(liveGamesActive){
+    el.innerHTML = '<span class="score-live">LIVE</span> <span style="font-size:14px;color:var(--accent3)">SCORES UPDATING EVERY 60s</span>';
+  } else if(liveStatsLastUpdate){
+    el.innerHTML = `<span style="font-size:14px;color:var(--text3)">LAST UPDATED: ${liveStatsLastUpdate.toLocaleTimeString()}</span>`;
+  }
+}
+
+function startLiveStatsPolling(){
+  refreshLiveStats();
+  if(liveStatsPolling) clearInterval(liveStatsPolling);
+  liveStatsPolling = setInterval(refreshLiveStats, 60000);
+}
+
+// Total fantasy points for a player (saved completed + live in-progress)
+function playerStatScore(pid){
+  // Saved completed game stats
+  const saved = S.playerStats
+    ? Object.values(S.playerStats).filter(s=>s.pid===pid).reduce((sum,s)=>sum+(s.fp||0),0)
+    : 0;
+  // Live stats (already include today's completed games from live fetch, avoid double-counting)
+  // Only add live if no saved entry exists for today
+  const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+  const hasSavedToday = S.playerStats && Object.keys(S.playerStats).some(k=>k.includes('_'+today+'_'));
+  const live = (!hasSavedToday && livePlayerStats[pid]) ? (livePlayerStats[pid].fp||0) : 0;
+  return +(saved + live).toFixed(1);
+}
+
+function isPlayerLive(pid){
+  return livePlayerStats[pid]?.live === true;
+}
+
+function managerStatScoreAuto(mid){
+  return +(S.rosters[mid]||[]).reduce((s,pid)=>s+playerStatScore(pid),0).toFixed(1);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
