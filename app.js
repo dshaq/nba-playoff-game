@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -384,13 +384,23 @@ async function saveState(){
   else { try{localStorage.setItem('nba_playoff_2026',JSON.stringify(S));}catch(e){} }
 }
 
+function migrateState(){
+  // Ensure waiverClaims is always an array (old states had it as an object)
+  if(S && S.waiverClaims && !Array.isArray(S.waiverClaims)){
+    S.waiverClaims = [];
+  }
+  if(S && !S.waiverClaims){ S.waiverClaims = []; }
+  // Ensure waiverPriority exists
+  if(S && !S.waiverPriority){ S.waiverPriority = []; }
+}
+
 async function loadState(){
   if(db){
     const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
-    if(data?.state){ S=JSON.parse(data.state); return true; }
+    if(data?.state){ S=JSON.parse(data.state); migrateState(); return true; }
     return false;
   } else {
-    try{ const raw=localStorage.getItem('nba_playoff_2026'); if(raw){S=JSON.parse(raw);return true;} }catch(e){}
+    try{ const raw=localStorage.getItem('nba_playoff_2026'); if(raw){S=JSON.parse(raw); migrateState(); return true;} }catch(e){}
     return false;
   }
 }
