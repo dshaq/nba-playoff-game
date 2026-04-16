@@ -41,7 +41,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* ── CRT vignette ── */
 body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.6) 100%);pointer-events:none;z-index:9997}
 
-.app{max-width:1000px;margin:0 auto;padding:.75rem;padding-bottom:60px}
+.app{max-width:1000px;margin:0 auto;padding:.75rem}
 
 /* ══════════════════════════════════
    TOPBAR — Mega Man title card
@@ -593,6 +593,23 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <!-- Bracket -->
   <div id="bracket-section" style="margin-bottom:.75rem"></div>
 
+  <!-- Collapsible commissioner bar -->
+  <div id="comm-login-bar" class="hidden" style="margin-bottom:.5rem">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel2);border:1px solid var(--border);flex-wrap:wrap">
+      <span style="font-size:14px;color:var(--text3)">🔒 COMMISSIONER</span>
+      <input type="password" id="comm-login-input" placeholder="PASSWORD" style="width:160px;margin-bottom:0;padding:4px 8px;font-size:14px"/>
+      <button class="btn btn-sm btn-primary" onclick="tryCommLogin()">UNLOCK</button>
+    </div>
+  </div>
+  <div id="comm-active-bar" class="hidden" style="margin-bottom:.5rem">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,255,136,.05);border:1px solid var(--green);flex-wrap:wrap">
+      <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--green)">🔓 COMMISSIONER</span>
+      <button class="btn btn-sm btn-green" style="padding:3px 10px;font-size:12px" onclick="lockComm()">LOCK</button>
+      <button class="btn btn-sm btn-reset" style="padding:3px 10px;font-size:12px" onclick="confirmReset()">⚠ RESET</button>
+      <span style="font-size:12px;color:var(--text3);margin-left:auto">manage teams in ROSTERS tab</span>
+    </div>
+  </div>
+
   <!-- Tab bar -->
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('standings')">STANDINGS</button>
@@ -755,18 +772,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   </div>
 </div>
 
-<!-- Commissioner bars — fixed at bottom -->
-<div id="comm-login-bar" class="hidden" style="position:fixed;bottom:0;left:0;right:0;z-index:9980;padding:.5rem 1rem;background:var(--panel);border-top:2px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <span style="font-size:15px;color:var(--text2);flex:1">🔒 COMMISSIONER CONTROLS LOCKED</span>
-  <input type="password" id="comm-login-input" placeholder="ENTER PASSWORD" style="width:180px;margin-bottom:0"/>
-  <button class="btn btn-sm btn-primary" onclick="tryCommLogin()">UNLOCK</button>
-</div>
-<div id="comm-active-bar" class="hidden" style="position:fixed;bottom:0;left:0;right:0;z-index:9980;padding:.5rem 1rem;background:rgba(0,255,136,.06);border-top:2px solid var(--green);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <span>🔓</span>
-  <span style="flex:1;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--green)">COMMISSIONER MODE ACTIVE</span>
-  <button class="btn btn-sm btn-green" onclick="lockComm()">LOCK</button>
-  <button class="btn btn-sm btn-reset" onclick="confirmReset()">⚠ RESET LEAGUE</button>
-</div>
+
 </div><!-- /app -->
 
 <script>

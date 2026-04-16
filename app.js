@@ -1554,10 +1554,6 @@ async function sendChat(){
   await saveChatState(chatState);
   input.value = '';
   renderChat();
-  setTimeout(()=>{
-    const msgs = document.getElementById('chat-messages');
-    if(msgs) msgs.scrollTop = msgs.scrollHeight;
-  }, 100);
 }
 
 async function deleteChat(id){
