@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -432,25 +432,44 @@ function startPolling(){
 // ── Live scores ───────────────────────────────────────────────────
 async function fetchScores(){
   try{
-    const today = new Date().toISOString().split('T')[0].replace(/-/g,'/');
-    const url = `https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json`;
-    const res = await fetch(url);
+    // Fetch today
+    const todayUrl = `https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json`;
+    const res = await fetch(todayUrl);
     const data = await res.json();
     const games = data?.scoreboard?.games || [];
-    if(!games.length){
-      document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">NO GAMES TODAY — CHECK BACK GAME NIGHT</span></div>`;
+
+    // Fetch yesterday's finals
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate()-1);
+    const yStr = yesterday.toISOString().split('T')[0].replace(/-/g,'');
+    let yGames = [];
+    try{
+      const yUrl = `https://cdn.nba.com/static/json/liveData/scoreboard/scoreboard_${yStr}.json`;
+      const yRes = await fetch(yUrl);
+      const yData = await yRes.json();
+      yGames = (yData?.scoreboard?.games||[]).filter(g=>g.gameStatus===3);
+    }catch(e){}
+
+    const allGames = [
+      ...games.map(g=>({...g,_day:'today'})),
+      ...yGames.map(g=>({...g,_day:'yesterday'}))
+    ];
+
+    if(!allGames.length){
+      document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">NO GAMES — PLAYOFFS START APR 18</span></div>`;
       return;
     }
-    // Duplicate for seamless loop
-    const html = [...games, ...games].map(g=>{
-      const home = g.homeTeam, away = g.awayTeam;
-      const status = g.gameStatusText || '';
-      const isLive = g.gameStatus === 2;
-      const isFinal = g.gameStatus === 3;
+
+    const renderGame = g => {
+      const home=g.homeTeam, away=g.awayTeam;
+      const status=g.gameStatusText||'';
+      const isLive=g.gameStatus===2, isFinal=g.gameStatus===3;
+      const isYday=g._day==='yesterday';
       const statusHtml = isLive
         ? `<span class="score-live">LIVE</span> <span style="font-size:13px;color:var(--text2)">${status}</span>`
-        : isFinal ? `<span class="score-final">FINAL</span>`
-        : `<span style="font-size:13px;color:var(--text3)">${status}</span>`;
+        : isFinal
+          ? `<span class="score-final">${isYday?'LAST NIGHT':'FINAL'}</span>`
+          : `<span style="font-size:13px;color:var(--text3)">${status}</span>`;
       return `<div class="score-item">
         ${statusHtml}
         <span class="score-team">${away.teamTricode}</span>
@@ -459,10 +478,12 @@ async function fetchScores(){
         <span class="score-pts" style="${isFinal&&home.score>away.score?'color:var(--accent2)':''}">${home.score||0}</span>
         <span class="score-team">${home.teamTricode}</span>
       </div>`;
-    }).join('');
+    };
+
+    const html = [...allGames,...allGames].map(renderGame).join('');
     document.getElementById('scores-content').className = 'scores-bar-inner';
     document.getElementById('scores-content').innerHTML = html;
-  } catch(e){
+  }catch(e){
     document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">SCORES UNAVAILABLE</span></div>`;
   }
 }
