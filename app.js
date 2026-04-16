@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const COLORS = ["#4a9eff","#00d4aa","#e94560","#7b2fff","#f5a623","#ff6b9d","#5fd46a","#ff9f43"];
 const ROUND_BONUS = [0, 5, 10, 20, 50];
@@ -583,7 +583,7 @@ function showManagerPicker(){
           ${S.managers.map(m=>{
           const ac=getAvatarColor(m.id);
           return `<button class="mgr-pick-btn" onclick="selectManager(${m.id})">
-            <div style="width:36px;height:36px;border:2px solid ${ac};flex-shrink:0">${getAvatar(m.id,'sm')}</div>
+            <div style="width:36px;height:36px;border:2px solid ${ac};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id,'sm')}</div>
             <span style="color:${ac}">${m.name}</span>
           </button>`;
         }).join('')}
@@ -866,7 +866,7 @@ function renderStandings(){
     const aColor = getAvatarColor(m.id);
     return `<div class="player-row" style="flex-wrap:wrap">
       <span class="rank-num ${rankClass}">${medal||(showScores?i+1:'')}</span>
-      <div style="width:40px;height:40px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer" onclick="openAvatarModal(${m.id})" title="Change icon">${getAvatar(m.id,'sm')}</div>
+      <div style="width:40px;height:40px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden" onclick="openAvatarModal(${m.id})" title="Change icon">${getAvatar(m.id,'sm')}</div>
       <div style="flex:1;min-width:100px">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-size:19px;font-weight:600;color:var(--text)">${m.name}</span>
@@ -884,7 +884,7 @@ function renderNameEdit(){
   document.getElementById('name-edit-list').innerHTML=S.managers.map(m=>{
     const aColor = getAvatarColor(m.id);
     return `<div class="name-input-row" style="margin-bottom:12px">
-      <div style="width:44px;height:44px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer" onclick="openAvatarModal(${m.id})" title="Change icon">
+      <div style="width:44px;height:44px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden" onclick="openAvatarModal(${m.id})" title="Change icon">
         ${getAvatar(m.id,'sm')}
       </div>
       <input type="text" style="width:200px" value="${m.name}"
@@ -1007,7 +1007,7 @@ function renderWaiver(){
         const isMe=mid===myId;
         return `<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid ${isMe?'var(--accent2)':'var(--border)'};background:${isMe?'rgba(245,166,35,.1)':'var(--bg2)'}">
           <span style="font-size:11px;color:var(--text3)">#${i+1}</span>
-          <div style="width:20px;height:20px;border:1px solid ${getAvatarColor(m.id)};flex-shrink:0">${getAvatar(m.id,'sm')}</div>
+          <div style="width:32px;height:32px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id,'sm')}</div>
           <span style="font-size:13px;color:${isMe?'var(--accent2)':'var(--text)'}">${m.name}</span>
         </div>`;
       }).join('')}
@@ -1073,7 +1073,7 @@ function renderWaiver(){
         claimSection=`<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
           ${playerClaims.map(c=>`
             <div style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:rgba(245,166,35,.1);border:1px solid var(--accent2)">
-              <div style="width:16px;height:16px;border:1px solid ${getAvatarColor(c.managerId)}" title="${c.managerName}">${getAvatar(c.managerId,'sm')}</div>
+              <div style="width:22px;height:22px;border:1px solid ${getAvatarColor(c.managerId)};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0" title="${c.managerName}">${getAvatar(c.managerId,'sm')}</div>
               <span style="font-size:11px;color:var(--accent2)">${c.managerName}</span>
             </div>`).join('')}
           ${isMyClaim?`<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`:''}
@@ -1125,7 +1125,7 @@ function renderRosters(){
     const players=S.rosters[m.id].map(pid=>getPlayer(pid)),slotsOpen=waiverSlotsOpen(m.id);
     return `<div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.875rem;flex-wrap:wrap">
-        <div style="width:44px;height:44px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0">${getAvatar(m.id,'sm')}</div>
+        <div style="width:44px;height:44px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id,'sm')}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:18px;color:var(--text)">${m.name}</span>
