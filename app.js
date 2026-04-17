@@ -777,21 +777,21 @@ function showManagerPicker(){
           <!-- Bubble tail pointing left toward pizza guy -->
           <div style="position:absolute;left:-10px;top:24px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:10px solid var(--accent3)"></div>
           <div style="position:absolute;left:-7px;top:26px;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:8px solid var(--panel2)"></div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px">
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:10px 12px">
-              <div style="font-size:18px;margin-bottom:4px">🏀</div>
-              <div style="font-size:11px;color:var(--accent3);font-family:'Press Start 2P',monospace;margin-bottom:6px">DRAFT</div>
-              <div style="font-size:14px;color:var(--text2);line-height:1.6">Snake order, 8 players each. Everyone picks one at a time on their turn.</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
+              <span style="font-size:16px;flex-shrink:0">🏀</span>
+              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">DRAFT</span>
+              <span style="font-size:14px;color:var(--text2)">Snake order, 8 players each. Everyone picks one at a time on their turn.</span>
             </div>
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:10px 12px">
-              <div style="font-size:18px;margin-bottom:4px">📊</div>
-              <div style="font-size:11px;color:var(--accent3);font-family:'Press Start 2P',monospace;margin-bottom:6px">SCORING</div>
-              <div style="font-size:14px;color:var(--text2);line-height:1.6">PTS+REB+AST+STL+BLK minus misses &amp; TOs. Survive each round for bonuses: +5/+10/+20/+50.</div>
+            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
+              <span style="font-size:16px;flex-shrink:0">📊</span>
+              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">SCORING</span>
+              <span style="font-size:14px;color:var(--text2)">PTS+REB+AST+STL+BLK minus misses &amp; TOs. Bonuses for each round survived: +5/+10/+20/+50.</span>
             </div>
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:10px 12px">
-              <div style="font-size:18px;margin-bottom:4px">🔄</div>
-              <div style="font-size:11px;color:var(--accent3);font-family:'Press Start 2P',monospace;margin-bottom:6px">WAIVERS</div>
-              <div style="font-size:14px;color:var(--text2);line-height:1.6">Slot opens when your player's team is eliminated or injured. No voluntary drops. Claims process nightly.</div>
+            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
+              <span style="font-size:16px;flex-shrink:0">🔄</span>
+              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">WAIVERS</span>
+              <span style="font-size:14px;color:var(--text2)">Slot opens when your player's team is eliminated or injured. No voluntary drops. Claims process nightly.</span>
             </div>
           </div>
         </div>
