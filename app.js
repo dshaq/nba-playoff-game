@@ -406,7 +406,7 @@ function playerLogoHtml(team, size=36, playerName=''){
   // Check for individual portrait first
   if(playerName && PLAYER_PORTRAITS[playerName]){
     const color = TEAM_COLORS[team] || "#4a9eff";
-    return `<div style="width:${size}px;height:${size}px;flex-shrink:0;border:2px solid ${color};background:#020c18;overflow:hidden"><img src="${PLAYER_PORTRAITS[playerName]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/></div>`;
+    return `<div style="width:${size}px;height:${size}px;flex-shrink:0;border:2px solid ${color};background:#020c18;overflow:hidden"><img src="${PLAYER_PORTRAITS[playerName]}" style="width:130%;height:130%;object-fit:cover;object-position:center 8%;image-rendering:pixelated;margin-left:-15%"/></div>`;
   }
   const logo = getTeamLogo(team);
   const color = logo?.color || TEAM_COLORS[team] || "#4a9eff";
