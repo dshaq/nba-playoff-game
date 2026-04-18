@@ -679,7 +679,7 @@ async function resetLeague(){
     teams: TEAMS.map(t=>({...t,eliminated:false,survivedRounds:0})),
   };
   document.getElementById('round-sel').value = 1;
-  document.getElementById('m-round').textContent = 'R1';
+  if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R1';
   await saveState();
   render();
   alert('✓ LEAGUE RESET — ready for the real draft!');
@@ -867,7 +867,7 @@ async function renameMgr(id,val){
   const t=val.trim(); if(t){m.name=t;m.initials=initials(t);}
   await saveState(); render();
 }
-async function setRound(r){S.round=r;document.getElementById('m-round').textContent='R'+r;await saveState();render();}
+async function setRound(r){S.round=r;if(document.getElementById('m-round'))document.getElementById('m-round').textContent='R'+r;await saveState();render();}
 async function randomizeDraft(){
   if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
   const n=S.managers.length,idx=[...Array(n).keys()].sort(()=>Math.random()-.5),old=[...S.managers];
@@ -1084,7 +1084,7 @@ function render(){
     draftTab.style.borderColor = done ? 'var(--border)' : '';
     draftTab.innerHTML = done ? 'DRAFT <span style="font-size:8px;color:var(--text3)">OVER</span>' : 'DRAFT';
   }
-  document.getElementById('m-avail').textContent=waiverPlayers().length;
+  if(document.getElementById('m-avail')) document.getElementById('m-avail').textContent=waiverPlayers().length;
 }
 
 function renderDraftBanner(){
