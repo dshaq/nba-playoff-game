@@ -681,19 +681,14 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- STANDINGS -->
   <div id="tab-standings">
-    <div class="grid-4" style="margin-bottom:1rem">
-      <div class="metric"><div class="metric-val" id="m-round">R1</div><div class="metric-lbl">CURRENT ROUND</div></div>
-      <div class="metric"><div class="metric-val" id="m-mgrs">—</div><div class="metric-lbl">MANAGERS</div></div>
-      <div class="metric"><div class="metric-val" id="m-avail">0</div><div class="metric-lbl">ON WAIVERS</div></div>
-      <div class="metric"><div class="metric-val">85</div><div class="metric-lbl">MAX BONUS/PLAYER</div></div>
-    </div>
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
-        <div class="section-title" style="margin-bottom:0">LEADERBOARD</div>
-        <button class="btn-ghost" onclick="showTab('manage-names')" style="font-size:14px">✏ EDIT NAMES</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent3);letter-spacing:.05em">🏆 LIVE LEADERBOARD</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="live-stats-indicator" style="font-size:12px;color:var(--text3)"></div>
+        <button class="btn-ghost" onclick="showTab('manage-names')" style="font-size:14px">✏ EDIT</button>
       </div>
-      <div id="standings-list"></div>
     </div>
+    <div id="standings-list"></div>
   </div>
 
   <!-- MANAGE NAMES -->

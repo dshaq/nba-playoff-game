@@ -1128,6 +1128,9 @@ function renderStandings(){
     return managerTotal(b.id)-managerTotal(a.id);
   });
 
+  // Max total for progress bar scaling
+  const maxTotal = Math.max(1, ...sorted.map(m=>managerTotal(m.id)));
+
   document.getElementById('standings-list').innerHTML=sorted.map((m,i)=>{
     const aColor = getAvatarColor(m.id);
     const total = managerTotal(m.id);
@@ -1136,20 +1139,57 @@ function renderStandings(){
     const tokens = tokensAvailable(m.id);
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'';
+    const barPct = Math.round((total/maxTotal)*100);
 
-    return `<div class="player-row" style="padding:.625rem .75rem;border-left:3px solid ${aColor}">
-      <span class="rank-num ${rankClass}" style="font-size:18px;min-width:32px">${medal||(showScores?i+1:'')}</span>
-      <div style="width:40px;height:40px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden" onclick="openAvatarModal(${m.id})">${getAvatar(m.id,'sm')}</div>
-      <div style="flex:1">
-        <div style="font-size:18px;color:var(--text)">${m.name}</div>
-        ${showScores
-          ? `<div style="font-size:12px;color:var(--text3);margin-top:2px"><span style="color:var(--accent)">${stat}</span> STAT${bonus>0?` + <span style="color:var(--green)">${bonus}</span> BONUS`:''}</div>`
-          : `<div style="font-size:12px;color:var(--text3);margin-top:2px">PLAYOFFS STARTING</div>`}
+    // Find this manager's live players
+    const livePlayers = (S.rosters[m.id]||[])
+      .filter(pid => isPlayerLive(pid))
+      .map(pid => { const p=getPlayer(pid); return p ? p.name.split(' ').pop() : ''; })
+      .filter(Boolean);
+
+    // Today's live gain for this manager
+    const todayLive = (S.rosters[m.id]||[]).reduce((sum,pid) => {
+      const live = livePlayerStats[pid];
+      if(!live) return sum;
+      const alreadySaved = S.playerStats && Object.values(S.playerStats).some(
+        s => s.pid===pid && s.gameId && s.gameId===live.gameId
+      );
+      return sum + (alreadySaved ? 0 : (live.fp||0));
+    }, 0);
+
+    return `<div style="margin-bottom:.5rem;background:var(--panel);border:1px solid var(--border);border-left:4px solid ${aColor};padding:.75rem 1rem">
+      <div style="display:flex;align-items:center;gap:10px">
+        <!-- Rank + avatar -->
+        <div style="min-width:36px;text-align:center">
+          ${medal
+            ? `<span style="font-size:22px">${medal}</span>`
+            : `<span style="font-family:'Press Start 2P',monospace;font-size:13px;color:var(--text3)">#${i+1}</span>`}
+        </div>
+        <div style="width:44px;height:44px;flex-shrink:0;border:2px solid ${aColor};cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden" onclick="openAvatarModal(${m.id})">${getAvatar(m.id,'sm')}</div>
+        <!-- Name + live indicator -->
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:18px;color:var(--text);font-weight:600">${m.name}</span>
+            ${livePlayers.length ? `<span class="score-live" style="font-size:8px">▶ LIVE: ${livePlayers.join(', ')}</span>` : ''}
+            ${tokens>0 ? `<span style="display:inline-flex;align-items:center;gap:2px">${Array(Math.min(tokens,3)).fill('<span class="token" style="width:18px;height:18px;font-size:9px">🏀</span>').join('')}${tokens>3?`<span style="font-size:10px;color:var(--accent2)">+${tokens-3}</span>`:''}</span>` : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">
+            ${showScores
+              ? `<span style="color:var(--accent)">${stat}</span> stat + <span style="color:var(--green)">${bonus}</span> bonus${todayLive!==0?` · <span style="color:${todayLive>=0?'var(--green)':'var(--red)'}">${todayLive>0?'+':''}${todayLive.toFixed(1)} today</span>`:''}`
+              : 'PLAYOFFS UNDERWAY'}
+          </div>
+        </div>
+        <!-- Score -->
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:${i===0?'22':'18'}px;color:${i===0?'var(--accent2)':'var(--text)'}">${showScores?total:'—'}</div>
+          ${showScores?`<div style="font-size:10px;color:var(--text3)">PTS</div>`:''}
+        </div>
       </div>
-      <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${showScores ? `<div style="font-family:'Press Start 2P',monospace;font-size:16px;color:var(--accent2)">${total}<span style="font-size:8px;color:var(--text3);margin-left:3px">PTS</span></div>` : '<div style="color:var(--text3)">—</div>'}
-        ${tokens>0 ? `<div style="display:flex;align-items:center;gap:2px">${Array(Math.min(tokens,5)).fill('<span class="token" style="width:20px;height:20px;font-size:10px">🏀</span>').join('')}${tokens>5?`<span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2)">+${tokens-5}</span>`:''}</div>` : ''}
-      </div>
+      <!-- Progress bar -->
+      ${showScores&&total>0?`
+      <div style="margin-top:.5rem;height:4px;background:var(--border);position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${barPct}%;background:${i===0?'var(--accent2)':aColor};transition:width .3s"></div>
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -1912,14 +1952,20 @@ async function fetchGameBoxScore(eventId){
         const s = athlete?.stats||[];
         if(!s.length||s[0]==='DNP'||s[0]==='DND') continue;
 
-        const [fgm,fga]=parseSplit(s[1]);
-        const [ftm,fta]=parseSplit(s[3]);
-        const reb=parseInt(s[6])||0, ast=parseInt(s[7])||0;
-        const stl=parseInt(s[8])||0, blk=parseInt(s[9])||0;
-        const to=parseInt(s[10])||0, pts=parseInt(s[13])||0;
-        const ff=parseInt(s[11])||0, tf=parseInt(s[12])||0;
-        const fp = pts+reb+ast+stl+blk-(fga-fgm)-(fta-ftm)-to-ff-tf;
-        const min=s[0]||'0';
+        // ESPN stat order: MIN, PTS, FG, 3PT, FT, REB, AST, TO, STL, BLK, OREB, DREB, PF, +/-
+        // indices:          0    1    2   3    4   5    6    7   8    9    10    11    12   13
+        const min = s[0]||'0';
+        const pts = parseInt(s[1])||0;
+        const [fgm,fga] = parseSplit(s[2]);
+        const [ftm,fta] = parseSplit(s[4]);
+        const reb = parseInt(s[5])||0;
+        const ast = parseInt(s[6])||0;
+        const to  = parseInt(s[7])||0;
+        const stl = parseInt(s[8])||0;
+        const blk = parseInt(s[9])||0;
+        const pf  = parseInt(s[12])||0;
+        const ff=0, tf=0; // ESPN doesn't separate flagrant/technical in this feed
+        const fp = pts + reb + ast + stl + blk - (fga-fgm) - (fta-ftm) - to;
 
         const nameLower = name.toLowerCase();
         const matched = PLAYERS.find(p=>{
@@ -1930,7 +1976,7 @@ async function fetchGameBoxScore(eventId){
             nameLower.includes(pLast) ||
             pLower.includes(nameLower.split(' ').pop());
         });
-        if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,ff,tf,min,name:matched.name};
+        if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,pf,min,name:matched.name};
       }
     }
   }
@@ -2101,6 +2147,7 @@ function openPlayerModal(pid){
     const fpStr = (g.fp>=0?'+':'')+parseFloat(g.fp||0).toFixed(1);
     return `<tr class="${isTotal?'boxscore-total':''}">
       <td style="color:${g.live?'var(--red)':isTotal?'var(--accent2)':'var(--text3)'};font-family:'Press Start 2P',monospace;font-size:7px">${dateLabel}</td>
+      <td style="color:var(--text3)">${g.min||'—'}</td>
       <td>${g.pts||0}</td><td>${g.reb||0}</td><td>${g.ast||0}</td>
       <td>${g.stl||0}</td><td>${g.blk||0}</td><td>${g.to||0}</td>
       <td>${g.fgm||0}/${g.fga||0}</td><td>${g.ftm||0}/${g.fta||0}</td>
@@ -2111,7 +2158,7 @@ function openPlayerModal(pid){
   const tableHtml = gameStats.length ? `
     <table class="boxscore-table">
       <thead><tr>
-        <th>DATE</th><th>PTS</th><th>REB</th><th>AST</th>
+        <th>DATE</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
         <th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>FT</th><th>FP</th>
       </tr></thead>
       <tbody>
