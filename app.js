@@ -730,9 +730,9 @@ function showMainScreen(){
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
   document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
-  document.getElementById('m-mgrs').textContent = S.managers.length;
+  if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
-  document.getElementById('m-round').textContent = 'R'+(S.round||1);
+  if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
   if(isCommissioner){
     document.getElementById('comm-active-bar').classList.remove('hidden');
     document.getElementById('comm-login-bar').classList.add('hidden');
@@ -848,9 +848,9 @@ function selectManager(id){
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
   document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
-  document.getElementById('m-mgrs').textContent = S.managers.length;
+  if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
-  document.getElementById('m-round').textContent = 'R'+(S.round||1);
+  if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
   document.getElementById('comm-login-bar').classList.remove('hidden');
   document.getElementById('comm-active-bar').classList.add('hidden');
   render();
