@@ -95,7 +95,8 @@ select:focus{border-color:var(--accent3)}
 .scores-bar-inner{display:flex;gap:0;animation:marquee 50s linear infinite;white-space:nowrap}
 .scores-bar-inner:hover{animation-play-state:paused}
 @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.score-item{display:inline-flex;align-items:center;gap:8px;padding:.45rem 1.25rem;border-right:1px solid var(--border);font-size:16px;white-space:nowrap}
+.scores-bar-static{display:flex;flex-wrap:wrap;gap:0}
+.score-item{display:inline-flex;align-items:center;gap:8px;padding:.4rem 1rem;border-right:1px solid var(--border);font-size:15px;white-space:nowrap}
 .score-live{color:var(--red);font-family:'Press Start 2P',monospace;font-size:7px;animation:blink .8s step-end infinite}
 @keyframes blink{50%{opacity:0}}
 .score-final{color:var(--text3);font-size:12px}
