@@ -1122,10 +1122,10 @@ function renderDraftBanner(){
 function renderStandings(){
   const draftDone = S.draftIdx >= S.snakeOrder.length;
   const playoffsStarted = S.teams.some(t=>t.survivedRounds>0||t.eliminated);
-  const showScores = draftDone && playoffsStarted;
+  const showScores = draftDone; // show scores as soon as draft is done
   const sorted=[...S.managers].sort((a,b)=>{
-    if(!showScores) return a.id-b.id;
-    return managerTotal(b.id)-managerTotal(a.id);
+    if(!draftDone) return a.id-b.id;
+    return managerTotal(b.id)-managerTotal(a.id); // always sort by total points
   });
 
   // Max total for progress bar scaling
