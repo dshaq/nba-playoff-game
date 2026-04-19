@@ -2142,14 +2142,26 @@ async function fetchGameBoxScore(eventId){
         const fp = pts + reb + ast + stl + blk - (fga-fgm) - (fta-ftm) - to;
 
         const nameLower = name.toLowerCase();
-        const matched = PLAYERS.find(p=>{
-          if(p.team!==ourTeam) return false;
-          const pLower = p.name.toLowerCase();
-          const pLast = p.name.split(' ').pop().toLowerCase();
-          return pLower===nameLower ||
-            nameLower.includes(pLast) ||
-            pLower.includes(nameLower.split(' ').pop());
-        });
+        // Priority: exact match first, then last-name match (avoids Bronny/LeBron collision)
+        const matched = 
+          PLAYERS.find(p=>p.team===ourTeam && p.name.toLowerCase()===nameLower) ||
+          PLAYERS.find(p=>{
+            if(p.team!==ourTeam) return false;
+            const pFirst = p.name.split(' ')[0].toLowerCase();
+            const pLast = p.name.split(' ').pop().toLowerCase();
+            const espnFirst = nameLower.split(' ')[0];
+            const espnLast = nameLower.split(' ').pop();
+            // Must match both first AND last to avoid false positives
+            return pFirst===espnFirst && pLast===espnLast;
+          }) ||
+          PLAYERS.find(p=>{
+            if(p.team!==ourTeam) return false;
+            const pLast = p.name.split(' ').pop().toLowerCase();
+            const espnLast = nameLower.split(' ').pop();
+            // Last name only as final fallback — only if unique on team
+            const sameTeamSameLast = PLAYERS.filter(x=>x.team===ourTeam && x.name.split(' ').pop().toLowerCase()===pLast);
+            return pLast===espnLast && sameTeamSameLast.length===1;
+          });
         if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,pf,min,name:matched.name};
       }
     }
