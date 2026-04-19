@@ -672,10 +672,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- Tab bar -->
   <div class="tab-bar">
-    <button class="tab active" onclick="showTab('standings')">STANDINGS</button>
-    <button class="tab" onclick="showTab('waiver')">WAIVERS</button>
+    <button class="tab active" onclick="showTab('live-score')">LIVE SCORE</button>
+    <button class="tab" onclick="showTab('standings')">STANDINGS</button>
     <button class="tab" onclick="showTab('rosters')">ROSTERS</button>
-    <button class="tab" onclick="showTab('scoring')">SCORING</button>
+    <button class="tab" onclick="showTab('waiver')">WAIVERS</button>
+    <button class="tab" onclick="showTab('rules')">RULES</button>
     <button class="tab" onclick="showTab('teams')">TEAMS</button>
     <button class="tab" id="draft-tab" onclick="showTab('draft')">DRAFT</button>
   </div>
@@ -750,8 +751,14 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   </div>
 
   <!-- SCORING -->
-  <div id="tab-scoring" class="hidden">
-    <!-- Commissioner controls live here — out of the way -->
+  <!-- LIVE SCORE TAB -->
+  <div id="tab-live-score" class="hidden">
+    <div class="card"><div class="section-title">LIVE SCORE BREAKDOWN</div><div id="scoring-breakdown"></div></div>
+  </div>
+
+  <!-- RULES TAB -->
+  <div id="tab-rules" class="hidden">
+    <!-- Commissioner controls -->
     <div id="comm-login-bar" class="hidden">
       <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-color:var(--border2)">
         <span style="font-size:15px;color:var(--text3);flex:1">🔒 COMMISSIONER UNLOCK</span>
@@ -765,15 +772,6 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
         <span style="flex:1;font-family:'Press Start 2P',monospace;font-size:8px">COMMISSIONER MODE ACTIVE</span>
         <button class="btn btn-sm btn-green" onclick="lockComm()">LOCK</button>
         <button class="btn btn-sm btn-reset" onclick="confirmReset()">⚠ RESET LEAGUE</button>
-      </div>
-    </div>
-    <div class="card" style="border-left:4px solid var(--accent3)">
-      <div class="section-title">HOW TO PLAY</div>
-      <div style="font-size:16px;color:var(--text2);line-height:2.2">
-        🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time. Order is randomized at league creation.<br>
-        📊 <span style="color:var(--accent3)">EARN POINTS</span> — your players score fantasy points each game based on their real stats. Bonuses stack each round they survive (+5/+10/+20/+50 — max +85 per player).<br>
-        🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens only when your player's team is eliminated or they're injured. No voluntary drops. Submit claims and they process nightly by priority order.<br>
-        🥇 <span style="color:var(--accent3)">WIN</span> — most total fantasy points at the end of the NBA Finals takes the crown.
       </div>
     </div>
     <!-- Portrait Uploader — Commissioner only -->
@@ -792,7 +790,15 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
       </div>
       <div id="portrait-upload-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:.75rem"></div>
     </div>
-
+    <div class="card" style="border-left:4px solid var(--accent3)">
+      <div class="section-title">HOW TO PLAY</div>
+      <div style="font-size:16px;color:var(--text2);line-height:2.2">
+        🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time. Order is randomized at league creation.<br>
+        📊 <span style="color:var(--accent3)">EARN POINTS</span> — your players score fantasy points each game based on their real stats. Bonuses stack each round they survive (+5/+10/+20/+50 — max +85 per player).<br>
+        🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens only when your player's team is eliminated or they're injured. No voluntary drops. Submit claims and they process nightly by priority order.<br>
+        🥇 <span style="color:var(--accent3)">WIN</span> — most total fantasy points at the end of the NBA Finals takes the crown.
+      </div>
+    </div>
     <div class="card">
       <div class="section-title">ESPN SCORING RULES</div>
       <table style="width:100%;font-size:17px;border-collapse:collapse">
@@ -830,7 +836,6 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
       </div>
       <div style="margin-top:.875rem;font-size:15px;color:var(--text3);background:var(--bg2);padding:10px;border:1px solid var(--border)">BONUSES STACK — FINALS WINNER EARNS <span style="color:var(--accent3)">+85 TOTAL BONUS PTS</span> PER PLAYER</div>
     </div>
-    <div class="card"><div class="section-title">LIVE SCORE BREAKDOWN</div><div id="scoring-breakdown"></div></div>
   </div>
 
 </div><!-- /main-screen -->

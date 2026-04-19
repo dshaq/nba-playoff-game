@@ -7,7 +7,7 @@ const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.
 const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
 const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
-const ALL_TABS = ['standings','manage-names','draft','waiver','rosters','scoring','teams'];
+const ALL_TABS = ['live-score','standings','manage-names','draft','waiver','rosters','rules','teams'];
 const LEAGUE_ID = 'nba-2026';
 
 // 2026 NBA Playoff Teams — BRACKET SET
@@ -1572,7 +1572,7 @@ function renderRosters(){
 }
 
 function renderScoring(){
-  // Show portrait uploader for commissioner
+  // Show portrait uploader for commissioner (on rules tab)
   const uploaderCard = document.getElementById('portrait-uploader-card');
   if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
 
