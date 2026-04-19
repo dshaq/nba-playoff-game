@@ -7,7 +7,7 @@ const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.
 const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
 const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
-const ALL_TABS = ['standings','manage-names','draft','waiver','rosters','scoring'];
+const ALL_TABS = ['standings','manage-names','draft','waiver','rosters','scoring','teams'];
 const LEAGUE_ID = 'nba-2026';
 
 // 2026 NBA Playoff Teams — BRACKET SET
@@ -1074,7 +1074,7 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -1664,6 +1664,100 @@ function renderScoring(){
 }
 
 
+
+// ── Teams Gallery ────────────────────────────────────────────────
+function renderTeams(){
+  const el = document.getElementById('tab-teams');
+  if(!el) return;
+
+  // Build a lookup of who owns each player
+  const ownerMap = {}; // pid -> managerName
+  if(S.managers && S.rosters){
+    for(const m of S.managers){
+      for(const pid of (S.rosters[m.id]||[])){
+        ownerMap[pid] = m.name;
+      }
+    }
+  }
+
+  const teamFilter = window._teamGalleryFilter || null;
+
+  // Team selector chips
+  const chipHtml = TEAMS.map(t=>{
+    const tc = (TEAM_LOGOS[t.id]?.color)||'#4a9eff';
+    const active = teamFilter===t.id;
+    return `<button onclick="setTeamGalleryFilter('${t.id}')" style="
+      padding:4px 10px;border:2px solid ${active?tc:'var(--border)'};
+      background:${active?tc+'22':'transparent'};color:${active?tc:'var(--text3)'};
+      font-family:'VT323',monospace;font-size:14px;cursor:pointer;
+      ${t.eliminated?'opacity:.4;text-decoration:line-through':''}
+    ">${TEAM_LOGOS[t.id]?.svg?'':''} ${t.id}</button>`;
+  }).join('');
+
+  // Players to show
+  const playersToShow = teamFilter
+    ? PLAYERS.filter(p=>p.team===teamFilter)
+    : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team)); // only playoff teams
+
+  // Sort: drafted first, then by espn score
+  const drafted = playersToShow.filter(p=>ownerMap[p.id]);
+  const undrafted = playersToShow.filter(p=>!ownerMap[p.id]);
+  const sorted = [...drafted, ...undrafted];
+
+  const cardHtml = sorted.map(p=>{
+    const t = TEAMS.find(t=>t.id===p.team);
+    const tc = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+    const hasPortrait = PLAYER_PORTRAITS[p.name];
+    const logo = TEAM_LOGOS[p.team];
+    const owner = ownerMap[p.id];
+    const statScore = playerStatScore(p.id);
+    const isLive = isPlayerLive(p.id);
+    const elim = t?.eliminated;
+
+    return `<div onclick="openPlayerModal(${p.id})" style="
+      flex-shrink:0;width:110px;cursor:pointer;
+      background:#020c18;border:2px solid ${elim?'#333':tc};
+      display:flex;flex-direction:column;
+      opacity:${elim?0.4:1};
+      transition:transform .1s;
+    " onmouseenter="this.style.transform='scale(1.04)'" onmouseleave="this.style.transform='scale(1)'">
+      <!-- Portrait -->
+      <div style="width:106px;height:106px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
+        ${hasPortrait
+          ? `<img src="${PLAYER_PORTRAITS[p.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
+          : logo
+            ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:12px">${logo.svg}</div>`
+            : `<div style="font-family:'Press Start 2P',monospace;font-size:10px;color:${tc}">${p.team}</div>`
+        }
+        ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
+        ${owner?`<div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.8);font-size:9px;padding:1px 4px;color:var(--accent3);white-space:nowrap;overflow:hidden;max-width:90px;text-overflow:ellipsis">${owner}</div>`:''}
+      </div>
+      <!-- Divider -->
+      <div style="height:2px;background:${elim?'#333':tc}"></div>
+      <!-- Name bar -->
+      <div style="padding:4px 5px;background:#020c18;flex:1">
+        <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${elim?'#444':tc};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.toUpperCase()}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${p.pos}</div>
+      </div>
+      <!-- Stats bar -->
+      <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;color:var(--text3)">${p.team}</span>
+        <span style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('teams-chips').innerHTML = chipHtml;
+  document.getElementById('teams-gallery').innerHTML = sorted.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">${cardHtml}</div>`
+    : `<div style="color:var(--text3);padding:1rem">No players found.</div>`;
+}
+
+function setTeamGalleryFilter(teamId){
+  window._teamGalleryFilter = (window._teamGalleryFilter===teamId) ? null : teamId;
+  renderTeams();
+}
+
 // ── Bracket ───────────────────────────────────────────────────────
 function renderBracket(){
   const el = document.getElementById('bracket-section');
@@ -1711,14 +1805,26 @@ function renderBracket(){
     return t && (t.survivedRounds||0) >= rounds && !t.eliminated;
   }
 
-  function bTeam(team, rounds){
+  function bTeam(team, rounds, opponent){
     if(!team) return `<div class="b-team tbd"><span class="b-seed">?</span> TBD</div>`;
     const t = teamMap[team.id];
     const elim = t && t.eliminated;
     const survived = t ? (t.survivedRounds||0) : 0;
     const isWinner = survived >= rounds && !elim;
-    return `<div class="b-team ${elim?'eliminated':isWinner?'winner':''}">
-      <span class="b-seed">${team.seed}</span>${team.name}
+    // Get series wins for this team
+    let winsHtml = '';
+    if(opponent && !isWinner && !elim){
+      const sr = getSeriesRecord(team.id, opponent.id);
+      if(sr && sr.wins){
+        const myWins = sr.wins[team.id]||0;
+        const oppWins = sr.wins[opponent.id]||0;
+        if(myWins>0||oppWins>0){
+          winsHtml = `<span style="font-family:'Press Start 2P',monospace;font-size:7px;margin-left:auto;color:${myWins>oppWins?'var(--accent2)':'var(--text3)'}">${myWins}-${oppWins}</span>`;
+        }
+      }
+    }
+    return `<div class="b-team ${elim?'eliminated':isWinner?'winner':''}" style="display:flex;align-items:center;gap:4px">
+      <span class="b-seed">${team.seed}</span>${team.name}${winsHtml}
     </div>`;
   }
 
@@ -1773,7 +1879,7 @@ function renderBracket(){
   }
 
   function matchup(t1, t2, rounds){
-    return `<div class="b-matchup">${bTeam(t1,rounds)}${bTeam(t2,rounds)}</div>`;
+    return `<div class="b-matchup">${bTeam(t1,rounds,t2)}${bTeam(t2,rounds,t1)}</div>`;
   }
 
   // ── West R1 ──
@@ -2325,6 +2431,8 @@ async function boot(){
   try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
   const hasState=await loadState();
   await loadPortraits();
+  fetchSeriesRecords();
+  setInterval(fetchSeriesRecords, 120000);
   document.getElementById('loading-overlay').style.display='none';
   if(hasState){
     currentManagerId===null?showManagerPicker():showMainScreen();

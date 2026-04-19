@@ -676,6 +676,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
     <button class="tab" onclick="showTab('waiver')">WAIVERS</button>
     <button class="tab" onclick="showTab('rosters')">ROSTERS</button>
     <button class="tab" onclick="showTab('scoring')">SCORING</button>
+    <button class="tab" onclick="showTab('teams')">TEAMS</button>
     <button class="tab" id="draft-tab" onclick="showTab('draft')">DRAFT</button>
   </div>
 
@@ -698,6 +699,15 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
       <div style="font-size:15px;color:var(--text2);margin-bottom:1rem">CHANGE NICKNAMES AND PICK YOUR PLAYER ICON — UPDATES EVERYWHERE INSTANTLY</div>
       <div id="name-edit-list"></div>
       <button class="btn btn-green" style="margin-top:1rem" onclick="showTab('standings')">✓ DONE</button>
+    </div>
+  </div>
+
+  <!-- TEAMS -->
+  <div id="tab-teams" class="hidden">
+    <div style="margin-bottom:.75rem">
+      <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent3);margin-bottom:.625rem">► SELECT TEAM — TAP PLAYER FOR STATS</div>
+      <div id="teams-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.875rem"></div>
+      <div id="teams-gallery"></div>
     </div>
   </div>
 
