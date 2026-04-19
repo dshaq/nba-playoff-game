@@ -1573,24 +1573,92 @@ function renderRosters(){
 
 function renderScoring(){
   document.getElementById('scoring-breakdown').innerHTML=S.managers.map(m=>{
-    const players=S.rosters[m.id].map(pid=>getPlayer(pid));
-    return `<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <div style="width:28px;height:28px;border:2px solid ${getAvatarColor(m.id)};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id)}</div>
-        <span style="font-size:17px;color:var(--text)">${m.name}</span>
-        <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:var(--accent2);margin-left:auto">${managerTotal(m.id)} PTS</span>
+    const players=S.rosters[m.id].map(pid=>getPlayer(pid)).filter(Boolean);
+    const aColor=getAvatarColor(m.id);
+    const mTotal=managerTotal(m.id);
+    const mStat=managerStatScore(m.id);
+    const mBonus=managerBonusScore(m.id);
+
+    return `<div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:2px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:.625rem">
+        <div style="width:36px;height:36px;border:2px solid ${aColor};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id)}</div>
+        <span style="font-size:17px;color:var(--text);font-weight:600">${m.name}</span>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-family:'Press Start 2P',monospace;font-size:13px;color:var(--accent2)">${mTotal} PTS</div>
+          <div style="font-size:11px;color:var(--text3)">${mStat} STAT${mBonus>0?` + <span style="color:var(--green)">${mBonus} BONUS</span>`:''}</div>
+        </div>
       </div>
-      ${players.length?players.map(p=>{
-        const t=getTeam(p.team),bd=espnBD(p),bonus=bonusForPlayer(p.id,m.id),inactive=isInactive(m.id,p.id);
-        return `<div style="font-size:13px;padding:4px 0 4px 34px;border-bottom:1px solid var(--bg2)">
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <span style="flex:1;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${inactive?` <span style="color:var(--red);font-size:12px">(INACTIVE)</span>`:''}</span>
-            <span style="color:var(--green)">+${bd.pos}</span><span style="color:var(--red)">−${bd.neg}</span>
-            ${bonus>0?`<span style="color:var(--green)">+${bonus}B</span>`:''}
-            <span style="color:var(--accent2);font-weight:bold">${inactive?bonus:(bd.net+bonus).toFixed(1)}</span>
-          </div>
-        </div>`;
-      }).join(''):'<div style="font-size:14px;color:var(--text3);padding-left:34px">NO PLAYERS DRAFTED</div>'}
+      ${players.length?`
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:4px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">PLAYER</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">FP</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">PTS</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">REB</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">AST</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">STL</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">BLK</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">TO</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">BONUS</th>
+              <th style="padding:4px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${players.map(p=>{
+              const t=getTeam(p.team);
+              const statScore=playerStatScore(p.id);
+              const bonus=bonusForPlayer(p.id,m.id);
+              const playerTotal=+(statScore+bonus).toFixed(1);
+              const isLive=isPlayerLive(p.id);
+              const inj=(S.injured[m.id]||[]).includes(p.id);
+              const teamColor=(TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+
+              // Get aggregated stats for display
+              const savedStats=S.playerStats
+                ? Object.values(S.playerStats).filter(s=>s.pid===p.id)
+                : [];
+              const live=livePlayerStats[p.id];
+              const allStats=[...savedStats];
+              if(live){
+                const alreadySaved=savedStats.some(s=>s.gameId&&s.gameId===live.gameId);
+                if(!alreadySaved) allStats.push(live);
+              }
+              const agg=allStats.reduce((a,s)=>({
+                pts:a.pts+(s.pts||0),reb:a.reb+(s.reb||0),ast:a.ast+(s.ast||0),
+                stl:a.stl+(s.stl||0),blk:a.blk+(s.blk||0),to:a.to+(s.to||0),
+                fgm:a.fgm+(s.fgm||0),fga:a.fga+(s.fga||0)
+              }),{pts:0,reb:0,ast:0,stl:0,blk:0,to:0,fgm:0,fga:0});
+              const hasStats=allStats.length>0;
+              const missedFG=agg.fga-agg.fgm;
+
+              return `<tr style="border-bottom:1px solid var(--bg2);${t.eliminated?'opacity:.5':''}">
+                <td style="padding:5px 6px">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    ${playerLogoHtml(p.team,24,p.name)}
+                    <div>
+                      <span style="color:var(--text);cursor:pointer" onclick="openPlayerModal(${p.id})">${p.name}</span>
+                      <span class="pos-badge" style="font-size:9px">${p.pos}</span>
+                      ${isLive?'<span class="score-live" style="font-size:7px;margin-left:3px">LIVE</span>':''}
+                      ${t.eliminated?'<span class="badge badge-elim" style="font-size:9px">ELIM</span>':inj?'<span class="badge badge-inj" style="font-size:9px">INJ</span>':''}
+                    </div>
+                  </div>
+                </td>
+                <td style="text-align:center;font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">${hasStats?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}</td>
+                <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
+                <td style="text-align:center;color:var(--text2)">${hasStats?agg.reb:'—'}</td>
+                <td style="text-align:center;color:var(--text2)">${hasStats?agg.ast:'—'}</td>
+                <td style="text-align:center;color:var(--text2)">${hasStats?agg.stl:'—'}</td>
+                <td style="text-align:center;color:var(--text2)">${hasStats?agg.blk:'—'}</td>
+                <td style="text-align:center;color:${agg.to>0?'var(--red)':'var(--text2)'}">${hasStats?agg.to:'—'}</td>
+                <td style="text-align:center;color:var(--green)">${bonus>0?'+'+bonus:'—'}</td>
+                <td style="text-align:center;font-family:'Press Start 2P',monospace;font-size:10px;color:${playerTotal>0?'var(--accent2)':playerTotal<0?'var(--red)':'var(--text3)'}">${hasStats||bonus>0?`${playerTotal>0?'+':''}${playerTotal.toFixed(1)}`:'—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`:'<div style="font-size:14px;color:var(--text3);padding:6px 0">NO PLAYERS DRAFTED</div>'}
     </div>`;
   }).join('');
 }
