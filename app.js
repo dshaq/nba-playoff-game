@@ -1815,19 +1815,23 @@ function renderBracket(){
     const elim = t && t.eliminated;
     const survived = t ? (t.survivedRounds||0) : 0;
     const isWinner = survived >= rounds && !elim;
-    // Get series wins for this team
+
     let winsHtml = '';
-    if(opponent && !isWinner && !elim){
+    if(opponent){
       const sr = getSeriesRecord(team.id, opponent.id);
       if(sr && sr.wins){
         const myWins = sr.wins[team.id]||0;
         const oppWins = sr.wins[opponent.id]||0;
-        if(myWins>0||oppWins>0){
-          winsHtml = `<span style="font-family:'Press Start 2P',monospace;font-size:7px;margin-left:auto;color:${myWins>oppWins?'var(--accent2)':'var(--text3)'}">${myWins}-${oppWins}</span>`;
+        const isLeading = myWins > oppWins;
+        const isTied = myWins === oppWins && myWins > 0;
+        const hasGames = myWins > 0 || oppWins > 0;
+        if(hasGames || isWinner || elim){
+          const color = isWinner ? 'var(--accent)' : isLeading ? 'var(--accent2)' : elim ? 'var(--red)' : 'var(--text3)';
+          winsHtml = `<span style="font-family:'Press Start 2P',monospace;font-size:7px;margin-left:auto;padding-left:4px;color:${color}">${myWins}-${oppWins}</span>`;
         }
       }
     }
-    return `<div class="b-team ${elim?'eliminated':isWinner?'winner':''}" style="display:flex;align-items:center;gap:4px">
+    return `<div class="b-team ${elim?'eliminated':isWinner?'winner':''}" style="display:flex;align-items:center;gap:2px">
       <span class="b-seed">${team.seed}</span>${team.name}${winsHtml}
     </div>`;
   }
@@ -2521,21 +2525,48 @@ async function handlePortraitUpload(input){
 
 async function fetchSeriesRecords(){
   try{
-    const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3');
-    const d = await res.json();
-    const newRecords = {};
-    for(const ev of (d.events||[])){
-      const comp = ev.competitions?.[0];
-      const series = comp?.series;
-      if(!series) continue;
-      const teams = comp?.competitors?.map(c=>espnTeamToOurs(c.team?.abbreviation||'')).filter(Boolean);
-      if(teams.length<2) continue;
-      const key = teams.slice().sort().join('-');
-      const wins = {};
-      (series.competitors||[]).forEach((c,i)=>{ if(teams[i]) wins[teams[i]]=(c.wins||0); });
-      newRecords[key] = {summary: series.summary||'', wins};
+    // Scan from playoffs start through next 60 days to capture all series
+    const startDate = new Date('2026-04-18');
+    const dates = [];
+    for(let i=0;i<60;i++){
+      const d = new Date(startDate);
+      d.setDate(d.getDate()+i);
+      dates.push(d.toISOString().slice(0,10).replace(/-/g,''));
     }
+
+    const newRecords = {};
+
+    // Batch dates in groups of 7 to avoid too many requests
+    for(let i=0;i<dates.length;i+=7){
+      const batch = dates.slice(i,i+7);
+      await Promise.all(batch.map(async dateStr => {
+        try{
+          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3&dates=${dateStr}`);
+          const d = await res.json();
+          for(const ev of (d.events||[])){
+            const comp = ev.competitions?.[0];
+            const series = comp?.series;
+            if(!series) continue;
+            const teams = comp?.competitors?.map(c=>espnTeamToOurs(c.team?.abbreviation||'')).filter(Boolean);
+            if(teams.length<2) continue;
+            const key = teams.slice().sort().join('-');
+            const wins = {};
+            (series.competitors||[]).forEach((c,i)=>{ if(teams[i]) wins[teams[i]]=(c.wins||0); });
+            const summary = series.summary||'';
+            // Always overwrite with latest data (higher total wins = more recent)
+            const existing = newRecords[key];
+            const newTotal = Object.values(wins).reduce((a,b)=>a+b,0);
+            const existingTotal = existing ? Object.values(existing.wins).reduce((a,b)=>a+b,0) : -1;
+            if(newTotal >= existingTotal){
+              newRecords[key] = {summary, wins};
+            }
+          }
+        }catch(e){}
+      }));
+    }
+
     if(Object.keys(newRecords).length) seriesRecords = newRecords;
+    console.log('Series records loaded:', Object.keys(newRecords).length, 'series');
   }catch(e){ console.warn('fetchSeriesRecords error:', e); }
 }
 
