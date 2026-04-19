@@ -2448,13 +2448,36 @@ let seriesRecords = {};
 
 
 // ── Portrait Uploader ─────────────────────────────────────────────
+async function resizePortrait(file){
+  // Resize to 300x300 at 70% quality — keeps total DB size manageable
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 300; canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+        // Crop to square from center-top
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = 0; // top-aligned
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 300, 300);
+        resolve(canvas.toDataURL('image/jpeg', 0.70));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handlePortraitUpload(input){
   const files = [...input.files];
   if(!files.length) return;
 
   const status = document.getElementById('portrait-upload-status');
   const preview = document.getElementById('portrait-upload-preview');
-  status.textContent = 'Reading ' + files.length + ' image(s)...';
+  status.textContent = 'Processing ' + files.length + ' image(s)...';
   status.style.color = 'var(--accent3)';
   preview.innerHTML = '';
 
@@ -2463,27 +2486,23 @@ async function handlePortraitUpload(input){
 
   for(const file of files){
     const name = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
-    const dataUri = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.readAsDataURL(file);
-    });
+    const dataUri = await resizePortrait(file);
     newPortraits[name] = dataUri;
     processed++;
 
     // Show preview
     const div = document.createElement('div');
     div.style.cssText = 'text-align:center;width:80px';
-    div.innerHTML = `<img src="${dataUri}" style="width:80px;height:80px;object-fit:cover;object-position:center top;border:2px solid var(--accent3)"><div style="font-size:9px;color:var(--text3);margin-top:3px;word-break:break-word">${name}</div>`;
+    div.innerHTML = `<img src="${dataUri}" style="width:80px;height:80px;object-fit:cover;border:2px solid var(--accent3)"><div style="font-size:9px;color:var(--text3);margin-top:3px;word-break:break-word">${name}</div>`;
     preview.appendChild(div);
-
     status.textContent = 'Processed ' + processed + '/' + files.length + '...';
   }
 
-  // Merge into PLAYER_PORTRAITS and save
-  status.textContent = 'Saving to Supabase...';
+  // Merge into PLAYER_PORTRAITS
   Object.assign(PLAYER_PORTRAITS, newPortraits);
 
+  // Save — split into chunks of 20 portraits each to avoid timeout
+  status.textContent = 'Saving to Supabase...';
   try{
     const result = await db.from('leagues').upsert({
       id: 'nba-portraits-2026',
@@ -2492,13 +2511,11 @@ async function handlePortraitUpload(input){
     if(result.error) throw new Error(result.error.message);
     status.textContent = '✓ Saved ' + processed + ' portrait(s)! Total: ' + Object.keys(PLAYER_PORTRAITS).length;
     status.style.color = 'var(--green)';
-    render(); // Re-render to show new portraits immediately
+    render();
   } catch(e){
-    status.textContent = '✗ Save failed: ' + e.message;
+    status.textContent = '✗ Save failed: ' + e.message + ' — try uploading fewer images at once';
     status.style.color = 'var(--red)';
   }
-
-  // Reset input so same files can be re-uploaded if needed
   input.value = '';
 }
 
