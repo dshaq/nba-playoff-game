@@ -2438,6 +2438,35 @@ async function dragDrop(e, mid, idx){
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
+
+// ── Series Records ────────────────────────────────────────────────
+let seriesRecords = {};
+
+async function fetchSeriesRecords(){
+  try{
+    const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3');
+    const d = await res.json();
+    const newRecords = {};
+    for(const ev of (d.events||[])){
+      const comp = ev.competitions?.[0];
+      const series = comp?.series;
+      if(!series) continue;
+      const teams = comp?.competitors?.map(c=>espnTeamToOurs(c.team?.abbreviation||'')).filter(Boolean);
+      if(teams.length<2) continue;
+      const key = teams.slice().sort().join('-');
+      const wins = {};
+      (series.competitors||[]).forEach((c,i)=>{ if(teams[i]) wins[teams[i]]=(c.wins||0); });
+      newRecords[key] = {summary: series.summary||'', wins};
+    }
+    if(Object.keys(newRecords).length) seriesRecords = newRecords;
+  }catch(e){ console.warn('fetchSeriesRecords error:', e); }
+}
+
+function getSeriesRecord(team1, team2){
+  const key = [team1,team2].sort().join('-');
+  return seriesRecords[key] || null;
+}
+
 async function boot(){
   initSupabase();
   try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
