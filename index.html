@@ -776,6 +776,23 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
         🥇 <span style="color:var(--accent3)">WIN</span> — most total fantasy points at the end of the NBA Finals takes the crown.
       </div>
     </div>
+    <!-- Portrait Uploader — Commissioner only -->
+    <div id="portrait-uploader-card" class="card hidden" style="border-left:4px solid var(--accent3);margin-bottom:.75rem">
+      <div class="section-title" style="margin-bottom:.75rem">🎨 UPLOAD PLAYER PORTRAITS</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:.875rem">
+        Pick portrait images — filenames should match player names (e.g. <span style="color:var(--accent3)">Jayson_Tatum.jpeg</span>).
+        They'll save to Supabase automatically.
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;display:inline-block">
+          <input type="file" id="portrait-file-input" multiple accept="image/*" style="display:none" onchange="handlePortraitUpload(this)">
+          <span class="btn btn-green" style="display:inline-block">📁 CHOOSE IMAGES</span>
+        </label>
+        <div id="portrait-upload-status" style="font-size:13px;color:var(--text3)">No files selected</div>
+      </div>
+      <div id="portrait-upload-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:.75rem"></div>
+    </div>
+
     <div class="card">
       <div class="section-title">ESPN SCORING RULES</div>
       <table style="width:100%;font-size:17px;border-collapse:collapse">

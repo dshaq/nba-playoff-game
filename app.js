@@ -1572,6 +1572,10 @@ function renderRosters(){
 }
 
 function renderScoring(){
+  // Show portrait uploader for commissioner
+  const uploaderCard = document.getElementById('portrait-uploader-card');
+  if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
+
   document.getElementById('scoring-breakdown').innerHTML=S.managers.map(m=>{
     const players=S.rosters[m.id].map(pid=>getPlayer(pid)).filter(Boolean);
     const aColor=getAvatarColor(m.id);
@@ -2441,6 +2445,62 @@ async function dragDrop(e, mid, idx){
 
 // ── Series Records ────────────────────────────────────────────────
 let seriesRecords = {};
+
+
+// ── Portrait Uploader ─────────────────────────────────────────────
+async function handlePortraitUpload(input){
+  const files = [...input.files];
+  if(!files.length) return;
+
+  const status = document.getElementById('portrait-upload-status');
+  const preview = document.getElementById('portrait-upload-preview');
+  status.textContent = 'Reading ' + files.length + ' image(s)...';
+  status.style.color = 'var(--accent3)';
+  preview.innerHTML = '';
+
+  let processed = 0;
+  const newPortraits = {};
+
+  for(const file of files){
+    const name = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+    const dataUri = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+    newPortraits[name] = dataUri;
+    processed++;
+
+    // Show preview
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;width:80px';
+    div.innerHTML = `<img src="${dataUri}" style="width:80px;height:80px;object-fit:cover;object-position:center top;border:2px solid var(--accent3)"><div style="font-size:9px;color:var(--text3);margin-top:3px;word-break:break-word">${name}</div>`;
+    preview.appendChild(div);
+
+    status.textContent = 'Processed ' + processed + '/' + files.length + '...';
+  }
+
+  // Merge into PLAYER_PORTRAITS and save
+  status.textContent = 'Saving to Supabase...';
+  Object.assign(PLAYER_PORTRAITS, newPortraits);
+
+  try{
+    const result = await db.from('leagues').upsert({
+      id: 'nba-portraits-2026',
+      state: JSON.stringify(PLAYER_PORTRAITS)
+    });
+    if(result.error) throw new Error(result.error.message);
+    status.textContent = '✓ Saved ' + processed + ' portrait(s)! Total: ' + Object.keys(PLAYER_PORTRAITS).length;
+    status.style.color = 'var(--green)';
+    render(); // Re-render to show new portraits immediately
+  } catch(e){
+    status.textContent = '✗ Save failed: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+
+  // Reset input so same files can be re-uploaded if needed
+  input.value = '';
+}
 
 async function fetchSeriesRecords(){
   try{
