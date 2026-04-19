@@ -2442,10 +2442,12 @@ async function boot(){
   initSupabase();
   try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
   const hasState=await loadState();
-  await loadPortraits();
+  // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
+  document.getElementById('loading-overlay').style.display='none';
+  // Load portraits in background, re-render when done
+  loadPortraits().then(()=>render()).catch(()=>{});
   fetchSeriesRecords();
   setInterval(fetchSeriesRecords, 120000);
-  document.getElementById('loading-overlay').style.display='none';
   if(hasState){
     currentManagerId===null?showManagerPicker():showMainScreen();
   } else {
