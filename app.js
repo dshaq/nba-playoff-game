@@ -1,3 +1,4 @@
+// v66 — OUT badge + INJ eligibility fix
 const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
 
@@ -1662,10 +1663,22 @@ function renderRosters(){
                 <span style="font-size:5px;color:var(--text3)">BONUS</span>
                 <span style="font-size:5px;color:${ROUND_FG[Math.min(sr,4)]}">+${bonus}</span>
               </div>`:''}
-              ${(isCommissioner||currentManagerId===m.id)&&!t.eliminated?`<div style="display:flex;gap:2px;margin-top:2px">
-                ${!inj?`<button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">INJ</button>`:''}
-                ${inj?`<button style="flex:1;font-size:5px;padding:2px;background:var(--green);border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();clearInjury(${m.id},${p.id})">✓ OK</button>`:''}
-              </div>`:''}
+              ${(()=>{
+                // Show INJ if: already injured (show OK), OR team played but player sat out
+                if(t.eliminated) return '';
+                const canManage = isCommissioner || currentManagerId===m.id;
+                if(!canManage) return '';
+                if(inj) return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:var(--green);border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();clearInjury(${m.id},${p.id})">✓ OK</button></div>`;
+                // Check if team has played games but player has 0 stats in any of them
+                const teamGameIds = new Set(Object.values(S.playerStats||{}).filter(s=>{
+                  const tp = PLAYERS.find(x=>x.id===s.pid);
+                  return tp && tp.team===p.team;
+                }).map(s=>s.gameId));
+                const playerGameIds = new Set(Object.values(S.playerStats||{}).filter(s=>s.pid===p.id).map(s=>s.gameId));
+                const missedGame = [...teamGameIds].some(gid=>!playerGameIds.has(gid));
+                if(!missedGame) return ''; // No missed games — no INJ button
+                return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">INJ</button></div>`;
+              })()}
             </div>
           </div>`;
         }).join('')}
