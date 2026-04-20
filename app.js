@@ -643,21 +643,45 @@ async function fetchScores(){
     // Find top FP player portrait for this game
     const topPlayer = g.espnId ? gameTopPlayer[g.espnId] : null;
 
+    // For upcoming games with no live data, find the best-known player
+    // with a portrait from either team — prefer drafted players
+    let previewPlayer = null;
+    if(!topPlayer && isUpcoming){
+      const awayTeamId = espnTeamToOurs(away.teamTricode||'');
+      const homeTeamId = espnTeamToOurs(home.teamTricode||'');
+      const bothTeams = [awayTeamId, homeTeamId].filter(Boolean);
+      // Build pool: all players on these teams who have portraits
+      const pool = PLAYERS.filter(p=>bothTeams.includes(p.team) && PLAYER_PORTRAITS[p.name]);
+      // Prefer players with most career FP (ppg proxy), alternating teams for variety
+      const byTeam = {};
+      bothTeams.forEach(tid=>{
+        byTeam[tid] = pool.filter(p=>p.team===tid).sort((a,b)=>b.ppg-a.ppg);
+      });
+      // Pick one from each team — best available
+      const picks = bothTeams.map(tid=>byTeam[tid]?.[0]).filter(Boolean);
+      previewPlayer = picks.length ? picks[Math.floor(Date.now()/10000)%picks.length] : null;
+    }
+
+    const displayPlayer = topPlayer || (previewPlayer ? {name:previewPlayer.name, fp:null, isPreview:true} : null);
+
     const statusHtml = isLive
       ? `<span class="score-status live">● ${status}</span>`
       : isFinal
         ? `<span class="score-status final">${isYday?'YESTERDAY':'FINAL'}</span>`
         : `<span class="score-status upcoming">${status}</span>`;
 
-    // Portrait or fallback team color blocks
-    const portraitHtml = topPlayer
-      ? `<div style="width:52px;height:52px;overflow:hidden;flex-shrink:0;position:relative;border:2px solid ${isLive?'var(--red)':'var(--border)'}">
-          <img src="${PLAYER_PORTRAITS[topPlayer.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>
-          ${isLive?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.85);font-family:'Press Start 2P',monospace;font-size:5px;color:#fff;text-align:center;padding:1px">${topPlayer.fp>0?'+':''}${topPlayer.fp.toFixed(0)} FP</div>`:''}
+    // Portrait
+    const borderColor = isLive ? 'var(--red)' : isFinal ? 'var(--border)' : 'var(--border2)';
+    const portraitHtml = displayPlayer && PLAYER_PORTRAITS[displayPlayer.name]
+      ? `<div style="width:52px;height:52px;overflow:hidden;flex-shrink:0;position:relative;border:2px solid ${borderColor}">
+          <img src="${PLAYER_PORTRAITS[displayPlayer.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>
+          ${isLive&&displayPlayer.fp!=null?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.85);font-family:'Press Start 2P',monospace;font-size:5px;color:#fff;text-align:center;padding:1px">${displayPlayer.fp>0?'+':''}${(+displayPlayer.fp).toFixed(0)} FP</div>`:''}
+          ${isUpcoming?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);font-family:'Press Start 2P',monospace;font-size:4px;color:var(--accent3);text-align:center;padding:1px">TONIGHT</div>`:''}
         </div>`
-      : `<div style="width:52px;height:52px;display:flex;flex-direction:column;flex-shrink:0">
-          <div style="flex:1;background:${awayColor}22;border:1px solid ${awayColor}44"></div>
-          <div style="flex:1;background:${homeColor}22;border:1px solid ${homeColor}44"></div>
+      : `<div style="width:52px;height:52px;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;border:1px solid var(--border2)">
+          <div style="flex:1;background:${awayColor}33"></div>
+          <div style="height:1px;background:var(--border2)"></div>
+          <div style="flex:1;background:${homeColor}33"></div>
         </div>`;
 
     return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}" style="min-width:130px;flex-direction:row;gap:8px;padding:.4rem .625rem;align-items:center">
@@ -2452,6 +2476,7 @@ async function refreshLiveStats(){
 
     render();
     updateLiveStatsIndicator();
+    fetchScores(); // Re-render scoreboard portraits with latest live FP leaders
   }catch(e){ console.warn('refreshLiveStats error:', e); }
 }
 
