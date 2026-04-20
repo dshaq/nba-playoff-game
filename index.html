@@ -91,20 +91,36 @@ select:focus{border-color:var(--accent3)}
 /* ══════════════════════════════════
    SCORES BAR
 ══════════════════════════════════ */
-.scores-bar{background:var(--panel);border:2px solid var(--border);border-left:4px solid var(--accent);margin-bottom:.75rem;overflow:hidden;position:sticky;top:0;z-index:100}
-.scores-bar-inner{display:flex;gap:0;animation:marquee 50s linear infinite;white-space:nowrap}
-.scores-bar-inner:hover{animation-play-state:paused}
-@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.scores-bar-static{display:flex;flex-wrap:wrap;gap:0}
-.score-item{display:inline-flex;align-items:center;gap:8px;padding:.4rem 1rem;border-right:1px solid var(--border);font-size:15px;white-space:nowrap}
+.scores-bar{background:var(--bg);border-bottom:2px solid var(--border);overflow:hidden;position:sticky;top:0;z-index:100}
+.scores-bar-static{display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.scores-bar-static::-webkit-scrollbar{display:none}
+.score-item{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:120px;padding:.5rem .75rem;border-right:1px solid var(--border2);
+  gap:3px;flex-shrink:0;cursor:default;position:relative;
+  background:var(--panel);
+}
+.score-item:hover{background:var(--panel2)}
+.score-item.live-game{border-bottom:2px solid var(--red)}
+.score-item.upcoming-game{border-bottom:2px solid var(--border)}
+.score-item.final-game{border-bottom:2px solid var(--border2)}
+.score-teams-row{display:flex;align-items:center;gap:6px;width:100%}
+.score-team-block{display:flex;flex-direction:column;align-items:center;flex:1;gap:1px}
+.score-team-abbr{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text2)}
+.score-team-abbr.winner{color:var(--text)}
+.score-num{font-family:'Press Start 2P',monospace;font-size:15px;color:var(--text3)}
+.score-num.winner{color:var(--accent2);text-shadow:0 0 8px rgba(245,166,35,.4)}
+.score-num.live{color:var(--red)}
+.score-divider{font-size:11px;color:var(--border);flex-shrink:0}
+.score-status{font-family:'Press Start 2P',monospace;font-size:6px;text-align:center}
+.score-status.live{color:var(--red);animation:blink .8s step-end infinite}
+.score-status.final{color:var(--text3)}
+.score-status.upcoming{color:var(--accent3)}
 .score-live{color:var(--red);font-family:'Press Start 2P',monospace;font-size:7px;animation:blink .8s step-end infinite}
 @keyframes blink{50%{opacity:0}}
-.score-final{color:var(--text3);font-size:12px}
-.score-team{font-size:15px;color:var(--text)}
-.score-pts{font-size:17px;font-weight:bold;color:var(--accent3)}
-.score-vs{color:var(--text3);font-size:12px}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.scores-loading{padding:.75rem 1rem;font-size:14px;color:var(--text2)}
 .scores-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:.45rem 1rem;border-right:2px solid var(--border);white-space:nowrap;display:flex;align-items:center;gap:6px;background:rgba(0,180,255,.05)}
-.scores-loading{padding:.45rem 1rem;font-size:15px;color:var(--text2)}
 
 /* ══════════════════════════════════
    BRACKET
@@ -654,12 +670,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- Live scores -->
   <div class="scores-bar">
-    <div style="display:flex">
-      <div class="scores-label">📺 LIVE</div>
-      <div style="flex:1;overflow:hidden">
-        <div id="scores-content" class="scores-loading">LOADING SCORES...</div>
-      </div>
-    </div>
+    <div id="scores-content" class="scores-loading" style="padding:.75rem 1rem">LOADING SCORES...</div>
   </div>
 
   <!-- Draft on-clock banner -->

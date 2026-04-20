@@ -612,18 +612,42 @@ async function fetchScores(){
     const status=g.gameStatusText||'';
     const isLive=g.gameStatus===2, isFinal=g.gameStatus===3, isUpcoming=g.gameStatus===1;
     const isYday=g._day==='yesterday';
+
+    const awayWin = isFinal && (away.score||0) > (home.score||0);
+    const homeWin = isFinal && (home.score||0) > (away.score||0);
+
+    const awayId = espnTeamToOurs(away.teamTricode||'');
+    const homeId = espnTeamToOurs(home.teamTricode||'');
+    const awayLogo = TEAM_LOGOS[awayId];
+    const homeLogo = TEAM_LOGOS[homeId];
+    const awayColor = awayLogo?.color || '#4a9eff';
+    const homeColor = homeLogo?.color || '#4a9eff';
+
+    const mkLogo = (logo, color) => logo
+      ? `<div style="width:28px;height:28px;flex-shrink:0">${logo.svg}</div>`
+      : `<div style="width:28px;height:28px;border:1px solid ${color}55;display:flex;align-items:center;justify-content:center"></div>`;
+
     const statusHtml = isLive
-      ? `<span class="score-live">LIVE</span> <span style="font-size:13px;color:var(--text2)">${status}</span>`
+      ? `<span class="score-status live">● ${status}</span>`
       : isFinal
-        ? `<span class="score-final">${isYday?'LAST NIGHT':'FINAL'}</span>`
-        : `<span style="font-size:13px;color:var(--accent3)">${status}</span>`;
-    return `<div class="score-item">
+        ? `<span class="score-status final">${isYday?'YESTERDAY':'FINAL'}</span>`
+        : `<span class="score-status upcoming">${status}</span>`;
+
+    return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}">
       ${statusHtml}
-      <span class="score-team">${away.teamTricode}</span>
-      <span class="score-pts" style="${isFinal&&away.score>home.score?'color:var(--accent2)':''}">${away.score||0}</span>
-      <span class="score-vs">—</span>
-      <span class="score-pts" style="${isFinal&&home.score>away.score?'color:var(--accent2)':''}">${home.score||0}</span>
-      <span class="score-team">${home.teamTricode}</span>
+      <div class="score-teams-row">
+        <div class="score-team-block">
+          ${mkLogo(awayLogo, awayColor)}
+          <span class="score-team-abbr${awayWin?' winner':''}" style="${awayWin?'color:'+awayColor:''}">${away.teamTricode}</span>
+          ${!isUpcoming?`<span class="score-num${isLive?' live':awayWin?' winner':''}">${away.score||0}</span>`:''}
+        </div>
+        <span class="score-divider">${isUpcoming?'VS':'·'}</span>
+        <div class="score-team-block">
+          ${mkLogo(homeLogo, homeColor)}
+          <span class="score-team-abbr${homeWin?' winner':''}" style="${homeWin?'color:'+homeColor:''}">${home.teamTricode}</span>
+          ${!isUpcoming?`<span class="score-num${isLive?' live':homeWin?' winner':''}">${home.score||0}</span>`:''}
+        </div>
+      </div>
     </div>`;
   };
 
