@@ -1416,15 +1416,61 @@ function renderWaiver(){
               ? `<span style="font-size:11px;color:var(--text3)">NO SLOT</span>`
               : `<span style="font-size:11px;color:var(--text3)">SLOTS FULL</span>`;
 
-      const wPortrait = playerPortraitHtml(p.name, p.team, 36);
-      return `<div class="player-row" style="${elim?'opacity:.55':''}${claim&&!isMyClaim?';background:rgba(245,166,35,.05)':''}">
-        ${playerLogoHtml(p.team, 36, p.name)}
-        <div style="flex:1">
-          <div style="font-size:14px;color:var(--text)">${p.name} <span class="pos-badge">${p.pos}</span>${elim?' <span class="badge badge-elim">ELIM</span>':''}</div>
-          <div style="font-size:12px;color:var(--text2)">${t.name}${elim?' (eliminated)':''} · <span style="color:var(--green)">+${bd.pos}</span> <span style="color:var(--red)">−${bd.neg}</span> = <strong>${bd.net>0?'+':''}${bd.net}</strong></div>
-          ${claimSection}
+      // Build real playoff stats for this player
+      const statScore = playerStatScore(p.id);
+      const isLive = isPlayerLive(p.id);
+      const savedStats = S.playerStats ? Object.values(S.playerStats).filter(s=>s.pid===p.id) : [];
+      const live = livePlayerStats[p.id];
+      const allStats = [...savedStats];
+      if(live){ const dup = savedStats.some(s=>s.gameId&&s.gameId===live.gameId); if(!dup) allStats.push(live); }
+      const agg = allStats.reduce((a,s)=>({
+        pts:a.pts+(s.pts||0), reb:a.reb+(s.reb||0), ast:a.ast+(s.ast||0),
+        stl:a.stl+(s.stl||0), blk:a.blk+(s.blk||0), to:a.to+(s.to||0),
+        fgm:a.fgm+(s.fgm||0), fga:a.fga+(s.fga||0), gp: a.gp+1
+      }), {pts:0,reb:0,ast:0,stl:0,blk:0,to:0,fgm:0,fga:0,gp:0});
+      const hasStats = allStats.length > 0;
+      const tc = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+
+      return `<div style="margin-bottom:.75rem;padding:.75rem;background:var(--panel);border:1px solid var(--border);border-left:3px solid ${elim?'#333':tc};${claim&&!isMyClaim?'background:rgba(245,166,35,.03)':''}opacity:${elim?0.6:1}">
+        <!-- Header row: portrait + name + big FP + action -->
+        <div style="display:flex;align-items:center;gap:10px">
+          <div onclick="openPlayerModal(${p.id})" style="cursor:pointer;flex-shrink:0">
+            ${playerLogoHtml(p.team, 48, p.name)}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span style="font-size:16px;color:var(--text);cursor:pointer" onclick="openPlayerModal(${p.id})">${p.name}</span>
+              <span class="pos-badge">${p.pos}</span>
+              ${elim?'<span class="badge badge-elim">ELIM</span>':''}
+              ${isLive?'<span class="score-live" style="font-size:8px">LIVE</span>':''}
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">${t.name} · ${agg.gp} playoff game${agg.gp!==1?'s':''}</div>
+            ${claimSection}
+          </div>
+          <!-- Big FP total -->
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:'Press Start 2P',monospace;font-size:${hasStats?'20':'14'}px;color:${isLive?'var(--red)':hasStats&&statScore>0?'var(--accent2)':'var(--text3)'}">
+              ${hasStats ? (statScore>0?'+':'')+statScore.toFixed(1) : '—'}
+            </div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">FP</div>
+          </div>
+          <div style="flex-shrink:0;margin-left:6px">${actionBtn}</div>
         </div>
-        ${actionBtn}
+        <!-- Stats row -->
+        ${hasStats ? `<div style="display:flex;gap:0;margin-top:.5rem;border-top:1px solid var(--border2);padding-top:.5rem;overflow-x:auto">
+          ${[
+            ['PTS', agg.pts],
+            ['REB', agg.reb],
+            ['AST', agg.ast],
+            ['STL', agg.stl],
+            ['BLK', agg.blk],
+            ['TO',  agg.to],
+            ['FG',  agg.fga>0?(agg.fgm/agg.fga*100).toFixed(0)+'%':'—'],
+          ].map(([lbl,val])=>`<div style="flex:1;min-width:36px;text-align:center;padding:0 4px">
+            <div style="font-size:14px;color:${lbl==='TO'&&agg.to>0?'var(--red)':'var(--text)'}">${val}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text3);margin-top:2px">${lbl}</div>
+          </div>`).join('')}
+        </div>` : `<div style="margin-top:.5rem;font-size:12px;color:var(--text3)">No playoff stats yet</div>`}
       </div>`;
     }).join('');
 
