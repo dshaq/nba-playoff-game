@@ -1096,14 +1096,57 @@ async function addFromWaiver(pid,mid){
   await saveState(); render();
 }
 async function markInjured(mid,pid){
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  // Allow manager of that roster OR commissioner
+  if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE MARKED INJURED');return;}
   if(!(S.injured[mid]||[]).includes(pid)){if(!S.injured[mid])S.injured[mid]=[];S.injured[mid].push(pid);}
-  await saveState();render();
+  await saveState();
+  // Send email notification
+  const mgr = S.managers.find(m=>m.id===mid);
+  const player = getPlayer(pid);
+  sendInjuryEmail(mgr?.name||'Unknown', player?.name||'Unknown player');
+  render();
 }
 async function clearInjury(mid,pid){
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE CLEARED');return;}
   S.injured[mid]=(S.injured[mid]||[]).filter(x=>x!==pid);
   await saveState();render();
+}
+
+async function sendInjuryEmail(managerName, playerName){
+  try{
+    // Show in-app toast
+    showToast(`🤕 ${playerName} marked OUT — notification sent`, 'warn');
+
+    // Store in Supabase so commissioner sees it
+    if(!S.injuryNotifications) S.injuryNotifications = [];
+    S.injuryNotifications.unshift({
+      managerName, playerName,
+      timestamp: new Date().toISOString(),
+      read: false
+    });
+    if(S.injuryNotifications.length > 20) S.injuryNotifications = S.injuryNotifications.slice(0,20);
+    await saveState();
+
+    // Open mailto so their email client fires off a notification email
+    const subject = encodeURIComponent(`[HOOPS FANTASY] ${managerName} marked ${playerName} as OUT`);
+    const body = encodeURIComponent(`${managerName} has marked ${playerName} as injured/OUT in HOOPS FANTASY 2026.\n\nView the league: ${window.location.origin}`);
+    const mailto = `mailto:daveschachter@gmail.com?subject=${subject}&body=${body}`;
+    window.open(mailto, '_blank');
+  }catch(e){ console.warn('Injury notification error:', e); }
+}
+
+async function markNotifsRead(){
+  if(S.injuryNotifications) S.injuryNotifications.forEach(n=>n.read=true);
+  await saveState(); render();
+}
+
+function showToast(msg, type='info'){
+  const toast = document.createElement('div');
+  const bg = type==='warn'?'#ff9900':type==='error'?'var(--red)':'var(--accent)';
+  toast.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${bg};color:#000;font-family:'Press Start 2P',monospace;font-size:9px;padding:10px 16px;z-index:99999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.2)`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(), 4000);
 }
 async function toggleElim(tid){
   if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
@@ -1596,9 +1639,9 @@ function renderRosters(){
                   ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px">${logo.svg||`<img src="${logo.img}" style="width:80%;height:80%;object-fit:contain;image-rendering:pixelated"/>`}</div>`
                   : `<div style="font-size:11px;color:${teamColor}">${p.team}</div>`
               }
-              ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
-              ${t.eliminated?`<div style="position:absolute;top:3px;right:3px;background:#222;font-size:5px;padding:2px 3px;color:#666">OUT</div>`:''}
-              ${inj&&!t.eliminated?`<div style="position:absolute;top:3px;right:3px;background:#ff9900;font-size:5px;padding:2px 3px;color:#000">INJ</div>`:''}
+              ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
+              ${t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff3344;text-shadow:0 0 8px #ff3344">OUT</span></div>`:''}
+              ${inj&&!t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">OUT</span></div>`:''}
             </div>
             <!-- Gold divider like the preview -->
             <div style="height:2px;background:${borderColor}"></div>
@@ -1619,9 +1662,9 @@ function renderRosters(){
                 <span style="font-size:5px;color:var(--text3)">BONUS</span>
                 <span style="font-size:5px;color:${ROUND_FG[Math.min(sr,4)]}">+${bonus}</span>
               </div>`:''}
-              ${isCommissioner&&!t.eliminated?`<div style="display:flex;gap:2px;margin-top:2px">
+              ${(isCommissioner||currentManagerId===m.id)&&!t.eliminated?`<div style="display:flex;gap:2px;margin-top:2px">
                 ${!inj?`<button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">INJ</button>`:''}
-                ${inj?`<button style="flex:1;font-size:5px;padding:2px;background:var(--green);border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();clearInjury(${m.id},${p.id})">OK</button>`:''}
+                ${inj?`<button style="flex:1;font-size:5px;padding:2px;background:var(--green);border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();clearInjury(${m.id},${p.id})">✓ OK</button>`:''}
               </div>`:''}
             </div>
           </div>`;
@@ -1670,6 +1713,33 @@ function renderScoring(){
   // Show portrait uploader for commissioner (on rules tab)
   const uploaderCard = document.getElementById('portrait-uploader-card');
   if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
+
+  // Show injury notifications for commissioner
+  const notifCard = document.getElementById('injury-notifications-card');
+  if(notifCard){
+    const notifs = S.injuryNotifications||[];
+    const unread = notifs.filter(n=>!n.read);
+    if(isCommissioner && notifs.length > 0){
+      notifCard.classList.remove('hidden');
+      notifCard.innerHTML = `
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2);margin-bottom:.5rem">
+          🤕 INJURY NOTIFICATIONS ${unread.length>0?`<span style="background:var(--red);color:#fff;padding:1px 5px;font-size:7px">${unread.length} NEW</span>`:''}
+        </div>
+        ${notifs.slice(0,5).map(n=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);opacity:${n.read?0.5:1}">
+            <span style="font-size:12px">🤕</span>
+            <div style="flex:1;font-size:13px;color:var(--text2)">
+              <strong>${n.managerName}</strong> marked <strong>${n.playerName}</strong> as OUT
+              <div style="font-size:11px;color:var(--text3)">${new Date(n.timestamp).toLocaleString()}</div>
+            </div>
+            ${!n.read?`<span style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--red)">NEW</span>`:''}
+          </div>`).join('')}
+        <button class="btn btn-sm" style="margin-top:.5rem;font-size:11px" onclick="markNotifsRead()">MARK ALL READ</button>
+      `;
+    } else {
+      notifCard.classList.add('hidden');
+    }
+  }
 
   const sortedMgrs = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
   document.getElementById('scoring-breakdown').innerHTML=sortedMgrs.map(m=>{
