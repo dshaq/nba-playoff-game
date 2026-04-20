@@ -1117,7 +1117,7 @@ async function clearInjury(mid,pid){
 async function sendInjuryEmail(managerName, playerName){
   try{
     // Show in-app toast
-    showToast(`🤕 ${playerName} marked OUT — notification sent`, 'warn');
+    showToast(`🤕 ${playerName} marked DTD — notification sent`, 'warn');
 
     // Store in Supabase so commissioner sees it
     if(!S.injuryNotifications) S.injuryNotifications = [];
@@ -1130,7 +1130,7 @@ async function sendInjuryEmail(managerName, playerName){
     await saveState();
 
     // Open mailto so their email client fires off a notification email
-    const subject = encodeURIComponent(`[HOOPS FANTASY] ${managerName} marked ${playerName} as OUT`);
+    const subject = encodeURIComponent(`[HOOPS FANTASY] ${managerName} marked ${playerName} as DTD`);
     const body = encodeURIComponent(`${managerName} has marked ${playerName} as injured/OUT in HOOPS FANTASY 2026.\n\nView the league: ${window.location.origin}`);
     const mailto = `mailto:daveschachter@gmail.com?subject=${subject}&body=${body}`;
     window.open(mailto, '_blank');
@@ -1643,7 +1643,7 @@ function renderRosters(){
               }
               ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
               ${t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff3344;text-shadow:0 0 8px #ff3344">OUT</span></div>`:''}
-              ${inj&&!t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">OUT</span></div>`:''}
+              ${inj&&!t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">DTD</span></div>`:''}
             </div>
             <!-- Gold divider like the preview -->
             <div style="height:2px;background:${borderColor}"></div>
