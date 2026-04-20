@@ -572,6 +572,7 @@ async function fetchScores(){
       const completed = e.status?.type?.completed;
       return {
         _day: dayLabel,
+        espnId: e.id,
         gameStatus: completed ? 3 : state==='in' ? 2 : 1,
         gameStatusText: e.status?.type?.shortDetail || '',
         awayTeam:{teamTricode:away?.team?.abbreviation||'?', score:parseInt(away?.score)||0},
@@ -607,6 +608,25 @@ async function fetchScores(){
     return;
   }
 
+  // Build a map of gameId -> top FP player (from live + saved stats)
+  const gameTopPlayer = {};
+  const allStatSources = [
+    ...Object.values(livePlayerStats||{}).map(s=>({...s, isLive:true})),
+    ...Object.values(S.playerStats||{})
+  ];
+  for(const stat of allStatSources){
+    const gid = stat.gameId;
+    if(!gid) continue;
+    const existing = gameTopPlayer[gid];
+    const fp = stat.fp||0;
+    if(!existing || fp > existing.fp){
+      const p = PLAYERS.find(x=>x.id===parseInt(stat.pid||stat.id));
+      if(p && PLAYER_PORTRAITS[p.name]){
+        gameTopPlayer[gid] = {fp, name: p.name, pid: p.id, isLive: stat.isLive||false};
+      }
+    }
+  }
+
   const renderGame = g => {
     const home=g.homeTeam, away=g.awayTeam;
     const status=g.gameStatusText||'';
@@ -615,17 +635,11 @@ async function fetchScores(){
 
     const awayWin = isFinal && (away.score||0) > (home.score||0);
     const homeWin = isFinal && (home.score||0) > (away.score||0);
+    const awayColor = TEAM_LOGOS[espnTeamToOurs(away.teamTricode||'')]?.color || '#4a9eff';
+    const homeColor = TEAM_LOGOS[espnTeamToOurs(home.teamTricode||'')]?.color || '#4a9eff';
 
-    const awayId = espnTeamToOurs(away.teamTricode||'');
-    const homeId = espnTeamToOurs(home.teamTricode||'');
-    const awayLogo = TEAM_LOGOS[awayId];
-    const homeLogo = TEAM_LOGOS[homeId];
-    const awayColor = awayLogo?.color || '#4a9eff';
-    const homeColor = homeLogo?.color || '#4a9eff';
-
-    const mkLogo = (logo, color) => logo
-      ? `<div style="width:28px;height:28px;flex-shrink:0">${logo.svg}</div>`
-      : `<div style="width:28px;height:28px;border:1px solid ${color}55;display:flex;align-items:center;justify-content:center"></div>`;
+    // Find top FP player portrait for this game
+    const topPlayer = g.espnId ? gameTopPlayer[g.espnId] : null;
 
     const statusHtml = isLive
       ? `<span class="score-status live">● ${status}</span>`
@@ -633,19 +647,30 @@ async function fetchScores(){
         ? `<span class="score-status final">${isYday?'YESTERDAY':'FINAL'}</span>`
         : `<span class="score-status upcoming">${status}</span>`;
 
-    return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}">
-      ${statusHtml}
-      <div class="score-teams-row">
-        <div class="score-team-block">
-          ${mkLogo(awayLogo, awayColor)}
+    // Portrait or fallback team color blocks
+    const portraitHtml = topPlayer
+      ? `<div style="width:52px;height:52px;overflow:hidden;flex-shrink:0;position:relative;border:2px solid ${isLive?'var(--red)':'var(--border)'}">
+          <img src="${PLAYER_PORTRAITS[topPlayer.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>
+          ${isLive?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.85);font-family:'Press Start 2P',monospace;font-size:5px;color:#fff;text-align:center;padding:1px">${topPlayer.fp>0?'+':''}${topPlayer.fp.toFixed(0)} FP</div>`:''}
+        </div>`
+      : `<div style="width:52px;height:52px;display:flex;flex-direction:column;flex-shrink:0">
+          <div style="flex:1;background:${awayColor}22;border:1px solid ${awayColor}44"></div>
+          <div style="flex:1;background:${homeColor}22;border:1px solid ${homeColor}44"></div>
+        </div>`;
+
+    return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}" style="min-width:130px;flex-direction:row;gap:8px;padding:.4rem .625rem;align-items:center">
+      <!-- Portrait / visual -->
+      ${portraitHtml}
+      <!-- Score info -->
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+        ${statusHtml}
+        <div style="display:flex;align-items:center;gap:4px">
           <span class="score-team-abbr${awayWin?' winner':''}" style="${awayWin?'color:'+awayColor:''}">${away.teamTricode}</span>
-          ${!isUpcoming?`<span class="score-num${isLive?' live':awayWin?' winner':''}">${away.score||0}</span>`:''}
+          ${!isUpcoming?`<span class="score-num${isLive?' live':awayWin?' winner':''}" style="font-size:12px">${away.score||0}</span>`:''}
         </div>
-        <span class="score-divider">${isUpcoming?'VS':'·'}</span>
-        <div class="score-team-block">
-          ${mkLogo(homeLogo, homeColor)}
+        <div style="display:flex;align-items:center;gap:4px">
           <span class="score-team-abbr${homeWin?' winner':''}" style="${homeWin?'color:'+homeColor:''}">${home.teamTricode}</span>
-          ${!isUpcoming?`<span class="score-num${isLive?' live':homeWin?' winner':''}">${home.score||0}</span>`:''}
+          ${!isUpcoming?`<span class="score-num${isLive?' live':homeWin?' winner':''}" style="font-size:12px">${home.score||0}</span>`:''}
         </div>
       </div>
     </div>`;
