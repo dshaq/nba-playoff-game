@@ -677,7 +677,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
     <button class="tab" onclick="showTab('rosters')">ROSTERS</button>
     <button class="tab" onclick="showTab('waiver')">WAIVERS</button>
     <button class="tab" onclick="showTab('rules')">RULES</button>
-    <button class="tab" onclick="showTab('teams')">TEAMS</button>
+    <button class="tab" onclick="showTab('teams')">PLAYERS</button>
     <button class="tab" id="draft-tab" onclick="showTab('draft')">DRAFT</button>
   </div>
 
@@ -706,8 +706,15 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <!-- TEAMS -->
   <div id="tab-teams" class="hidden">
     <div style="margin-bottom:.75rem">
-      <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent3);margin-bottom:.625rem">► SELECT TEAM — TAP PLAYER FOR STATS</div>
-      <div id="teams-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.875rem"></div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent3);margin-bottom:.625rem">► PLAYER DIRECTORY — TAP FOR STATS</div>
+      <div id="teams-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.5rem"></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:.875rem">
+        <span style="font-size:12px;color:var(--text3);font-family:'Press Start 2P',monospace;font-size:8px">SORT:</span>
+        <button class="btn btn-sm" id="psort-fp" onclick="setPlayerSort('fp')" style="font-size:11px">FP ↓</button>
+        <button class="btn btn-sm" id="psort-name" onclick="setPlayerSort('name')" style="font-size:11px">NAME</button>
+        <button class="btn btn-sm" id="psort-team" onclick="setPlayerSort('team')" style="font-size:11px">TEAM</button>
+        <button class="btn btn-sm" id="psort-pos" onclick="setPlayerSort('pos')" style="font-size:11px">POS</button>
+      </div>
       <div id="teams-gallery"></div>
     </div>
   </div>

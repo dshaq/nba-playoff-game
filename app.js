@@ -1377,10 +1377,10 @@ function renderWaiver(){
   const avail=waiverPlayers().filter(p=>!waiverTeamFilter||p.team===waiverTeamFilter).sort((a,b)=>{
     const ae=getTeam(a.team).eliminated?1:0,be=getTeam(b.team).eliminated?1:0;
     if(ae!==be) return ae-be;
-    // Claimed players first within each group
-    const ac=(S.waiverClaims||[]).some(c=>c.pid===a.id)?0:1;
-    const bc=(S.waiverClaims||[]).some(c=>c.pid===b.id)?0:1;
-    if(ac!==bc) return ac-bc;
+    // Sort by actual playoff fantasy points scored so far
+    const aFP = playerStatScore(a.id);
+    const bFP = playerStatScore(b.id);
+    if(bFP !== aFP) return bFP - aFP;
     return espnScore(b)-espnScore(a);
   });
 
@@ -1576,8 +1576,9 @@ function renderScoring(){
   const uploaderCard = document.getElementById('portrait-uploader-card');
   if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
 
-  document.getElementById('scoring-breakdown').innerHTML=S.managers.map(m=>{
-    const players=S.rosters[m.id].map(pid=>getPlayer(pid)).filter(Boolean);
+  const sortedMgrs = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  document.getElementById('scoring-breakdown').innerHTML=sortedMgrs.map(m=>{
+    const players=S.rosters[m.id].map(pid=>getPlayer(pid)).filter(Boolean).sort((a,b)=>playerStatScore(b.id)-playerStatScore(a.id));
     const aColor=getAvatarColor(m.id);
     const mTotal=managerTotal(m.id);
     const mStat=managerStatScore(m.id);
@@ -1675,7 +1676,7 @@ function renderTeams(){
   if(!el) return;
 
   // Build a lookup of who owns each player
-  const ownerMap = {}; // pid -> managerName
+  const ownerMap = {};
   if(S.managers && S.rosters){
     for(const m of S.managers){
       for(const pid of (S.rosters[m.id]||[])){
@@ -1685,6 +1686,14 @@ function renderTeams(){
   }
 
   const teamFilter = window._teamGalleryFilter || null;
+  const sortMode = window._playerSortMode || 'fp';
+
+  // Highlight active sort button
+  ['fp','name','team','pos'].forEach(s=>{
+    const btn = document.getElementById('psort-'+s);
+    if(btn) btn.style.borderColor = s===sortMode ? 'var(--accent2)' : 'var(--border)';
+    if(btn) btn.style.color = s===sortMode ? 'var(--accent2)' : 'var(--text2)';
+  });
 
   // Team selector chips
   const chipHtml = TEAMS.map(t=>{
@@ -1695,18 +1704,26 @@ function renderTeams(){
       background:${active?tc+'22':'transparent'};color:${active?tc:'var(--text3)'};
       font-family:'VT323',monospace;font-size:14px;cursor:pointer;
       ${t.eliminated?'opacity:.4;text-decoration:line-through':''}
-    ">${TEAM_LOGOS[t.id]?.svg?'':''} ${t.id}</button>`;
+    ">${t.id}</button>`;
   }).join('');
 
   // Players to show
   const playersToShow = teamFilter
     ? PLAYERS.filter(p=>p.team===teamFilter)
-    : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team)); // only playoff teams
+    : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team));
 
-  // Sort: drafted first, then by espn score
-  const drafted = playersToShow.filter(p=>ownerMap[p.id]);
-  const undrafted = playersToShow.filter(p=>!ownerMap[p.id]);
-  const sorted = [...drafted, ...undrafted];
+  // Sort
+  const sorted = [...playersToShow].sort((a,b)=>{
+    if(sortMode==='name'){
+      const aLast = a.name.split(' ').pop();
+      const bLast = b.name.split(' ').pop();
+      return aLast.localeCompare(bLast);
+    }
+    if(sortMode==='team') return a.team.localeCompare(b.team);
+    if(sortMode==='pos') return a.pos.localeCompare(b.pos);
+    // Default: FP (most points this playoffs first)
+    return playerStatScore(b.id) - playerStatScore(a.id);
+  });
 
   const cardHtml = sorted.map(p=>{
     const t = TEAMS.find(t=>t.id===p.team);
@@ -1759,6 +1776,11 @@ function renderTeams(){
 
 function setTeamGalleryFilter(teamId){
   window._teamGalleryFilter = (window._teamGalleryFilter===teamId) ? null : teamId;
+  renderTeams();
+}
+
+function setPlayerSort(mode){
+  window._playerSortMode = mode;
   renderTeams();
 }
 
