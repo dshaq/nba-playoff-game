@@ -603,7 +603,8 @@ async function fetchScores(){
     }catch(e){}
   }
 
-  const allGames = [...todayGames, ...yGames];
+  const gameOrder = g => g.gameStatus===2 ? 0 : g.gameStatus===1 ? 1 : 2;
+  const allGames = [...todayGames, ...yGames].sort((a,b) => gameOrder(a)-gameOrder(b));
 
   if(!allGames.length){
     document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">PLAYOFFS START TODAY — FIRST TIP AT 1PM ET 🏀</span></div>`;
@@ -1496,8 +1497,8 @@ function renderWaiver(){
     const ae=getTeam(a.team).eliminated?1:0,be=getTeam(b.team).eliminated?1:0;
     if(ae!==be) return ae-be;
     // Sort by actual playoff fantasy points scored so far
-    const aFP = playerStatScore(a.id);
-    const bFP = playerStatScore(b.id);
+    const aFP = playerFPPG(a.id)||playerStatScore(a.id)/100;
+    const bFP = playerFPPG(b.id)||playerStatScore(b.id)/100;
     if(bFP !== aFP) return bFP - aFP;
     return espnScore(b)-espnScore(a);
   });
@@ -1568,9 +1569,10 @@ function renderWaiver(){
           <!-- Big FP total -->
           <div style="text-align:right;flex-shrink:0">
             <div style="font-family:'Press Start 2P',monospace;font-size:${hasStats?'20':'14'}px;color:${isLive?'var(--red)':hasStats&&statScore>0?'var(--accent2)':'var(--text3)'}">
-              ${hasStats ? (statScore>0?'+':'')+statScore.toFixed(1) : '—'}
+              ${hasStats ? (playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1) : '—'}
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-top:2px">FP</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">FPPG</div>
+            ${hasStats&&agg.gp>1?`<div style="font-size:9px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} total</div>`:''}
           </div>
           <div style="flex-shrink:0;margin-left:6px">${actionBtn}</div>
         </div>
@@ -1679,11 +1681,15 @@ function renderRosters(){
             <!-- Stats row -->
             <div style="padding:3px 5px 5px;background:#041428;border-top:1px solid ${borderColor}40;display:flex;flex-direction:column;gap:2px">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:5px;color:var(--text3)">FP TOTAL</span>
+                <span style="font-size:5px;color:var(--text3)">FPPG</span>
                 <span style="font-size:6px;color:${isLive?'#ff3344':statScore!==0?'var(--accent2)':'var(--text3)'}">
-                  ${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}
+                  ${statScore!==0||isLive?`${(playerFPPG(p.id)||0)>0?'+':''}${(playerFPPG(p.id)||statScore).toFixed(1)}`:'—'}
                 </span>
               </div>
+              ${playerGamesPlayed(p.id)>1?`<div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:5px;color:var(--text3)">TOTAL</span>
+                <span style="font-size:5px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)}</span>
+              </div>`:''}
               ${bonus>0?`<div style="display:flex;justify-content:space-between">
                 <span style="font-size:5px;color:var(--text3)">BONUS</span>
                 <span style="font-size:5px;color:${ROUND_FG[Math.min(sr,4)]}">+${bonus}</span>
@@ -1853,7 +1859,12 @@ function renderScoring(){
                     </div>
                   </div>
                 </td>
-                <td style="text-align:center;font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">${hasStats?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}</td>
+                <td style="text-align:center">
+                  <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">
+                    ${hasStats?(playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1):'—'}
+                  </div>
+                  ${hasStats&&allStats.length>1?`<div style="font-size:10px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} tot</div>`:''}
+                </td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.reb:'—'}</td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.ast:'—'}</td>
@@ -1924,8 +1935,8 @@ function renderTeams(){
     }
     if(sortMode==='team') return a.team.localeCompare(b.team);
     if(sortMode==='pos') return a.pos.localeCompare(b.pos);
-    // Default: FP (most points this playoffs first)
-    return playerStatScore(b.id) - playerStatScore(a.id);
+    // Default: FPPG (best per-game performers first)
+    return playerFPPG(b.id) - playerFPPG(a.id);
   });
 
   const cardHtml = sorted.map(p=>{
@@ -1935,6 +1946,7 @@ function renderTeams(){
     const logo = TEAM_LOGOS[p.team];
     const owner = ownerMap[p.id];
     const statScore = playerStatScore(p.id);
+    const fppg = playerFPPG(p.id);
     const isLive = isPlayerLive(p.id);
     const elim = t?.eliminated;
 
@@ -1966,7 +1978,9 @@ function renderTeams(){
       <!-- Stats bar -->
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
-        <span style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}</span>
+        <span style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
+          ${statScore!==0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
+        </span>
       </div>
     </div>`;
   }).join('');
@@ -2395,7 +2409,21 @@ async function fetchGameBoxScore(eventId){
             const sameTeamSameLast = PLAYERS.filter(x=>x.team===ourTeam && x.name.split(' ').pop().toLowerCase()===pLast);
             return pLast===espnLast && sameTeamSameLast.length===1;
           });
-        if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,pf,min,name:matched.name};
+        const [tpm,tpa] = parseSplit(s[3]); // 3PT
+        const oreb = parseInt(s[10])||0;
+        const dreb = parseInt(s[11])||0;
+        const plusMinus = parseInt(s[13])||0;
+        // Derived stats
+        const fgm2 = fgm-tpm, fga2 = fga-tpa;
+        const fgPct  = fga>0  ? fgm/fga  : null;
+        const tpPct  = tpa>0  ? tpm/tpa  : null;
+        const fg2Pct = fga2>0 ? fgm2/fga2: null;
+        const efgPct = fga>0  ? (fgm+0.5*tpm)/fga : null;
+        const ftPct  = fta>0  ? ftm/fta  : null;
+        // Game Score (John Hollinger)
+        const gmSc = +(pts + 0.4*fgm - 0.7*fga - 0.4*(fta-ftm) + 0.7*oreb + 0.3*dreb + stl + 0.7*ast + 0.7*blk - 0.4*pf - to).toFixed(1);
+        if(matched) stats[matched.id]={fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,pf,min,name:matched.name,
+          tpm,tpa,oreb,dreb,plusMinus,fgPct,tpPct,fg2Pct,efgPct,ftPct,gmSc,fgm2,fga2};
       }
     }
   }
@@ -2497,6 +2525,20 @@ function startLiveStatsPolling(){
 }
 
 // Total fantasy points for a player (saved completed + live in-progress)
+function playerGamesPlayed(pid){
+  const saved = Object.values(S.playerStats||{}).filter(s=>s.pid===pid);
+  const live = livePlayerStats[pid];
+  const gameIds = new Set(saved.map(s=>s.gameId).filter(Boolean));
+  if(live && !gameIds.has(live.gameId)) return gameIds.size + 1;
+  return gameIds.size;
+}
+
+function playerFPPG(pid){
+  const gp = playerGamesPlayed(pid);
+  if(!gp) return 0;
+  return +(playerStatScore(pid)/gp).toFixed(1);
+}
+
 function playerStatScore(pid){
   // Saved completed game stats
   const saved = S.playerStats
@@ -2551,42 +2593,108 @@ function openPlayerModal(pid){
 
   gameStats.sort((a,b) => (a.date||'').localeCompare(b.date||''));
 
+  const gp = gameStats.length;
   const totals = gameStats.reduce((acc,g)=>{
     acc.pts+=(g.pts||0); acc.reb+=(g.reb||0); acc.ast+=(g.ast||0);
     acc.stl+=(g.stl||0); acc.blk+=(g.blk||0); acc.to+=(g.to||0);
-    acc.fgm+=(g.fgm||0); acc.fga+=(g.fga||0);
-    acc.ftm+=(g.ftm||0); acc.fta+=(g.fta||0);
-    acc.fp+=(g.fp||0);
+    acc.fgm+=(g.fgm||0); acc.fga+=(g.fga||0); acc.ftm+=(g.ftm||0); acc.fta+=(g.fta||0);
+    acc.tpm+=(g.tpm||0); acc.tpa+=(g.tpa||0); acc.oreb+=(g.oreb||0); acc.dreb+=(g.dreb||0);
+    acc.pf+=(g.pf||0); acc.fp+=(g.fp||0);
     return acc;
-  }, {pts:0,reb:0,ast:0,stl:0,blk:0,to:0,fgm:0,fga:0,ftm:0,fta:0,fp:0});
+  }, {pts:0,reb:0,ast:0,stl:0,blk:0,to:0,fgm:0,fga:0,ftm:0,fta:0,tpm:0,tpa:0,oreb:0,dreb:0,pf:0,fp:0});
 
-  const statRow = (g, isTotal=false) => {
-    const fgPct = g.fga>0?(g.fgm/g.fga*100).toFixed(0)+'%':'—';
-    const ftPct = g.fta>0?(g.ftm/g.fta*100).toFixed(0)+'%':'—';
-    const dateLabel = isTotal ? 'TOTAL' : (g.live ? '🔴 LIVE' : (g.date||'?').slice(4,8).replace(/(\d{2})(\d{2})/,'$1/$2'));
-    const fpStr = (g.fp>=0?'+':'')+parseFloat(g.fp||0).toFixed(1);
-    return `<tr class="${isTotal?'boxscore-total':''}">
-      <td style="color:${g.live?'var(--red)':isTotal?'var(--accent2)':'var(--text3)'};font-family:'Press Start 2P',monospace;font-size:7px">${dateLabel}</td>
-      <td style="color:var(--text3)">${g.min||'—'}</td>
-      <td>${g.pts||0}</td><td>${g.reb||0}</td><td>${g.ast||0}</td>
-      <td>${g.stl||0}</td><td>${g.blk||0}</td><td>${g.to||0}</td>
-      <td>${g.fgm||0}/${g.fga||0}</td><td>${g.ftm||0}/${g.fta||0}</td>
-      <td style="color:${isTotal?'var(--accent2)':parseFloat(g.fp||0)>=0?'var(--green)':'var(--red)'};font-family:'Press Start 2P',monospace;font-size:9px">${fpStr}</td>
+  // Helper: format percentage
+  const pct = (m,a) => a>0 ? (m/a).toFixed(3).replace(/^0/,'') : '—';
+  const efg = (fgm,tpm,fga) => fga>0 ? ((fgm+0.5*tpm)/fga).toFixed(3).replace(/^0/,'') : '—';
+
+  const statRow = (g, isTotal=false, isAvg=false) => {
+    const fgm2 = (g.fgm||0)-(g.tpm||0), fga2 = (g.fga||0)-(g.tpa||0);
+    const gmSc = g.gmSc != null ? g.gmSc :
+      +((g.pts||0) + 0.4*(g.fgm||0) - 0.7*(g.fga||0) - 0.4*((g.fta||0)-(g.ftm||0)) +
+        0.7*(g.oreb||0) + 0.3*(g.dreb||0) + (g.stl||0) + 0.7*(g.ast||0) + 0.7*(g.blk||0) -
+        0.4*(g.pf||0) - (g.to||0)).toFixed(1);
+    const dateLabel = isTotal ? 'TOT' : isAvg ? 'AVG' : (g.live ? '🔴' : (g.date||'?').slice(4,8).replace(/(\d{2})(\d{2})/,'$1/$2'));
+    const fpStr = isAvg
+      ? (gp>0 ? (g.fp/gp>=0?'+':'')+(g.fp/gp).toFixed(1) : '—')
+      : (g.fp!=null?(g.fp>=0?'+':'')+parseFloat(g.fp).toFixed(1):'—');
+    const rowColor = isTotal?'var(--accent2)':isAvg?'var(--accent3)':g.live?'var(--red)':'var(--text3)';
+    const div = (n,d) => d>0?(n/d).toFixed(1):'—';
+    return `<tr class="${isTotal||isAvg?'boxscore-total':''}">
+      <td style="color:${rowColor};font-family:'Press Start 2P',monospace;font-size:7px;white-space:nowrap">${dateLabel}</td>
+      <td style="color:var(--text3);font-size:12px">${isAvg?div(parseInt(g.min||0),gp):g.min||'—'}</td>
+      <td>${isAvg?div(g.pts,gp):g.pts||0}</td>
+      <td>${isAvg?div(g.fgm,gp):g.fgm||0}</td>
+      <td>${isAvg?div(g.fga,gp):g.fga||0}</td>
+      <td style="color:var(--text3)">${pct(g.fgm||0,g.fga||0)}</td>
+      <td>${isAvg?div(g.tpm,gp):g.tpm||0}</td>
+      <td>${isAvg?div(g.tpa,gp):g.tpa||0}</td>
+      <td style="color:var(--text3)">${pct(g.tpm||0,g.tpa||0)}</td>
+      <td>${isAvg?div(fgm2,gp):fgm2}</td>
+      <td>${isAvg?div(fga2,gp):fga2}</td>
+      <td style="color:var(--text3)">${pct(fgm2,fga2)}</td>
+      <td style="color:var(--accent3)">${efg(g.fgm||0,g.tpm||0,g.fga||0)}</td>
+      <td>${isAvg?div(g.ftm,gp):g.ftm||0}</td>
+      <td>${isAvg?div(g.fta,gp):g.fta||0}</td>
+      <td style="color:var(--text3)">${pct(g.ftm||0,g.fta||0)}</td>
+      <td style="color:var(--text3)">${isAvg?div(g.oreb,gp):g.oreb||0}</td>
+      <td style="color:var(--text3)">${isAvg?div(g.dreb,gp):g.dreb||0}</td>
+      <td>${isAvg?div(g.reb,gp):g.reb||0}</td>
+      <td>${isAvg?div(g.ast,gp):g.ast||0}</td>
+      <td>${isAvg?div(g.stl,gp):g.stl||0}</td>
+      <td>${isAvg?div(g.blk,gp):g.blk||0}</td>
+      <td style="color:${(g.to||0)>0?'var(--red)':'inherit'}">${isAvg?div(g.to,gp):g.to||0}</td>
+      <td style="color:var(--text3)">${isAvg?div(g.pf,gp):g.pf||0}</td>
+      <td style="font-weight:600">${isAvg?div(g.pts,gp):g.pts||0}</td>
+      <td style="color:${parseFloat(gmSc)>=10?'var(--green)':parseFloat(gmSc)<0?'var(--red)':'inherit'}">${isAvg?div(parseFloat(gmSc)*gp,gp):gmSc}</td>
+      <td style="color:${(g.plusMinus||0)>0?'var(--green)':(g.plusMinus||0)<0?'var(--red)':'inherit'}">${isAvg?'—':(g.plusMinus!=null?(g.plusMinus>0?'+':'')+g.plusMinus:'—')}</td>
+      <td style="color:${isAvg?'var(--accent3)':isTotal?'var(--accent2)':parseFloat(g.fp||0)>=0?'var(--green)':'var(--red)'};font-family:'Press Start 2P',monospace;font-size:9px">${fpStr}</td>
     </tr>`;
   };
 
+  // Summary stats bar (FPPG + totals at a glance)
+  const fppg = gp>0 ? (totals.fp/gp).toFixed(1) : '—';
+  const summaryHtml = gp>0 ? `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:.75rem;padding:.625rem;background:var(--bg2);border:1px solid var(--border)">
+      <div style="text-align:center"><div style="font-family:'Press Start 2P',monospace;font-size:14px;color:var(--accent2)">${fppg>0?'+':''}${fppg}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">FPPG</div></div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="text-align:center"><div style="font-family:'Press Start 2P',monospace;font-size:14px;color:var(--accent)">${totals.fp>=0?'+':''}${totals.fp.toFixed(1)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">TOTAL FP</div></div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${gp}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">GP</div></div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${(totals.pts/gp).toFixed(1)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">PPG</div></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${(totals.reb/gp).toFixed(1)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">RPG</div></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${(totals.ast/gp).toFixed(1)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">APG</div></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${pct(totals.fgm,totals.fga)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">FG%</div></div>
+      <div style="text-align:center"><div style="font-size:16px;color:var(--text)">${efg(totals.fgm,totals.tpm,totals.fga)}</div><div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-top:3px">eFG%</div></div>
+    </div>` : '';
+
   const tableHtml = gameStats.length ? `
-    <table class="boxscore-table">
-      <thead><tr>
-        <th>DATE</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
-        <th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>FT</th><th>FP</th>
-      </tr></thead>
+    ${summaryHtml}
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table class="boxscore-table" style="font-size:11px;min-width:900px">
+      <thead>
+        <tr style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text3)">
+          <th>DATE</th><th>MP</th><th>PTS</th>
+          <th>FG</th><th>FGA</th><th style="color:var(--text3)">FG%</th>
+          <th>3P</th><th>3PA</th><th style="color:var(--text3)">3P%</th>
+          <th>2P</th><th>2PA</th><th style="color:var(--text3)">2P%</th>
+          <th style="color:var(--accent3)">eFG%</th>
+          <th>FT</th><th>FTA</th><th style="color:var(--text3)">FT%</th>
+          <th style="color:var(--text3)">ORB</th><th style="color:var(--text3)">DRB</th><th>TRB</th>
+          <th>AST</th><th>STL</th><th>BLK</th>
+          <th style="color:var(--red)">TOV</th><th style="color:var(--text3)">PF</th>
+          <th>PTS</th><th>GmSc</th><th>+/-</th>
+          <th style="color:var(--accent2)">FP</th>
+        </tr>
+      </thead>
       <tbody>
         ${gameStats.map(g=>statRow(g)).join('')}
-        ${gameStats.length>1?statRow(totals,true):''}
+        ${gp>1?statRow(totals,true):''}
+        ${gp>1?statRow(totals,false,true):''}
       </tbody>
-    </table>` :
-    `<div style="padding:1.5rem;text-align:center;color:var(--text3);font-size:14px">No playoff stats yet — first tip today!</div>`;
+    </table>
+    </div>` :
+    `<div style="padding:1.5rem;text-align:center;color:var(--text3);font-size:14px">No playoff stats yet</div>`;
 
   const modal = document.createElement('div');
   modal.className = 'player-modal';
