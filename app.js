@@ -1,4 +1,8 @@
 // v66 — OUT badge + INJ eligibility fix
+
+// Mobile detection
+const IS_MOBILE = window.innerWidth <= 640;
+
 const SUPABASE_URL = 'https://ipsngddnavymcmfbbcxu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc25nZGRuYXZ5bWNtZmJiY3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDk3NDMsImV4cCI6MjA5MTc4NTc0M30.0MmQn49Y0FCn3r8GFI5XspZR12YwGWTcTbv765VoJEQ';
 
@@ -1649,7 +1653,7 @@ function renderRosters(){
             ondragleave="dragLeave(event)"
             ondrop="dragDrop(event,${m.id},${cardIdx})"` : ''}
             style="
-              flex-shrink:0;width:110px;
+              flex-shrink:0;width:${IS_MOBILE?88:110}px;
               background:#020c18;
               border:2px solid ${borderColor};
               display:flex;flex-direction:column;
@@ -1713,7 +1717,7 @@ function renderRosters(){
           </div>`;
         }).join('')}
         ${Array(Math.max(0,8-players.length)).fill(0).map((_,i)=>`
-          <div style="flex-shrink:0;width:110px;height:180px;background:#041428;border:2px dashed #1a3a5c;display:flex;align-items:center;justify-content:center">
+          <div style="flex-shrink:0;width:${IS_MOBILE?88:110}px;height:${IS_MOBILE?150:180}px;background:#041428;border:2px dashed #1a3a5c;display:flex;align-items:center;justify-content:center">
             <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:#1a3a5c">?</span>
           </div>`).join('')}
       </div>` : `<div style="font-size:15px;color:var(--text3);padding:1rem 0;text-align:center">NO PLAYERS DRAFTED YET</div>`;
@@ -1949,15 +1953,17 @@ function renderTeams(){
     const isLive = isPlayerLive(p.id);
     const elim = t?.eliminated;
 
+    const cardW = IS_MOBILE ? 88 : 110;
+    const imgW = cardW - 4;
     return `<div onclick="openPlayerModal(${p.id})" style="
-      flex-shrink:0;width:110px;cursor:pointer;
+      flex-shrink:0;width:${cardW}px;cursor:pointer;
       background:#020c18;border:2px solid ${elim?'#333':tc};
       display:flex;flex-direction:column;
       opacity:${elim?0.4:1};
       transition:transform .1s;
     " onmouseenter="this.style.transform='scale(1.04)'" onmouseleave="this.style.transform='scale(1)'">
       <!-- Portrait -->
-      <div style="width:106px;height:106px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
+      <div style="width:${imgW}px;height:${imgW}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
         ${hasPortrait
           ? `<img src="${PLAYER_PORTRAITS[p.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
           : logo
@@ -2911,10 +2917,56 @@ function getSeriesRecord(team1, team2){
   return seriesRecords[key] || null;
 }
 
+
+// ── Backfill missing playoff game stats ──────────────────────────
+async function backfillMissingStats(){
+  try{
+    const PLAYOFFS_START = new Date('2026-04-18');
+    const today = new Date();
+    const fmt = d => d.toISOString().split('T')[0].replace(/-/g,'');
+    
+    // Build list of dates from playoffs start to yesterday (today fetched by refreshLiveStats)
+    const dates = [];
+    const d = new Date(PLAYOFFS_START);
+    while(d < today){
+      dates.push(fmt(new Date(d)));
+      d.setDate(d.getDate()+1);
+    }
+    
+    // Check which gameIds we already have
+    const existingGameIds = new Set(Object.values(S.playerStats||{}).map(s=>s.gameId).filter(Boolean));
+    
+    let totalNew = 0;
+    for(const dateStr of dates){
+      const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3&dates=${dateStr}`);
+      const d2 = await res.json();
+      for(const ev of (d2.events||[])){
+        if(!ev.status?.type?.completed) continue;
+        if(existingGameIds.has(ev.id)) continue; // already have this game
+        const stats = await fetchGameBoxScore(ev.id, dateStr);
+        for(const [pid, stat] of Object.entries(stats)){
+          const key = `${pid}_${dateStr}_${ev.id}`;
+          if(!S.playerStats[key]){
+            S.playerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:ev.id};
+            totalNew++;
+          }
+        }
+      }
+    }
+    
+    if(totalNew > 0){
+      await saveState();
+      render();
+      console.log('Backfilled', totalNew, 'missing stat entries');
+    }
+  }catch(e){ console.warn('backfillMissingStats error:', e); }
+}
 async function boot(){
   initSupabase();
   try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
   const hasState=await loadState();
+  // Backfill any missing playoff game stats in background
+  backfillMissingStats();
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
   // Load portraits in background, re-render when done
