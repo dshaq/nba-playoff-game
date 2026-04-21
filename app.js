@@ -1569,10 +1569,9 @@ function renderWaiver(){
           <!-- Big FP total -->
           <div style="text-align:right;flex-shrink:0">
             <div style="font-family:'Press Start 2P',monospace;font-size:${hasStats?'20':'14'}px;color:${isLive?'var(--red)':hasStats&&statScore>0?'var(--accent2)':'var(--text3)'}">
-              ${hasStats ? (playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1) : '—'}
+              ${hasStats ? (statScore>0?'+':'')+statScore.toFixed(1) : '—'}
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-top:1px">FPPG</div>
-            ${hasStats&&agg.gp>1?`<div style="font-size:9px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} total</div>`:''}
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">FP${hasStats&&agg.gp>0?' · '+playerFPPG(p.id).toFixed(1)+'/g':''}</div>
           </div>
           <div style="flex-shrink:0;margin-left:6px">${actionBtn}</div>
         </div>
@@ -1681,14 +1680,14 @@ function renderRosters(){
             <!-- Stats row -->
             <div style="padding:3px 5px 5px;background:#041428;border-top:1px solid ${borderColor}40;display:flex;flex-direction:column;gap:2px">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:5px;color:var(--text3)">FPPG</span>
+                <span style="font-size:5px;color:var(--text3)">FP TOTAL</span>
                 <span style="font-size:6px;color:${isLive?'#ff3344':statScore!==0?'var(--accent2)':'var(--text3)'}">
-                  ${statScore!==0||isLive?`${(playerFPPG(p.id)||0)>0?'+':''}${(playerFPPG(p.id)||statScore).toFixed(1)}`:'—'}
+                  ${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}
                 </span>
               </div>
-              ${playerGamesPlayed(p.id)>1?`<div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:5px;color:var(--text3)">TOTAL</span>
-                <span style="font-size:5px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)}</span>
+              ${playerGamesPlayed(p.id)>0?`<div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:5px;color:var(--text3)">FPPG</span>
+                <span style="font-size:5px;color:var(--text3)">${playerFPPG(p.id)>0?'+':''}${playerFPPG(p.id).toFixed(1)}</span>
               </div>`:''}
               ${bonus>0?`<div style="display:flex;justify-content:space-between">
                 <span style="font-size:5px;color:var(--text3)">BONUS</span>
@@ -1861,9 +1860,9 @@ function renderScoring(){
                 </td>
                 <td style="text-align:center">
                   <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">
-                    ${hasStats?(playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1):'—'}
+                    ${hasStats?(statScore>0?'+':'')+statScore.toFixed(1):'—'}
                   </div>
-                  ${hasStats&&allStats.length>1?`<div style="font-size:10px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} tot</div>`:''}
+                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${playerFPPG(p.id)>0?'+':''}${playerFPPG(p.id).toFixed(1)}/g</div>`:''}
                 </td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.reb:'—'}</td>
@@ -1978,9 +1977,12 @@ function renderTeams(){
       <!-- Stats bar -->
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
-        <span style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
-          ${statScore!==0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
-        </span>
+        <div style="text-align:right">
+          <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
+            ${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}
+          </div>
+          ${fppg>0&&playerGamesPlayed(p.id)>1?`<div style="font-size:8px;color:var(--text3)">${fppg.toFixed(1)}/g</div>`:''}
+        </div>
       </div>
     </div>`;
   }).join('');
