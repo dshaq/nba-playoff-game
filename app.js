@@ -1570,12 +1570,12 @@ function renderWaiver(){
             <div style="font-size:12px;color:var(--text3);margin-top:2px">${t.name} · ${agg.gp} playoff game${agg.gp!==1?'s':''}</div>
             ${claimSection}
           </div>
-          <!-- Big FP total -->
+          <!-- Big FPPG, small total -->
           <div style="text-align:right;flex-shrink:0">
             <div style="font-family:'Press Start 2P',monospace;font-size:${hasStats?'20':'14'}px;color:${isLive?'var(--red)':hasStats&&statScore>0?'var(--accent2)':'var(--text3)'}">
-              ${hasStats ? (statScore>0?'+':'')+statScore.toFixed(1) : '—'}
+              ${hasStats ? (playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1) : '—'}
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-top:1px">FP${hasStats&&agg.gp>0?' · '+playerFPPG(p.id).toFixed(1)+'/g':''}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">FPPG${hasStats&&agg.gp>0?' · '+statScore.toFixed(1)+' tot':''}</div>
           </div>
           <div style="flex-shrink:0;margin-left:6px">${actionBtn}</div>
         </div>
@@ -1629,7 +1629,7 @@ function renderRosters(){
 
     // Horizontal boss card strip
     const bossGrid = players.length ? `
-      <div style="display:flex;gap:6px;overflow-x:auto;padding:8px 0 12px;scrollbar-width:thin;scrollbar-color:var(--border) transparent">
+      <div style="display:flex;gap:${IS_MOBILE?4:6}px;overflow-x:auto;padding:${IS_MOBILE?'6px 0 8px':'8px 0 12px'};-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border) transparent">
         ${getRosterOrder(m.id).map(pid=>getPlayer(pid)).filter(Boolean).map((p,cardIdx)=>{
           const t=getTeam(p.team);
           const inj=(S.injured[m.id]||[]).includes(p.id);
@@ -1663,7 +1663,7 @@ function renderRosters(){
               transition:border-color .15s;
             ">
             <!-- Portrait -->
-            <div style="width:106px;height:106px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="width:${IS_MOBILE?84:106}px;height:${IS_MOBILE?84:106}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
               ${hasPortrait
                 ? `<img src="${PLAYER_PORTRAITS[p.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
                 : logo
@@ -1684,14 +1684,14 @@ function renderRosters(){
             <!-- Stats row -->
             <div style="padding:3px 5px 5px;background:#041428;border-top:1px solid ${borderColor}40;display:flex;flex-direction:column;gap:2px">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:5px;color:var(--text3)">FP TOTAL</span>
+                <span style="font-size:5px;color:var(--text3)">FPPG</span>
                 <span style="font-size:6px;color:${isLive?'#ff3344':statScore!==0?'var(--accent2)':'var(--text3)'}">
-                  ${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}
+                  ${statScore!==0||isLive?`${playerFPPG(p.id)>0?'+':''}${playerFPPG(p.id).toFixed(1)}`:'—'}
                 </span>
               </div>
-              ${playerGamesPlayed(p.id)>0?`<div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:5px;color:var(--text3)">FPPG</span>
-                <span style="font-size:5px;color:var(--text3)">${playerFPPG(p.id)>0?'+':''}${playerFPPG(p.id).toFixed(1)}</span>
+              ${playerGamesPlayed(p.id)>1?`<div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:5px;color:var(--text3)">TOTAL</span>
+                <span style="font-size:5px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)}</span>
               </div>`:''}
               ${bonus>0?`<div style="display:flex;justify-content:space-between">
                 <span style="font-size:5px;color:var(--text3)">BONUS</span>
@@ -1710,8 +1710,12 @@ function renderRosters(){
                 }).map(s=>s.gameId));
                 const playerGameIds = new Set(Object.values(S.playerStats||{}).filter(s=>s.pid===p.id).map(s=>s.gameId));
                 const missedGame = [...teamGameIds].some(gid=>!playerGameIds.has(gid));
-                if(!missedGame) return ''; // No missed games — no INJ button
-                return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">INJ</button></div>`;
+                if(!missedGame) return ''; // No missed games — no DTD button
+                // If they played in the most recent team game they're healthy — hide button
+                const sortedTeamGames = [...teamGameIds].sort();
+                const latestTeamGame = sortedTeamGames[sortedTeamGames.length-1];
+                if(latestTeamGame && playerGameIds.has(latestTeamGame)) return ''; // Played latest game
+                return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">DTD</button></div>`;
               })()}
             </div>
           </div>`;
@@ -1864,9 +1868,9 @@ function renderScoring(){
                 </td>
                 <td style="text-align:center">
                   <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">
-                    ${hasStats?(statScore>0?'+':'')+statScore.toFixed(1):'—'}
+                    ${hasStats?(playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1):'—'}
                   </div>
-                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${playerFPPG(p.id)>0?'+':''}${playerFPPG(p.id).toFixed(1)}/g</div>`:''}
+                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} tot</div>`:''}
                 </td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.reb:'—'}</td>
@@ -1985,9 +1989,9 @@ function renderTeams(){
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
         <div style="text-align:right">
           <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
-            ${statScore!==0||isLive?`${statScore>0?'+':''}${statScore.toFixed(1)}`:'—'}
+            ${fppg>0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
           </div>
-          ${fppg>0&&playerGamesPlayed(p.id)>1?`<div style="font-size:8px;color:var(--text3)">${fppg.toFixed(1)}/g</div>`:''}
+          ${playerGamesPlayed(p.id)>1?`<div style="font-size:8px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)}</div>`:''}
         </div>
       </div>
     </div>`;
