@@ -2206,9 +2206,12 @@ function renderBracket(){
   el.innerHTML = `<div class="bracket-wrap">
     <div class="bracket-title">
       <span>🏆 2026 PLAYOFF BRACKET</span>
-      <span style="font-size:8px;color:var(--text3)">UPDATE VIA COMMISSIONER CONTROLS</span>
+      ${isCommissioner?'<span style="font-size:8px;color:var(--text3)">COMMISSIONER CONTROLS</span>':''}
     </div>
-    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);margin-bottom:6px;letter-spacing:.06em">— WEST —</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px" class="bracket-conf-labels">
+      <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);letter-spacing:.06em">— WEST —</span>
+      <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);letter-spacing:.06em">— EAST —</span>
+    </div>
     <div class="bracket-grid" style="margin-bottom:.75rem">
       ${col('R1',wr1)}
       ${col('SEMIS',wr2)}
@@ -2223,7 +2226,6 @@ function renderBracket(){
       ${col('SEMIS',er2)}
       ${col('R1',er1)}
     </div>
-    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);margin-bottom:6px;letter-spacing:.06em">— EAST —</div>
   </div>`;
 }
 
