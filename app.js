@@ -3036,7 +3036,10 @@ async function fetchSeriesRecords(){
       }));
     }
 
-    if(Object.keys(newRecords).length) seriesRecords = newRecords;
+    if(Object.keys(newRecords).length){
+      seriesRecords = newRecords;
+      renderBracket(); // Re-render bracket with fresh series scores
+    }
     console.log('Series records loaded:', Object.keys(newRecords).length, 'series');
   }catch(e){ console.warn('fetchSeriesRecords error:', e); }
 }
