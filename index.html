@@ -486,9 +486,19 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   .score-team-abbr{font-size:6px}
   .score-status{font-size:5px}
 
-  /* ── Bracket ── */
-  #bracket-section{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  #bracket-section > div{min-width:640px}
+  /* ── Bracket — real bracket scaled to fit mobile ── */
+  .bracket-wrap{padding:.375rem .375rem;margin-bottom:.5rem}
+  .bracket-grid{grid-template-columns:repeat(7,minmax(44px,1fr));min-width:0;gap:0}
+  .bracket-col{padding:0 1px}
+  .bracket-col-label{font-size:5px;margin-bottom:3px;letter-spacing:0}
+  .bracket-wrap > div[style*="WEST"], .bracket-wrap > div[style*="EAST"]{font-size:6px!important;margin-bottom:3px!important}
+  .b-matchup{margin:2px 0;gap:1px}
+  .b-team{font-size:9px;padding:2px 3px;gap:2px;line-height:1.2}
+  .b-seed{font-size:7px;min-width:9px}
+  .b-team span[style*="font-size:7px"]{font-size:5px!important;padding-left:2px!important}
+  .b-champion{padding:.25rem .375rem}
+  .b-trophy{font-size:14px}
+  .b-champ-name{font-size:5px}
 
   /* ── Tab bar ── */
   .tab-bar{gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none}
@@ -758,7 +768,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   </div>
 
   <!-- Bracket -->
-  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:.75rem"><div id="bracket-section"></div></div>
+  <div id="bracket-section" style="margin-bottom:.75rem"></div>
 
   <!-- Tab bar -->
   <div class="tab-bar">
