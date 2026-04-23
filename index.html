@@ -493,7 +493,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   /* ── Tab bar ── */
   .tab-bar{gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none}
   .tab-bar::-webkit-scrollbar{display:none}
-  .tab{font-size:8px;padding:.4rem .5rem;white-space:nowrap;flex-shrink:0}
+  .tab{font-size:11px;padding:.4rem .6rem;white-space:nowrap;flex-shrink:0}
 
   /* ── Cards ── */
   .card{padding:.625rem}
@@ -548,7 +548,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 /* Phones under 400px */
 @media(max-width:400px){
-  .tab{font-size:7px;padding:.35rem .4rem}
+  .tab{font-size:10px;padding:.35rem .5rem}
   .boss-card{width:72px!important}
   .boss-card > div:first-child{width:68px!important;height:68px!important}
 }
@@ -894,8 +894,9 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
       <div class="section-title">HOW TO PLAY</div>
       <div style="font-size:16px;color:var(--text2);line-height:2.2">
         🏀 <span style="color:var(--accent3)">DRAFT 8 PLAYERS</span> — snake order, everyone picks one at a time. Order is randomized at league creation.<br>
-        📊 <span style="color:var(--accent3)">EARN POINTS</span> — your players score fantasy points each game based on their real stats. Bonuses stack each round they survive (+5/+10/+20/+50 — max +85 per player).<br>
-        🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens only when your player's team is eliminated or they're injured. No voluntary drops. Submit claims and they process nightly by priority order.<br>
+        📊 <span style="color:var(--accent3)">EARN POINTS</span> — your players score fantasy points each game based on their real stats. Originally drafted players earn escalating round bonuses: <span style="color:var(--accent2)">+5 R1 · +10 R2 · +20 R3 · +50 Finals</span> (max +85 per player).<br>
+        🔄 <span style="color:var(--accent3)">WAIVERS</span> — a slot opens when your player's team is eliminated <strong>or</strong> you mark a player as injured (DTD). That player goes to the waiver pool and is available for everyone to claim. Claims process nightly in priority order.<br>
+        ⚠️ <span style="color:var(--accent3)">WAIVER BONUS RULE</span> — players picked up off waivers (at any point, for any reason) earn only a <span style="color:var(--accent2)">flat +5 bonus per round survived</span> from that point forward — regardless of how far they advance. This applies even if picked up mid-round.<br>
         🥇 <span style="color:var(--accent3)">WIN</span> — most total fantasy points at the end of the NBA Finals takes the crown.
       </div>
     </div>
@@ -934,7 +935,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
           <div style="font-size:14px;color:var(--red);margin-top:6px">WIN FINALS</div>
         </div>
       </div>
-      <div style="margin-top:.875rem;font-size:15px;color:var(--text3);background:var(--bg2);padding:10px;border:1px solid var(--border)">BONUSES STACK — FINALS WINNER EARNS <span style="color:var(--accent3)">+85 TOTAL BONUS PTS</span> PER PLAYER</div>
+      <div style="margin-top:.875rem;font-size:15px;color:var(--text3);background:var(--bg2);padding:10px;border:1px solid var(--border)">BONUSES STACK — FINALS WINNER EARNS <span style="color:var(--accent3)">+85 TOTAL BONUS PTS</span> PER ORIGINALLY DRAFTED PLAYER</div>
+      <div style="margin-top:.5rem;padding:.75rem;border:2px solid var(--accent2);background:rgba(245,166,35,.05)">
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2);margin-bottom:.5rem">⚠ WAIVER PICKUP BONUS</div>
+        <div style="font-size:14px;color:var(--text2)">Players acquired via waivers (injury or elimination) earn a <strong style="color:var(--accent2)">flat +5 pts per round survived</strong> from the point of acquisition — no escalating bonuses. This applies even if picked up mid-round.</div>
+      </div>
     </div>
   </div>
 

@@ -405,6 +405,42 @@ async function loadPortraits(){
   }catch(e){ console.warn('Could not load portraits:', e); }
 }
 
+// Per-user portrait selection (localStorage so it's personal per device)
+function getPortraitIndex(playerName){
+  try{ return parseInt(localStorage.getItem('pi_'+playerName)||'0')||0; }
+  catch(e){ return 0; }
+}
+function setPortraitIndex(playerName, idx){
+  try{ localStorage.setItem('pi_'+playerName, idx); }
+  catch(e){}
+}
+function getPortraitCount(playerName){
+  const p = PLAYER_PORTRAITS[playerName];
+  if(!p) return 0;
+  return Array.isArray(p) ? p.length : 1;
+}
+function getActivePortrait(playerName){
+  const p = PLAYER_PORTRAITS[playerName];
+  if(!p) return null;
+  if(!Array.isArray(p)) return p;
+  const idx = Math.min(getPortraitIndex(playerName), p.length-1);
+  return p[idx];
+}
+function cyclePortrait(playerName, dir){
+  const count = getPortraitCount(playerName);
+  if(count <= 1) return;
+  const current = getPortraitIndex(playerName);
+  const next = (current + dir + count) % count;
+  setPortraitIndex(playerName, next);
+  render();
+  // Re-open modal if open
+  const modal = document.getElementById('player-modal');
+  if(modal){
+    const pid = parseInt(modal.dataset.pid);
+    if(pid) { closePlayerModal(); openPlayerModal(pid); }
+  }
+}
+
 async function savePortraits(){
   if(!db) return;
   await db.from('leagues').upsert({id:'nba-portraits-2026', state:JSON.stringify(PLAYER_PORTRAITS)});
@@ -456,9 +492,13 @@ function getAcquiredRound(mid, pid){
 function bonusForPlayer(pid, mid){
   const t=getTeam(getPlayer(pid).team);
   const acquiredAfterRound = mid !== undefined ? getAcquiredRound(mid, pid) : 0;
+  const isWaiverPickup = acquiredAfterRound > 0; // picked up after draft = waiver acquisition
   let b=0;
   for(let r=1;r<=(t.survivedRounds||0);r++){
-    if(r > acquiredAfterRound) b+=ROUND_BONUS[r];
+    if(r > acquiredAfterRound){
+      // Waiver pickups only earn flat +5 per round survived (not escalating)
+      b += isWaiverPickup ? 5 : ROUND_BONUS[r];
+    }
   }
   return b;
 }
@@ -628,7 +668,7 @@ async function fetchScores(){
     const fp = stat.fp||0;
     if(!existing || fp > existing.fp){
       const p = PLAYERS.find(x=>x.id===parseInt(stat.pid||stat.id));
-      if(p && PLAYER_PORTRAITS[p.name]){
+      if(p && getActivePortrait(p.name)){
         gameTopPlayer[gid] = {fp, name: p.name, pid: p.id, isLive: stat.isLive||false};
       }
     }
@@ -656,7 +696,7 @@ async function fetchScores(){
       const homeTeamId = espnTeamToOurs(home.teamTricode||'');
       const bothTeams = [awayTeamId, homeTeamId].filter(Boolean);
       // Build pool: all players on these teams who have portraits
-      const pool = PLAYERS.filter(p=>bothTeams.includes(p.team) && PLAYER_PORTRAITS[p.name]);
+      const pool = PLAYERS.filter(p=>bothTeams.includes(p.team) && getActivePortrait(p.name));
       // Prefer players with most career FP (ppg proxy), alternating teams for variety
       const byTeam = {};
       bothTeams.forEach(tid=>{
@@ -677,9 +717,9 @@ async function fetchScores(){
 
     // Portrait
     const borderColor = isLive ? 'var(--red)' : isFinal ? 'var(--border)' : 'var(--border2)';
-    const portraitHtml = displayPlayer && PLAYER_PORTRAITS[displayPlayer.name]
+    const portraitHtml = displayPlayer && getActivePortrait(displayPlayer.name)
       ? `<div style="width:52px;height:52px;overflow:hidden;flex-shrink:0;position:relative;border:2px solid ${borderColor}">
-          <img src="${PLAYER_PORTRAITS[displayPlayer.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>
+          <img src="${getActivePortrait(displayPlayer.name)}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>
           ${isLive&&displayPlayer.fp!=null?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.85);font-family:'Press Start 2P',monospace;font-size:5px;color:#fff;text-align:center;padding:1px">${displayPlayer.fp>0?'+':''}${(+displayPlayer.fp).toFixed(0)} FP</div>`:''}
           ${isUpcoming?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);font-family:'Press Start 2P',monospace;font-size:4px;color:var(--accent3);text-align:center;padding:1px">TONIGHT</div>`:''}
         </div>`
@@ -1639,7 +1679,7 @@ function renderRosters(){
           const statScore=playerStatScore(p.id);
           const isLive=isPlayerLive(p.id);
           const bd=espnBD(p);
-          const hasPortrait=PLAYER_PORTRAITS[p.name];
+          const hasPortrait=getActivePortrait(p.name);
           const logo=TEAM_LOGOS[p.team];
           const borderColor=t.eliminated?'#333':inj?'#ff9900':isLive?'#ff3344':teamColor;
 
@@ -1665,12 +1705,13 @@ function renderRosters(){
             <!-- Portrait -->
             <div style="width:${IS_MOBILE?84:106}px;height:${IS_MOBILE?84:106}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
               ${hasPortrait
-                ? `<img src="${PLAYER_PORTRAITS[p.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
+                ? `<img src="${getActivePortrait(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
                 : logo
                   ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px">${logo.svg||`<img src="${logo.img}" style="width:80%;height:80%;object-fit:contain;image-rendering:pixelated"/>`}</div>`
                   : `<div style="font-size:11px;color:${teamColor}">${p.team}</div>`
               }
               ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
+              ${getPortraitCount(p.name)>1?`<div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.7);border:1px solid var(--accent2);font-family:'Press Start 2P',monospace;font-size:5px;padding:1px 3px;color:var(--accent2)">${getPortraitIndex(p.name)+1}/${getPortraitCount(p.name)}</div>`:''}
               ${t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff3344;text-shadow:0 0 8px #ff3344">OUT</span></div>`:''}
               ${inj&&!t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">DTD</span></div>`:''}
             </div>
@@ -1949,7 +1990,7 @@ function renderTeams(){
   const cardHtml = sorted.map(p=>{
     const t = TEAMS.find(t=>t.id===p.team);
     const tc = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
-    const hasPortrait = PLAYER_PORTRAITS[p.name];
+    const hasPortrait = getActivePortrait(p.name);
     const logo = TEAM_LOGOS[p.team];
     const owner = ownerMap[p.id];
     const statScore = playerStatScore(p.id);
@@ -1969,7 +2010,7 @@ function renderTeams(){
       <!-- Portrait -->
       <div style="width:${imgW}px;height:${imgW}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
         ${hasPortrait
-          ? `<img src="${PLAYER_PORTRAITS[p.name]}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
+          ? `<img src="${getActivePortrait(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
           : logo
             ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:12px">${logo.svg}</div>`
             : `<div style="font-family:'Press Start 2P',monospace;font-size:10px;color:${tc}">${p.team}</div>`
@@ -2161,6 +2202,80 @@ function renderBracket(){
   const finals = [matchup(wf,ef,4)];
   // ── Champion ──
   const champ = champion();
+
+  // Mobile: compact stacked 2-column layout
+  if(IS_MOBILE){
+    const mMatchup = (t1, t2, rounds, label) => {
+      const sr = t1 && t2 ? getSeriesRecord(t1?.id, t2?.id) : null;
+      const w1 = sr?.wins?.[t1?.id]||0, w2 = sr?.wins?.[t2?.id]||0;
+      const row = (team, opp, myW, oppW) => {
+        if(!team) return `<div style="padding:3px 6px;color:var(--text3);font-size:11px">TBD</div>`;
+        const t = teamMap[team.id];
+        const elim = t?.eliminated;
+        const won = (t?.survivedRounds||0)>=rounds && !elim;
+        const leading = myW > oppW;
+        const color = won?'var(--accent)':elim?'#444':leading?'var(--accent2)':'var(--text)';
+        const series = (myW>0||oppW>0||won||elim) ? `<span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${won?'var(--accent)':leading?'var(--accent2)':'var(--text3)'};margin-left:auto">${myW}-${oppW}</span>` : '';
+        return `<div style="display:flex;align-items:center;padding:3px 6px;${elim?'opacity:.45':''}${won?'background:rgba(0,180,255,.06)':''}">
+          <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3);min-width:14px">${team.seed}</span>
+          <span style="font-size:12px;color:${color};font-weight:${won?'600':'400'}">${team.name}</span>
+          ${series}
+        </div>`;
+      };
+      return `<div style="border:1px solid var(--border2);margin-bottom:4px">
+        ${label?`<div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);padding:2px 6px;background:var(--bg2)">${label}</div>`:''}
+        ${row(t1,t2,w1,w2)}
+        <div style="height:1px;background:var(--border2)"></div>
+        ${row(t2,t1,w2,w1)}
+      </div>`;
+    };
+
+    const wSection = (label, pairs, teamArr, rounds) =>
+      `<div style="flex:1;min-width:0">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">${label}</div>
+        ${pairs.map(([a,b])=>mMatchup(teamArr[a], teamArr[b], rounds, null)).join('')}
+      </div>`;
+
+    const wr2tt = r2teams('W'), er2tt = r2teams('E');
+    const wr3tt = r3teams('W'), er3tt = r3teams('E');
+    const wfin = finalsTeam('W'), efin = finalsTeam('E');
+
+    el.innerHTML = `<div style="padding:6px 0">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3);margin-bottom:6px">🏆 2026 PLAYOFF BRACKET</div>
+      <!-- R1 two cols -->
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        ${wSection('— WEST R1 —', r1pairs, W, 1)}
+        ${wSection('— EAST R1 —', r1pairs, E, 1)}
+      </div>
+      <!-- R2 two cols -->
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">WEST SEMIS</div>
+          ${[[0,1],[2,3]].map(([a,b])=>mMatchup(wr2tt[a],wr2tt[b],2,null)).join('')}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">EAST SEMIS</div>
+          ${[[0,1],[2,3]].map(([a,b])=>mMatchup(er2tt[a],er2tt[b],2,null)).join('')}
+        </div>
+      </div>
+      <!-- Conf Finals + Finals -->
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">WEST FINALS</div>
+          ${mMatchup(wr3tt[0],wr3tt[1],3,null)}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">NBA FINALS</div>
+          ${mMatchup(wfin,efin,4,null)}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);margin-bottom:4px">EAST FINALS</div>
+          ${mMatchup(er3tt[0],er3tt[1],3,null)}
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
 
   el.innerHTML = `<div class="bracket-wrap">
     <div class="bracket-title">
@@ -2584,7 +2699,7 @@ function openPlayerModal(pid){
   if(!p) return;
   const t = getTeam(p.team);
   const teamColor = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
-  const hasPortrait = PLAYER_PORTRAITS[p.name];
+  const hasPortrait = getActivePortrait(p.name);
   const logo = TEAM_LOGOS[p.team];
 
   // Get all saved game stats for this player
@@ -2711,13 +2826,14 @@ function openPlayerModal(pid){
   const modal = document.createElement('div');
   modal.className = 'player-modal';
   modal.id = 'player-modal';
+  modal.dataset.pid = pid;
   modal.onclick = e => { if(e.target===modal) closePlayerModal(); };
   modal.innerHTML = `
     <div class="player-modal-inner">
       <div class="player-modal-header">
         <div class="player-modal-portrait" style="border-color:${teamColor}">
           ${hasPortrait
-            ? `<img src="${PLAYER_PORTRAITS[p.name]}" />`
+            ? `<img src="${getActivePortrait(p.name)}" />`
             : logo ? logo.svg : `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#020c18;font-family:'Press Start 2P',monospace;font-size:10px;color:${teamColor}">${p.team}</div>`}
         </div>
         <div style="flex:1">
@@ -2848,8 +2964,17 @@ async function handlePortraitUpload(input){
     status.textContent = 'Processed ' + processed + '/' + files.length + '...';
   }
 
-  // Merge into PLAYER_PORTRAITS
-  Object.assign(PLAYER_PORTRAITS, newPortraits);
+  // Merge into PLAYER_PORTRAITS — append as array if player already has portrait
+  for(const [name, dataUri] of Object.entries(newPortraits)){
+    const existing = PLAYER_PORTRAITS[name];
+    if(!existing){
+      PLAYER_PORTRAITS[name] = dataUri; // first portrait — store as string
+    } else if(Array.isArray(existing)){
+      existing.push(dataUri); // already array — append
+    } else {
+      PLAYER_PORTRAITS[name] = [existing, dataUri]; // upgrade to array
+    }
+  }
 
   // Save — split into chunks of 20 portraits each to avoid timeout
   status.textContent = 'Saving to Supabase...';
