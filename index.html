@@ -120,6 +120,14 @@ select:focus{border-color:var(--accent3)}
 @keyframes blink{50%{opacity:0}}
 @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .scores-loading{padding:.75rem 1rem;font-size:14px;color:var(--text2)}
+.ticker-item{display:inline-flex;align-items:center;gap:6px;padding:0 16px;border-right:1px solid var(--border2);height:36px;flex-shrink:0}
+.ticker-item-portrait{width:28px;height:28px;overflow:hidden;flex-shrink:0;image-rendering:pixelated}
+.ticker-item-portrait img{width:100%;height:100%;object-fit:cover;object-position:center top}
+.ticker-rank{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);min-width:14px}
+.ticker-name{font-size:13px;color:var(--text);white-space:nowrap}
+.ticker-team{font-size:10px;color:var(--text3)}
+.ticker-fp{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent2);margin-left:4px}
+@keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .scores-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:.45rem 1rem;border-right:2px solid var(--border);white-space:nowrap;display:flex;align-items:center;gap:6px;background:rgba(0,180,255,.05)}
 
 /* ══════════════════════════════════
@@ -767,6 +775,14 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <!-- Draft on-clock banner -->
   <div id="draft-banner">
     <div id="draft-banner-inner"></div>
+  </div>
+
+  <!-- Top Players Banner -->
+  <div id="top-players-banner" style="overflow:hidden;background:var(--panel);border-bottom:2px solid var(--border);height:36px;display:flex;align-items:center">
+    <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:0 10px;border-right:2px solid var(--border);white-space:nowrap">🔥 TODAY</div>
+    <div style="overflow:hidden;flex:1;position:relative">
+      <div id="top-players-ticker" style="display:flex;gap:0;position:absolute;white-space:nowrap;will-change:transform"></div>
+    </div>
   </div>
 
   <!-- Bracket -->

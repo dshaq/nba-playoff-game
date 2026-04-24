@@ -1239,7 +1239,7 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -2056,6 +2056,80 @@ function setPlayerSort(mode){
   renderTeams();
 }
 
+
+// ── Top Players Ticker ────────────────────────────────────────────
+let _tickerAnimFrame = null;
+
+function renderTopPlayersBanner(){
+  const el = document.getElementById('top-players-ticker');
+  if(!el) return;
+
+  // Get today's date
+  const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+
+  // Aggregate today's FP per player (saved + live, deduped by gameId)
+  const playerTodayFP = {};
+  Object.values(S.playerStats||{}).filter(s=>s.date===today).forEach(s=>{
+    playerTodayFP[s.pid] = (playerTodayFP[s.pid]||0) + (s.fp||0);
+  });
+  Object.entries(livePlayerStats||{}).forEach(([pid,s])=>{
+    const alreadySaved = Object.values(S.playerStats||{}).some(x=>x.pid===parseInt(pid)&&x.gameId===s.gameId);
+    if(!alreadySaved) playerTodayFP[parseInt(pid)] = (playerTodayFP[parseInt(pid)]||0) + (s.fp||0);
+  });
+
+  // Sort and take top 5
+  const top5 = Object.entries(playerTodayFP)
+    .filter(([,fp])=>fp>0)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,5)
+    .map(([pid,fp],i)=>{
+      const p = PLAYERS.find(x=>x.id===parseInt(pid));
+      if(!p) return null;
+      const portrait = getActivePortrait(p.name);
+      const tc = TEAM_LOGOS[p.team]?.color||'#4a9eff';
+      const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+      return `<div class="ticker-item" onclick="openPlayerModal(${p.id})" style="cursor:pointer">
+        ${medal?`<span style="font-size:13px">${medal}</span>`:`<span class="ticker-rank">#${i+1}</span>`}
+        ${portrait
+          ? `<div class="ticker-item-portrait" style="border:1px solid ${tc}"><img src="${portrait}"/></div>`
+          : `<div class="ticker-item-portrait" style="background:${tc}22;border:1px solid ${tc}44;display:flex;align-items:center;justify-content:center"><span style="font-size:7px;color:${tc}">${p.team}</span></div>`}
+        <span class="ticker-name">${p.name.split(' ').pop()}</span>
+        <span class="ticker-team">${p.team}</span>
+        <span class="ticker-fp">${fp>0?'+':''}${fp.toFixed(1)}</span>
+      </div>`;
+    }).filter(Boolean);
+
+  if(!top5.length){
+    el.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--text3)">No games today yet</div>';
+    el.style.animation = 'none';
+    el.style.transform = '';
+    return;
+  }
+
+  // Duplicate items for seamless loop
+  const itemsHtml = top5.join('');
+  el.innerHTML = itemsHtml + itemsHtml; // doubled for seamless scroll
+
+  // Measure single set width and animate
+  requestAnimationFrame(()=>{
+    const singleWidth = el.scrollWidth / 2;
+    const duration = Math.max(12, singleWidth / 40); // ~40px/s
+    el.style.animation = 'none';
+    el.style.transform = '';
+    // Use JS animation for smooth seamless loop
+    let startTime = null;
+    let pos = 0;
+    function animate(ts){
+      if(!startTime) startTime = ts;
+      const elapsed = (ts - startTime) / 1000;
+      pos = (elapsed * 40) % singleWidth;
+      if(el.parentElement) el.style.transform = `translateX(-${pos}px)`;
+      _tickerAnimFrame = requestAnimationFrame(animate);
+    }
+    if(_tickerAnimFrame) cancelAnimationFrame(_tickerAnimFrame);
+    _tickerAnimFrame = requestAnimationFrame(animate);
+  });
+}
 // ── Bracket ───────────────────────────────────────────────────────
 function renderBracket(){
   const el = document.getElementById('bracket-section');
@@ -2562,6 +2636,7 @@ async function refreshLiveStats(){
     render();
     updateLiveStatsIndicator();
     fetchScores(); // Re-render scoreboard portraits with latest live FP leaders
+    renderTopPlayersBanner(); // Update ticker with fresh live FP
   }catch(e){ console.warn('refreshLiveStats error:', e); }
 }
 
