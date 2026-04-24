@@ -656,7 +656,7 @@ async function fetchScores(){
   }
 
   // Build a map of gameId -> top FP player (from live + saved stats)
-  const gameTopPlayer = {};
+  gameTopPlayer = {}; // rebuild from latest stats
   const allStatSources = [
     ...Object.values(livePlayerStats||{}).map(s=>({...s, isLive:true})),
     ...Object.values(S.playerStats||{})
@@ -664,13 +664,15 @@ async function fetchScores(){
   for(const stat of allStatSources){
     const gid = stat.gameId;
     if(!gid) continue;
-    const existing = gameTopPlayer[gid];
     const fp = stat.fp||0;
-    if(!existing || fp > existing.fp){
-      const p = PLAYERS.find(x=>x.id===parseInt(stat.pid||stat.id));
-      if(p && getActivePortrait(p.name)){
-        gameTopPlayer[gid] = {fp, name: p.name, pid: p.id, isLive: stat.isLive||false};
-      }
+    if(fp <= 0) continue; // skip zero scorers
+    const existing = gameTopPlayer[gid];
+    if(existing && fp <= existing.fp) continue;
+    // Always resolve name via PLAYERS array (stat.name may not match portrait keys)
+    const pid = parseInt(stat.pid||stat.id||0);
+    const p = PLAYERS.find(x=>x.id===pid);
+    if(p && getActivePortrait(p.name)){
+      gameTopPlayer[gid] = {fp, name: p.name, pid: p.id, isLive: !!(stat.isLive)};
     }
   }
 
@@ -2839,6 +2841,7 @@ async function dragDrop(e, mid, idx){
 
 // ── Series Records ────────────────────────────────────────────────
 let seriesRecords = {};
+let gameTopPlayer = {}; // persists between fetchScores calls
 
 
 // ── Portrait Uploader ─────────────────────────────────────────────
