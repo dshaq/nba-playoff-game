@@ -1344,14 +1344,14 @@ function renderStandings(){
         </div>
         <!-- Score -->
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-family:'Press Start 2P',monospace;font-size:${i===0?'22':'18'}px;color:${i===0?'var(--accent2)':'var(--text)'}">${showScores?total:'—'}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:${i===0?'22':'18'}px;color:${i===0?aColor:'var(--text)'}">${showScores?total:'—'}</div>
           ${showScores?`<div style="font-size:10px;color:var(--text3)">PTS</div>`:''}
         </div>
       </div>
       <!-- Progress bar -->
       ${showScores&&total>0?`
       <div style="margin-top:.5rem;height:4px;background:var(--border);position:relative">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${barPct}%;background:${i===0?'var(--accent2)':aColor};transition:width .3s"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${barPct}%;background:${aColor};transition:width .3s"></div>
       </div>`:''}
     </div>`;
   }).join('');
