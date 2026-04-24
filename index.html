@@ -1006,6 +1006,10 @@ const AVATAR_THEMES = [
   {name:"PURPLE RAIN",c1:"#cc44ff",c2:"#ee88ff",c3:"#9900cc",bg:"#110022"},
   {name:"AMBER",      c1:"#ff8800",c2:"#ffaa44",c3:"#cc5500",bg:"#1a0e00"},
   {name:"TEAL DREAM", c1:"#00ffee",c2:"#44ffee",c3:"#00bbaa",bg:"#001a18"},
+  {name:"ARCTIC WHITE",c1:"#e8f4ff",c2:"#ffffff",c3:"#a0c8e8",bg:"#0a1520"},
+  {name:"BLACK COBALT",c1:"#1a3a6e",c2:"#2a5aaa",c3:"#0d1f3c",bg:"#050c18"},
+  {name:"CRIMSON",    c1:"#c0392b",c2:"#e74c3c",c3:"#922b21",bg:"#1a0505"},
+  {name:"LIME SHOCK", c1:"#b8ff00",c2:"#d4ff55",c3:"#88cc00",bg:"#0e1a00"},
 ];
 
 // Single ball SVG — always fills container via width/height 100%
@@ -1042,7 +1046,7 @@ let pendingAvatarIdx = null;
 
 function openAvatarModal(mid){
   pendingAvatarMgr = mid;
-  pendingAvatarIdx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % 8);
+  pendingAvatarIdx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
   const grid = document.getElementById('avatar-grid');
   grid.innerHTML = AVATAR_THEMES.map((t,i)=>`
     <div class="av-choice ${i===pendingAvatarIdx?'selected':''}" onclick="selectAvatarChoice(${i})">
@@ -1067,13 +1071,13 @@ async function saveAvatar(){
 }
 
 function getAvatar(mid, size='sm'){
-  const idx = (S && S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % 8);
+  const idx = (S && S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
   const t = AVATAR_THEMES[idx] || AVATAR_THEMES[0];
   return size==='lg' ? makeBallSVGLarge(t) : makeBallSVG(t);
 }
 
 function getAvatarColor(mid){
-  const idx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % 8);
+  const idx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
   return AVATAR_THEMES[idx]?.c1 || '#ff6600';
 }
 
