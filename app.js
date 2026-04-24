@@ -877,7 +877,7 @@ function showManagerPicker(){
     <div style="max-width:420px;margin:2rem auto;padding:0 1rem">
       <div class="topbar" style="margin-bottom:1.5rem">
         <div>
-          <div class="topbar-title">🏀 NBA PLAYOFF FANTASY</div>
+          <div class="topbar-title">🕹️ NBA ARCADE</div>
           <div class="topbar-sub">2026 PLAYOFFS</div>
         </div>
       </div>
@@ -1199,8 +1199,8 @@ async function sendInjuryEmail(managerName, playerName){
     await saveState();
 
     // Open mailto so their email client fires off a notification email
-    const subject = encodeURIComponent(`[HOOPS FANTASY] ${managerName} marked ${playerName} as DTD`);
-    const body = encodeURIComponent(`${managerName} has marked ${playerName} as injured/OUT in HOOPS FANTASY 2026.\n\nView the league: ${window.location.origin}`);
+    const subject = encodeURIComponent(`[NBA ARCADE] ${managerName} marked ${playerName} as DTD`);
+    const body = encodeURIComponent(`${managerName} has marked ${playerName} as injured/OUT in NBA ARCADE.\n\nView the league: ${window.location.origin}`);
     const mailto = `mailto:daveschachter@gmail.com?subject=${subject}&body=${body}`;
     window.open(mailto, '_blank');
   }catch(e){ console.warn('Injury notification error:', e); }
