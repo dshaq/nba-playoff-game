@@ -2165,28 +2165,33 @@ function renderTopPlayersBanner(){
   const el = document.getElementById('top-players-ticker');
   if(!el) return;
 
-  // Use today's game IDs from live stats + scoreboard to find all today's games
-  // livePlayerStats has current game IDs; also grab any completed today from saved stats
+  // Determine which day to show — today first, fall back to yesterday
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g,'');
+  const yestDate = new Date(); yestDate.setDate(yestDate.getDate()-1);
+  const yestStr = yestDate.toISOString().split('T')[0].replace(/-/g,'');
+
+  // Collect today's game IDs (live + saved with today's date)
   const todayGameIds = new Set();
-
-  // Live games are always today
   Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) todayGameIds.add(s.gameId); });
+  Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStr && s.gameId) todayGameIds.add(s.gameId); });
 
-  // Also check saved stats for games from today or yesterday (ESPN may save with game date)
-  const recentDates = new Set();
-  for(let i=0;i<=1;i++){
-    const d = new Date(); d.setDate(d.getDate()-i);
-    recentDates.add(d.toISOString().split('T')[0].replace(/-/g,''));
+  // Fall back to yesterday if nothing today yet
+  let activeGameIds = todayGameIds;
+  let isYesterday = false;
+  if(todayGameIds.size === 0){
+    const yestGameIds = new Set();
+    Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr && s.gameId) yestGameIds.add(s.gameId); });
+    activeGameIds = yestGameIds;
+    isYesterday = yestGameIds.size > 0;
   }
-  Object.values(S.playerStats||{}).forEach(s=>{ if(s.date && recentDates.has(s.date) && s.gameId) todayGameIds.add(s.gameId); });
 
-  // Aggregate FP per player across today's game IDs
+  // Aggregate FP per player across active game IDs
   const playerTodayFP = {};
-  Object.values(S.playerStats||{}).filter(s=>todayGameIds.has(s.gameId)).forEach(s=>{
+  Object.values(S.playerStats||{}).filter(s=>activeGameIds.has(s.gameId)).forEach(s=>{
     playerTodayFP[s.pid] = (playerTodayFP[s.pid]||0) + (s.fp||0);
   });
   Object.entries(livePlayerStats||{}).forEach(([pid,s])=>{
-    if(!todayGameIds.has(s.gameId)) return;
+    if(!activeGameIds.has(s.gameId)) return;
     const alreadySaved = Object.values(S.playerStats||{}).some(x=>x.pid===parseInt(pid)&&x.gameId===s.gameId);
     if(!alreadySaved) playerTodayFP[parseInt(pid)] = (playerTodayFP[parseInt(pid)]||0) + (s.fp||0);
   });
@@ -2214,7 +2219,7 @@ function renderTopPlayersBanner(){
     }).filter(Boolean);
 
   if(!top5.length){
-    el.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--text3)">No games today yet</div>';
+    el.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--text3)">No games yet today</div>';
     el.style.animation = 'none';
     el.style.transform = '';
     return;
