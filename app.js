@@ -1884,7 +1884,7 @@ function renderScoring(){
           <thead>
             <tr style="border-bottom:1px solid var(--border)">
               <th style="text-align:left;padding:4px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">PLAYER</th>
-              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">FP</th>
+              <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">FP/G</th>
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">PTS</th>
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">REB</th>
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">AST</th>
@@ -1892,7 +1892,7 @@ function renderScoring(){
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">BLK</th>
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">TO</th>
               <th style="padding:4px 4px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">BONUS</th>
-              <th style="padding:4px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">TOTAL</th>
+              <th style="padding:4px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);font-weight:normal">TOTAL FP</th>
             </tr>
           </thead>
           <tbody>
@@ -1941,9 +1941,9 @@ function renderScoring(){
                 </td>
                 <td style="text-align:center">
                   <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">
-                    ${hasStats?(statScore>0?'+':'')+statScore.toFixed(1):'—'}
+                    ${hasStats?((playerFPPG(p.id,m.id)||0)>0?'+':'')+(playerFPPG(p.id,m.id)||0).toFixed(1):'—'}
                   </div>
-                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${(playerFPPG(p.id,m.id)||0).toFixed(1)}/g</div>`:''}
+                  ${hasStats?`<div style="font-size:10px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} tot</div>`:''}
                   ${excludedFP>0?`<div style="font-size:9px;color:var(--red)" title="Stats before pickup not counted">-${excludedFP} excl</div>`:''}
                 </td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
