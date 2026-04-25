@@ -1591,6 +1591,7 @@ function renderWaiver(){
               <span class="pos-badge">${p.pos}</span>
               ${elim?'<span class="badge badge-elim">ELIM</span>':''}
               ${isLive?'<span class="score-live" style="font-size:8px">LIVE</span>':''}
+              ${!elim?injuryBadgeHtml(p.name,true):''}
             </div>
             <div style="font-size:12px;color:var(--text3);margin-top:2px">${t.name} · ${agg.gp} playoff game${agg.gp!==1?'s':''}</div>
             ${claimSection}
@@ -1698,7 +1699,11 @@ function renderRosters(){
               ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
               ${getPortraitCount(p.name)>1?`<div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.7);border:1px solid var(--accent2);font-family:'Press Start 2P',monospace;font-size:5px;padding:1px 3px;color:var(--accent2)">${getPortraitIndex(p.name)+1}/${getPortraitCount(p.name)}</div>`:''}
               ${t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff3344;text-shadow:0 0 8px #ff3344">OUT</span></div>`:''}
-              ${inj&&!t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">DTD</span></div>`:''}
+              ${(()=>{
+                if(t.eliminated) return '';
+                if(inj) return `<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff9900;text-shadow:0 0 8px #ff9900">DTD</span></div>`;
+                return injuryBadgeHtml(p.name);
+              })()}
             </div>
             <!-- Gold divider like the preview -->
             <div style="height:2px;background:${borderColor}"></div>
@@ -2013,6 +2018,7 @@ function renderTeams(){
       <!-- Stats bar -->
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
+          ${injuryBadgeHtml(p.name,true)}
         <div style="text-align:right">
           <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
             ${fppg>0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
@@ -2023,7 +2029,35 @@ function renderTeams(){
     </div>`;
   }).join('');
 
+  // Build injury alert for drafted players
+  const draftedInjured = Object.values(espnInjuries).filter(inj => {
+    const p = PLAYERS.find(x=>x.name.toLowerCase()===inj.name.toLowerCase());
+    if(!p) return false;
+    return Object.values(S.rosters||{}).some(r=>r.includes(p.id));
+  });
+
+  const injAlertHtml = draftedInjured.length ? `
+    <div style="margin-bottom:.75rem;padding:.625rem;background:rgba(255,51,68,.08);border:2px solid var(--red)">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--red);margin-bottom:.5rem">🚑 INJURY REPORT — DRAFTED PLAYERS</div>
+      ${draftedInjured.map(inj=>{
+        const p = PLAYERS.find(x=>x.name.toLowerCase()===inj.name.toLowerCase());
+        const ownerMid = Object.entries(S.rosters||{}).find(([,r])=>r.includes(p?.id))?.[0];
+        const owner = S.managers?.find(m=>String(m.id)===ownerMid);
+        const color = inj.status==='Out'?'var(--red)':'#ff9900';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2)">
+          ${getActivePortrait(inj.name)?`<img src="${getActivePortrait(inj.name)}" style="width:28px;height:28px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:1px solid ${color}"/>`:''}
+          <div style="flex:1">
+            <span style="font-size:13px;color:var(--text)">${inj.name}</span>
+            <span style="font-family:'Press Start 2P',monospace;font-size:7px;padding:1px 4px;background:${color};color:#000;margin-left:6px">${inj.status==='Out'?'OUT':'DTD'}</span>
+            ${owner?`<span style="font-size:11px;color:var(--text3);margin-left:6px">→ ${owner.name}</span>`:''}
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${inj.comment?.slice(0,100)||''}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   document.getElementById('teams-chips').innerHTML = chipHtml;
+  document.getElementById('teams-injury-alert').innerHTML = injAlertHtml;
   document.getElementById('teams-gallery').innerHTML = sorted.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">${cardHtml}</div>`
     : `<div style="color:var(--text3);padding:1rem">No players found.</div>`;
@@ -2922,6 +2956,50 @@ async function dragDrop(e, mid, idx){
 let seriesRecords = {};
 let gameTopPlayer = {}; // persists between fetchScores calls
 
+
+// ── ESPN Injury Feed ─────────────────────────────────────────────
+let espnInjuries = {}; // name_lower -> {status, comment, updated}
+
+async function fetchInjuryReport(){
+  try{
+    const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries');
+    const d = await res.json();
+    const newData = {};
+    for(const teamData of (d.injuries||[])){
+      for(const inj of (teamData.injuries||[])){
+        const name = inj.athlete?.displayName;
+        if(!name) continue;
+        const status = inj.status; // "Out", "Day-To-Day", "Questionable"
+        if(!status || status==='Active') continue;
+        newData[name.toLowerCase()] = {
+          name,
+          status,
+          comment: inj.shortComment||'',
+          updated: inj.date||''
+        };
+      }
+    }
+    espnInjuries = newData;
+    render(); // Re-render to show updated badges
+    console.log('Injury report updated:', Object.keys(espnInjuries).length, 'players');
+  }catch(e){ console.warn('fetchInjuryReport error:', e); }
+}
+
+function getESPNInjury(playerName){
+  return espnInjuries[playerName?.toLowerCase()] || null;
+}
+
+function injuryBadgeHtml(playerName, small=false){
+  const inj = getESPNInjury(playerName);
+  if(!inj) return '';
+  const color = inj.status==='Out' ? 'var(--red)' : inj.status==='Day-To-Day' ? '#ff9900' : '#ffcc00';
+  const label = inj.status==='Out' ? 'OUT' : inj.status==='Day-To-Day' ? 'DTD' : 'Q';
+  if(small) return `<span style="font-family:'Press Start 2P',monospace;font-size:6px;padding:1px 3px;background:${color};color:#000;margin-left:3px">${label}</span>`;
+  return `<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
+    <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:${color};text-shadow:0 0 8px ${color}">${label}</span>
+  </div>`;
+}
+
 function rebuildGameTopPlayer(){
   gameTopPlayer = {};
   // Include ALL players — even fp=0 so we show someone for low-scoring early games
@@ -3288,6 +3366,9 @@ async function boot(){
   const hasState=await loadState();
   // Backfill any missing playoff game stats in background
   backfillMissingStats();
+  // Fetch ESPN injury report
+  fetchInjuryReport();
+  setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
   // Load portraits in background, re-render when done
