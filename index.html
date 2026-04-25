@@ -939,6 +939,25 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
       <div id="portrait-upload-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:.75rem"></div>
     </div>
 
+    <!-- Custom Logo Uploader — Commissioner only -->
+    <div id="logo-uploader-card" class="card hidden" style="border-left:4px solid var(--accent2);margin-bottom:.75rem">
+      <div class="section-title" style="margin-bottom:.5rem">🎨 UPLOAD CUSTOM LOGOS</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:.75rem">
+        Upload any image as a selectable team logo. Filename becomes the display name.<br>
+        e.g. <span style="color:var(--accent2)">Pizza_Guy.png</span> → appears as "Pizza Guy" in the picker.
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;display:inline-block">
+          <input type="file" id="logo-file-input" multiple accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
+          <span class="btn btn-green" style="display:inline-block">📁 CHOOSE IMAGES</span>
+        </label>
+        <div id="logo-upload-status" style="font-size:13px;color:var(--text3)">No files selected</div>
+      </div>
+      <div id="logo-upload-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:.75rem"></div>
+      <!-- Show existing custom logos -->
+      <div id="logo-existing" style="margin-top:.75rem"></div>
+    </div>
+
     <!-- Animation Uploader — Commissioner only -->
     <div id="animation-uploader-card" class="card hidden" style="border-left:4px solid var(--green);margin-bottom:.75rem">
       <div class="section-title" style="margin-bottom:.5rem">🎬 UPLOAD PLAYER ANIMATIONS</div>
@@ -1050,6 +1069,30 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 <script>
 // ── Avatar system ──
+// Custom logos uploaded by commissioner — stored in Supabase
+let CUSTOM_LOGOS = []; // [{name, dataUri, color}]
+
+async function loadCustomLogos(){
+  try{
+    const {data} = await db.from('leagues').select('state').eq('id','nba-custom-logos-2026').single();
+    if(data?.state){
+      CUSTOM_LOGOS = JSON.parse(data.state);
+      console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos');
+    }
+  }catch(e){ /* none yet */ }
+}
+
+async function saveCustomLogos(){
+  await db.from('leagues').upsert({id:'nba-custom-logos-2026', state:JSON.stringify(CUSTOM_LOGOS)});
+}
+
+// Combined: index 0-11 = ball themes, 12+ = custom logos
+function getAvatarByIndex(idx){
+  if(idx < AVATAR_THEMES.length) return {type:'ball', theme:AVATAR_THEMES[idx]};
+  const logo = CUSTOM_LOGOS[idx - AVATAR_THEMES.length];
+  return logo ? {type:'custom', logo} : {type:'ball', theme:AVATAR_THEMES[0]};
+}
+
 const AVATAR_THEMES = [
   {name:"ORANGE FIRE",c1:"#ff6600",c2:"#ff9900",c3:"#cc4400",bg:"#1a0a00"},
   {name:"ICE BLUE",   c1:"#00b4ff",c2:"#44ccff",c3:"#0077cc",bg:"#001830"},
@@ -1101,11 +1144,24 @@ function openAvatarModal(mid){
   pendingAvatarMgr = mid;
   pendingAvatarIdx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
   const grid = document.getElementById('avatar-grid');
-  grid.innerHTML = AVATAR_THEMES.map((t,i)=>`
-    <div class="av-choice ${i===pendingAvatarIdx?'selected':''}" onclick="selectAvatarChoice(${i})">
+
+  const ballChoices = AVATAR_THEMES.map((t,i)=>`
+    <div class="av-choice ${i===pendingAvatarIdx?'selected':''}" onclick="selectAvatarChoice(${i})" title="${t.name}">
       ${makeBallSVGLarge(t,52)}
       <div class="av-choice-label">${t.name}</div>
     </div>`).join('');
+
+  const customChoices = CUSTOM_LOGOS.length ? `
+    <div style="grid-column:1/-1;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3);padding:8px 0 4px">CUSTOM LOGOS</div>
+    ${CUSTOM_LOGOS.map((logo,i)=>{
+      const idx = AVATAR_THEMES.length + i;
+      return `<div class="av-choice ${idx===pendingAvatarIdx?'selected':''}" onclick="selectAvatarChoice(${idx})" title="${logo.name}">
+        <img src="${logo.dataUri}" style="width:52px;height:52px;object-fit:cover;image-rendering:pixelated;border-radius:2px"/>
+        <div class="av-choice-label">${logo.name}</div>
+      </div>`;
+    }).join('')}` : '';
+
+  grid.innerHTML = ballChoices + customChoices;
   document.getElementById('avatar-modal').classList.remove('hidden');
 }
 
@@ -1125,13 +1181,19 @@ async function saveAvatar(){
 
 function getAvatar(mid, size='sm'){
   const idx = (S && S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
-  const t = AVATAR_THEMES[idx] || AVATAR_THEMES[0];
-  return size==='lg' ? makeBallSVGLarge(t) : makeBallSVG(t);
+  const av = getAvatarByIndex(idx);
+  if(av.type === 'custom'){
+    const sz = size==='lg' ? 60 : 36;
+    return `<img src="${av.logo.dataUri}" style="width:${sz}px;height:${sz}px;object-fit:cover;image-rendering:pixelated;border-radius:2px"/>`;
+  }
+  return size==='lg' ? makeBallSVGLarge(av.theme) : makeBallSVG(av.theme);
 }
 
 function getAvatarColor(mid){
   const idx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
-  return AVATAR_THEMES[idx]?.c1 || '#ff6600';
+  const av = getAvatarByIndex(idx);
+  if(av.type === 'custom') return av.logo.color || '#4a9eff';
+  return av.theme?.c1 || '#ff6600';
 }
 
 // ── Mascot messages ──

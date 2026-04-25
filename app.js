@@ -1850,6 +1850,9 @@ function renderScoring(){
   if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
   const animCard = document.getElementById('animation-uploader-card');
   if(animCard) animCard.classList.toggle('hidden', !isCommissioner);
+  const logoCard = document.getElementById('logo-uploader-card');
+  if(logoCard) logoCard.classList.toggle('hidden', !isCommissioner);
+  renderExistingLogos();
 
   // Show injury notifications for commissioner
   const notifCard = document.getElementById('injury-notifications-card');
@@ -3307,6 +3310,95 @@ function rebuildGameTopPlayer(){
 
 // ── Portrait Uploader ─────────────────────────────────────────────
 
+
+async function handleLogoUpload(input){
+  const files = [...input.files];
+  if(!files.length) return;
+  const status = document.getElementById('logo-upload-status');
+  const preview = document.getElementById('logo-upload-preview');
+  status.textContent = 'Processing ' + files.length + ' logo(s)...';
+  status.style.color = 'var(--accent3)';
+  preview.innerHTML = '';
+
+  for(const file of files){
+    const name = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+    // Resize to 80x80
+    const dataUri = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 80; canvas.height = 80;
+          const ctx = canvas.getContext('2d');
+          const size = Math.min(img.width, img.height);
+          ctx.drawImage(img, (img.width-size)/2, (img.height-size)/2, size, size, 0, 0, 80, 80);
+          resolve(canvas.toDataURL('image/png', 0.85));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Pick a vibrant color from the image center
+    const canvas2 = document.createElement('canvas'); canvas2.width=1; canvas2.height=1;
+    const ctx2 = canvas2.getContext('2d');
+    const img2 = new Image(); img2.src = dataUri;
+    await new Promise(r=>img2.onload=r);
+    ctx2.drawImage(img2, 30, 10, 20, 20, 0, 0, 1, 1);
+    const [r,g,b] = ctx2.getImageData(0,0,1,1).data;
+    const color = '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+
+    // Remove existing logo with same name
+    CUSTOM_LOGOS = CUSTOM_LOGOS.filter(l=>l.name!==name);
+    CUSTOM_LOGOS.push({name, dataUri, color});
+
+    // Preview
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;width:70px';
+    div.innerHTML = `<img src="${dataUri}" style="width:60px;height:60px;object-fit:cover;border:2px solid var(--accent2)"><div style="font-size:9px;color:var(--text3);margin-top:3px">${name}</div>`;
+    preview.appendChild(div);
+    status.textContent = 'Added: ' + name;
+  }
+
+  // Save
+  status.textContent = 'Saving...';
+  try{
+    await saveCustomLogos();
+    status.textContent = '✓ Saved ' + CUSTOM_LOGOS.length + ' custom logo(s)!';
+    status.style.color = 'var(--green)';
+    renderExistingLogos();
+    render();
+  }catch(e){
+    status.textContent = '✗ Error: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+  input.value = '';
+}
+
+function renderExistingLogos(){
+  const el = document.getElementById('logo-existing');
+  if(!el) return;
+  if(!CUSTOM_LOGOS.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--text3);margin-bottom:6px">EXISTING LOGOS</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    + CUSTOM_LOGOS.map((l,i)=>`
+      <div style="text-align:center;width:70px">
+        <img src="${l.dataUri}" style="width:60px;height:60px;object-fit:cover;border:2px solid ${l.color}"/>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${l.name}</div>
+        <button onclick="deleteCustomLogo(${i})" style="font-size:8px;background:none;border:1px solid var(--red);color:var(--red);cursor:pointer;padding:1px 4px;margin-top:2px">✕</button>
+      </div>`).join('')
+    + '</div>';
+}
+
+async function deleteCustomLogo(i){
+  if(!confirm('Delete "'+CUSTOM_LOGOS[i]?.name+'"?')) return;
+  CUSTOM_LOGOS.splice(i,1);
+  await saveCustomLogos();
+  renderExistingLogos();
+  render();
+}
+
 async function handleAnimationUpload(input){
   const files = [...input.files];
   if(!files.length) return;
@@ -3713,6 +3805,8 @@ async function boot(){
   fetchInjuryReport();
   // Load player animations
   loadAnimations();
+  // Load custom logos
+  loadCustomLogos().then(()=>render());
   setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
