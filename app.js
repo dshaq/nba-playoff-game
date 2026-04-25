@@ -3102,21 +3102,17 @@ function updateAnimatedPortrait(container, pid){
   const deltaColor = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text3)';
   const deltaStr = delta > 0 ? '+'+delta.toFixed(1) : delta < 0 ? delta.toFixed(1) : '';
 
-  container.innerHTML = \`
-    <video autoplay loop=\${type==='idle'?'true':'false'} muted playsinline
-      style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"
-      onended="activeAnimations[\${pid}]={type:'idle',delta:0,ts:Date.now()};updateAnimatedPortrait(this.parentElement,\${pid})">
-      <source src="\${videoSrc}" type="video/mp4">
-    </video>
-    \${deltaStr ? \`<div style="position:absolute;top:2px;left:2px;font-family:'Press Start 2P',monospace;font-size:8px;color:\${deltaColor};text-shadow:0 0 6px \${deltaColor};animation:fp-float 1.5s ease-out forwards">\${deltaStr} FP</div>\` : ''}
-  \`;
+  const fpOverlay = deltaStr ? `<div style="position:absolute;top:2px;left:2px;font-family:'Press Start 2P',monospace;font-size:8px;color:${deltaColor};text-shadow:0 0 6px ${deltaColor};animation:fp-float 1.5s ease-out forwards">${deltaStr} FP</div>` : '';
+  const isLooping = type === 'idle' ? 'true' : 'false';
+  const onEnded = type !== 'idle' ? `this.parentElement.__anim=${pid};activeAnimations[${pid}]={type:'idle',delta:0,ts:Date.now()};updateAnimatedPortrait(this.parentElement,${pid})` : '';
+  container.innerHTML = `<video autoplay ${type==='idle'?'loop':''}  muted playsinline onended="${onEnded}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"><source src="${videoSrc}" type="video/mp4"></video>${fpOverlay}`;
 }
 
 function buildStaticPortrait(p, dataset){
   const portrait = getActivePortrait(p.name);
   const logo = TEAM_LOGOS[p.team];
-  if(portrait) return \`<img src="\${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>\`;
-  if(logo) return \`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:12px">\${logo.svg}</div>\`;
+  if(portrait) return '<img src="'+portrait+'" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>';
+  if(logo) return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:12px">'+logo.svg+'</div>';
   return '';
 }
 
@@ -3182,7 +3178,13 @@ async function handleAnimationUpload(input){
     // Show preview
     const div = document.createElement('div');
     div.style.cssText = 'text-align:center;width:80px';
-    div.innerHTML = `<video src="${dataUri}" autoplay muted loop style="width:80px;height:80px;object-fit:cover;border:2px solid var(--green)"></video><div style="font-size:9px;color:var(--text3);margin-top:3px">${playerName}<br>${normType.toUpperCase()}</div>`;
+    const vid = document.createElement('video');
+    vid.src = dataUri; vid.autoplay = true; vid.muted = true; vid.loop = true;
+    vid.style.cssText = 'width:80px;height:80px;object-fit:cover;border:2px solid var(--green)';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:9px;color:var(--text3);margin-top:3px';
+    label.textContent = playerName + ' ' + normType.toUpperCase();
+    div.appendChild(vid); div.appendChild(label);
     preview.appendChild(div);
     status.textContent = 'Processed ' + processed + '/' + files.length + '...';
   }
