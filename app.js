@@ -1929,7 +1929,7 @@ function renderScoring(){
               return `<tr style="border-bottom:1px solid var(--bg2);${t.eliminated?'opacity:.5':''}">
                 <td style="padding:5px 6px">
                   <div style="display:flex;align-items:center;gap:6px">
-                    ${playerLogoHtml(p.team,24,p.name)}
+                    <div onclick="openPlayerModal(${p.id})" style="cursor:pointer">${playerLogoHtml(p.team,24,p.name)}</div>
                     <div>
                       <span style="color:var(--text);cursor:pointer" onclick="openPlayerModal(${p.id})">${p.name}</span>
                       <span class="pos-badge" style="font-size:9px">${p.pos}</span>
