@@ -655,26 +655,8 @@ async function fetchScores(){
     return;
   }
 
-  // Build a map of gameId -> top FP player (from live + saved stats)
-  gameTopPlayer = {}; // rebuild from latest stats
-  const allStatSources = [
-    ...Object.values(livePlayerStats||{}).map(s=>({...s, isLive:true})),
-    ...Object.values(S.playerStats||{})
-  ];
-  for(const stat of allStatSources){
-    const gid = stat.gameId;
-    if(!gid) continue;
-    const fp = stat.fp||0;
-    if(fp <= 0) continue; // skip zero scorers
-    const existing = gameTopPlayer[gid];
-    if(existing && fp <= existing.fp) continue;
-    // Always resolve name via PLAYERS array (stat.name may not match portrait keys)
-    const pid = parseInt(stat.pid||stat.id||0);
-    const p = PLAYERS.find(x=>x.id===pid);
-    if(p && getActivePortrait(p.name)){
-      gameTopPlayer[gid] = {fp, name: p.name, pid: p.id, isLive: !!(stat.isLive)};
-    }
-  }
+  // Rebuild gameTopPlayer from latest live + saved stats
+  rebuildGameTopPlayer();
 
   const renderGame = g => {
     const home=g.homeTeam, away=g.awayTeam;
@@ -2636,6 +2618,7 @@ async function refreshLiveStats(){
 
     render();
     updateLiveStatsIndicator();
+    rebuildGameTopPlayer(); // Update top player map with fresh live data
     fetchScores(); // Re-render scoreboard portraits with latest live FP leaders
     renderTopPlayersBanner(); // Update ticker with fresh live FP
   }catch(e){ console.warn('refreshLiveStats error:', e); }
@@ -2918,6 +2901,29 @@ async function dragDrop(e, mid, idx){
 // ── Series Records ────────────────────────────────────────────────
 let seriesRecords = {};
 let gameTopPlayer = {}; // persists between fetchScores calls
+
+function rebuildGameTopPlayer(){
+  gameTopPlayer = {};
+  // Include ALL players — even fp=0 so we show someone for low-scoring early games
+  const allStatSources = [
+    ...Object.entries(livePlayerStats||{}).map(([pid,s])=>({...s, pid:parseInt(pid), isLive:true})),
+    ...Object.values(S.playerStats||{}).map(s=>({...s, isLive:false}))
+  ];
+  for(const stat of allStatSources){
+    const gid = stat.gameId;
+    if(!gid) continue;
+    const fp = typeof stat.fp === 'number' ? stat.fp : 0;
+    const existing = gameTopPlayer[gid];
+    if(existing && fp <= existing.fp) continue;
+    const pid = parseInt(stat.pid||stat.id||0);
+    const p = PLAYERS.find(x=>x.id===pid);
+    if(p && getActivePortrait(p.name)){
+      gameTopPlayer[gid] = {fp, name:p.name, pid:p.id, isLive:!!(stat.isLive)};
+    }
+  }
+}
+
+
 
 
 // ── Portrait Uploader ─────────────────────────────────────────────
