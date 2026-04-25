@@ -2820,12 +2820,19 @@ function playerGamesPlayedForManager(pid, mid=null){
   return gameIds.size;
 }
 
-function playerStatScore(pid){
-  // Saved completed game stats
+function playerStatScore(pid, mid=null){
+  // If mid provided, only count stats earned ON OR AFTER acquisition date
+  let acqDate = null;
+  if(mid !== null && S.waiverAcquisitions){
+    acqDate = S.waiverAcquisitions[mid+'_'+pid] || null;
+  }
   const saved = S.playerStats
-    ? Object.values(S.playerStats).filter(s=>s.pid===pid).reduce((sum,s)=>sum+(s.fp||0),0)
+    ? Object.values(S.playerStats).filter(s=>{
+        if(s.pid!==pid) return false;
+        if(acqDate && s.date && s.date < acqDate) return false; // exclude pre-acquisition
+        return true;
+      }).reduce((sum,s)=>sum+(s.fp||0),0)
     : 0;
-  // Add live stats — but skip if this specific player already has a saved entry for same gameId
   const live = livePlayerStats[pid];
   let liveContrib = 0;
   if(live){
