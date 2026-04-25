@@ -731,7 +731,8 @@ async function fetchScores(){
           <div style="flex:1;background:${homeColor}33"></div>
         </div>`;
 
-    return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}" style="min-width:130px;flex-direction:row;gap:8px;padding:.4rem .625rem;align-items:center">
+    const onClickAttr = (!isUpcoming && g.espnId) ? `onclick="openGameModal('${g.espnId}','${home.teamTricode}','${away.teamTricode}','${(status||'').replace(/'/g,String.fromCharCode(39))}')"` : '';
+    return `<div class="score-item ${isLive?'live-game':isFinal?'final-game':'upcoming-game'}" ${onClickAttr} style="min-width:130px;flex-direction:row;gap:8px;padding:.4rem .625rem;align-items:center;${!isUpcoming&&g.espnId?'cursor:pointer':''}">
       <!-- Portrait / visual -->
       ${portraitHtml}
       <!-- Score info -->
@@ -2998,6 +2999,162 @@ async function handlePortraitUpload(input){
     status.style.color = 'var(--red)';
   }
   input.value = '';
+}
+
+
+// ── Game Box Score Modal ──────────────────────────────────────────
+async function openGameModal(espnId, homeTricode, awayTricode, statusText){
+  const existing = document.getElementById('game-modal');
+  if(existing) existing.remove();
+
+  const awayId = espnTeamToOurs(awayTricode||'');
+  const homeId = espnTeamToOurs(homeTricode||'');
+  const awayColor = TEAM_LOGOS[awayId]?.color||'#4a9eff';
+  const homeColor = TEAM_LOGOS[homeId]?.color||'#4a9eff';
+
+  const modal = document.createElement('div');
+  modal.id = 'game-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--panel);border:2px solid var(--border);width:100%;max-width:700px;max-height:90vh;overflow-y:auto;overflow-x:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:1">
+        <span style="font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent3)">${awayTricode} @ ${homeTricode} <span style="color:var(--text3);font-size:7px;margin-left:8px">${statusText||''}</span></span>
+        <button onclick="document.getElementById('game-modal').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div id="game-modal-body" style="padding:.75rem 1rem">
+        <div style="text-align:center;padding:2rem;color:var(--text3);font-family:'Press Start 2P',monospace;font-size:8px">LOADING...</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  try{
+    const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${espnId}`);
+    const sd = await res.json();
+    const box = sd.boxscore;
+    const comp = sd.header?.competitions?.[0];
+    const awayScore = comp?.competitors?.find(c=>c.team?.abbreviation===awayTricode)?.score||'';
+    const homeScore = comp?.competitors?.find(c=>c.team?.abbreviation===homeTricode)?.score||'';
+
+    function pSplit(str){ const p=(str||'0-0').split('-'); return [parseInt(p[0])||0,parseInt(p[1])||0]; }
+    function calcFP(s){
+      if(!s||s[0]==='DNP') return null;
+      const pts=parseInt(s[1])||0, [fgm,fga]=pSplit(s[2]), [tpm,tpa]=pSplit(s[3]),
+            [ftm,fta]=pSplit(s[4]), reb=parseInt(s[5])||0, ast=parseInt(s[6])||0,
+            to=parseInt(s[7])||0, stl=parseInt(s[8])||0, blk=parseInt(s[9])||0;
+      return pts+reb+ast+stl+blk-(fga-fgm)-(fta-ftm)-to;
+    }
+
+    function teamTable(teamData, color){
+      if(!teamData) return '<div style="color:var(--text3);padding:.5rem">No data</div>';
+      const grp = teamData.statistics?.[0];
+      if(!grp) return '<div style="color:var(--text3);padding:.5rem">No stats</div>';
+      const ourTeam = espnTeamToOurs(teamData.team?.abbreviation||'');
+
+      const headerCols = ['PLAYER','MIN','PTS','FG','3P','2P','eFG','FT','FT%','REB','AST','TO','STL','BLK','+/-','FP'];
+      const headerHtml = headerCols.map(h=>
+        `<th style="padding:3px 4px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text3);font-weight:normal;text-align:center;white-space:nowrap">${h}</th>`
+      ).join('');
+
+      const rows = (grp.athletes||[]).map(a => {
+        const name = a.athlete?.displayName||'';
+        const s = a.stats||[];
+        const isDNP = !s.length || s[0]==='DNP';
+
+        // Find player in our DB
+        const matched = ourTeam ? (
+          PLAYERS.find(p=>p.team===ourTeam && p.name.toLowerCase()===name.toLowerCase()) ||
+          PLAYERS.find(p=>p.team===ourTeam && p.name.split(' ').pop().toLowerCase()===name.split(' ').pop().toLowerCase())
+        ) : null;
+        const portrait = matched ? getActivePortrait(matched.name) : null;
+        const nameCell = portrait
+          ? `<div style="display:flex;align-items:center;gap:5px;cursor:pointer" onclick="document.getElementById('game-modal').remove();openPlayerModal(${matched.id})">
+               <div style="width:22px;height:22px;overflow:hidden;flex-shrink:0;border:1px solid ${color}"><img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/></div>
+               <span>${name}</span></div>`
+          : `<span style="cursor:${matched?'pointer':'default'}" ${matched?`onclick="document.getElementById('game-modal').remove();openPlayerModal(${matched.id})"`:''}">${name}</span>`;
+
+        if(isDNP) return `<tr style="opacity:.4"><td style="padding:3px 6px;font-size:11px;color:var(--text3)">${nameCell}</td><td colspan="15" style="padding:3px 6px;font-size:10px;color:var(--text3)">DNP</td></tr>`;
+
+        const [fgm,fga]=pSplit(s[2]), [tpm,tpa]=pSplit(s[3]), [ftm,fta]=pSplit(s[4]);
+        const fgm2=fgm-tpm, fga2=fga-tpa;
+        const efg = fga>0?((fgm+.5*tpm)/fga).toFixed(3).replace(/^0/,''):'-';
+        const ftpct = fta>0?(ftm/fta).toFixed(3).replace(/^0/,''):'-';
+        const pm = s[13]||'0';
+        const fp = calcFP(s);
+        const pmN = parseInt(pm)||0;
+        const toN = parseInt(s[7])||0;
+
+        return `<tr style="border-bottom:1px solid var(--bg2)">
+          <td style="padding:3px 6px;font-size:11px;white-space:nowrap">${nameCell}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${s[0]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[1]}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm}-${fga}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${tpm}-${tpa}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm2}-${fga2}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${efg}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${ftm}-${fta}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${ftpct}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[5]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[6]}</td>
+          <td style="padding:3px 4px;font-size:11px;color:${toN>0?'var(--red)':'inherit'};text-align:center">${s[7]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[8]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[9]}</td>
+          <td style="padding:3px 4px;font-size:11px;color:${pmN>0?'var(--green)':pmN<0?'var(--red)':'inherit'};text-align:center">${pmN>0?'+':''}${pm}</td>
+          <td style="padding:3px 4px;font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'var(--accent2)':fp<0?'var(--red)':'var(--text3)'};text-align:center">${fp!=null?(fp>0?'+':'')+fp:'-'}</td>
+        </tr>`;
+      }).join('');
+
+      const totRow = (grp.totals||[]).length ? (()=>{
+        const t = grp.totals;
+        const [fgm,fga]=pSplit(t[2]), [tpm,tpa]=pSplit(t[3]), [ftm,fta]=pSplit(t[4]);
+        const fgm2=fgm-tpm, fga2=fga-tpa;
+        const efg = fga>0?((fgm+.5*tpm)/fga).toFixed(3).replace(/^0/,''):'-';
+        const ftpct = fta>0?(ftm/fta).toFixed(3).replace(/^0/,''):'-';
+        const fp = calcFP(t);
+        return `<tr style="border-top:2px solid var(--border);background:var(--bg2);font-weight:600">
+          <td style="padding:3px 6px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3)">TOTALS</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${t[0]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[1]}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm}-${fga}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${tpm}-${tpa}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm2}-${fga2}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${efg}</td>
+          <td style="padding:3px 4px;font-size:10px;text-align:center">${ftm}-${fta}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${ftpct}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[5]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[6]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[7]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[8]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">${t[9]}</td>
+          <td style="padding:3px 4px;font-size:11px;text-align:center">-</td>
+          <td style="padding:3px 4px;font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'var(--accent2)':fp<0?'var(--red)':'var(--text3)'};text-align:center">${fp!=null?(fp>0?'+':'')+fp:'-'}</td>
+        </tr>`;
+      })() : '';
+
+      return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table style="width:100%;border-collapse:collapse;min-width:580px">
+          <thead><tr style="border-bottom:2px solid var(--border)">${headerHtml}</tr></thead>
+          <tbody>${rows}${totRow}</tbody>
+        </table></div>`;
+    }
+
+    document.getElementById('game-modal-body').innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:1rem;padding:.75rem;background:var(--bg2);border:1px solid var(--border)">
+        <div style="text-align:center"><div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${awayColor}">${awayTricode}</div><div style="font-family:'Press Start 2P',monospace;font-size:28px;color:${awayColor};margin-top:4px">${awayScore||'-'}</div></div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3)">${statusText}</div>
+        <div style="text-align:center"><div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${homeColor}">${homeTricode}</div><div style="font-family:'Press Start 2P',monospace;font-size:28px;color:${homeColor};margin-top:4px">${homeScore||'-'}</div></div>
+      </div>
+      <div style="margin-bottom:1rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${awayColor};margin-bottom:.5rem;padding:4px 6px;background:${awayColor}22;border-left:3px solid ${awayColor}">${awayTricode}</div>
+        ${teamTable(box?.players?.find(p=>p.team?.abbreviation===awayTricode), awayColor)}
+      </div>
+      <div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${homeColor};margin-bottom:.5rem;padding:4px 6px;background:${homeColor}22;border-left:3px solid ${homeColor}">${homeTricode}</div>
+        ${teamTable(box?.players?.find(p=>p.team?.abbreviation===homeTricode), homeColor)}
+      </div>`;
+  } catch(e){
+    document.getElementById('game-modal-body').innerHTML = `<div style="color:var(--red);padding:1rem;font-size:13px">Error: ${e.message}</div>`;
+  }
 }
 
 async function fetchSeriesRecords(){
