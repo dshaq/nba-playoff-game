@@ -1807,7 +1807,7 @@ function renderScoring(){
         <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2);margin-bottom:.5rem">
           🤕 INJURY NOTIFICATIONS ${unread.length>0?`<span style="background:var(--red);color:#fff;padding:1px 5px;font-size:7px">${unread.length} NEW</span>`:''}
         </div>
-        ${notifs.slice(0,5).map(n=>`
+        ${notifs.slice(0,10).map(n=>`
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);opacity:${n.read?0.5:1}">
             <span style="font-size:12px">🤕</span>
             <div style="flex:1;font-size:13px;color:var(--text2)">
@@ -2081,15 +2081,28 @@ function renderTopPlayersBanner(){
   const el = document.getElementById('top-players-ticker');
   if(!el) return;
 
-  // Get today's date
-  const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+  // Use today's game IDs from live stats + scoreboard to find all today's games
+  // livePlayerStats has current game IDs; also grab any completed today from saved stats
+  const todayGameIds = new Set();
 
-  // Aggregate today's FP per player (saved + live, deduped by gameId)
+  // Live games are always today
+  Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) todayGameIds.add(s.gameId); });
+
+  // Also check saved stats for games from today or yesterday (ESPN may save with game date)
+  const recentDates = new Set();
+  for(let i=0;i<=1;i++){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    recentDates.add(d.toISOString().split('T')[0].replace(/-/g,''));
+  }
+  Object.values(S.playerStats||{}).forEach(s=>{ if(s.date && recentDates.has(s.date) && s.gameId) todayGameIds.add(s.gameId); });
+
+  // Aggregate FP per player across today's game IDs
   const playerTodayFP = {};
-  Object.values(S.playerStats||{}).filter(s=>s.date===today).forEach(s=>{
+  Object.values(S.playerStats||{}).filter(s=>todayGameIds.has(s.gameId)).forEach(s=>{
     playerTodayFP[s.pid] = (playerTodayFP[s.pid]||0) + (s.fp||0);
   });
   Object.entries(livePlayerStats||{}).forEach(([pid,s])=>{
+    if(!todayGameIds.has(s.gameId)) return;
     const alreadySaved = Object.values(S.playerStats||{}).some(x=>x.pid===parseInt(pid)&&x.gameId===s.gameId);
     if(!alreadySaved) playerTodayFP[parseInt(pid)] = (playerTodayFP[parseInt(pid)]||0) + (s.fp||0);
   });
@@ -2098,7 +2111,7 @@ function renderTopPlayersBanner(){
   const top5 = Object.entries(playerTodayFP)
     .filter(([,fp])=>fp>0)
     .sort((a,b)=>b[1]-a[1])
-    .slice(0,5)
+    .slice(0,10)
     .map(([pid,fp],i)=>{
       const p = PLAYERS.find(x=>x.id===parseInt(pid));
       if(!p) return null;
