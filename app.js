@@ -2299,6 +2299,7 @@ function toggleChat(){
   chatOpen = !chatOpen;
   document.getElementById('chat-panel').style.display = chatOpen ? 'flex' : 'none';
   document.getElementById('chat-bubble').style.display = chatOpen ? 'none' : 'flex';
+  if(chatOpen) clearNewMessageIndicator();
   if(chatOpen){
     renderChat();
     document.getElementById('chat-input').focus();
@@ -2382,17 +2383,36 @@ async function saveChatState(msgs){
 }
 
 async function pollChat(){
-  if(!chatOpen) return;
   const msgs = await loadChatState();
-  if(msgs.length !== lastChatCount){
-    lastChatCount = msgs.length;
-    renderChatMessages(msgs);
+  if(chatOpen){
+    // Chat is open — update messages and clear new-message indicator
+    if(msgs.length !== lastChatCount){
+      lastChatCount = msgs.length;
+      renderChatMessages(msgs);
+    }
+    clearNewMessageIndicator();
+  } else {
+    // Chat is closed — check for new messages and blink if so
+    if(msgs.length > lastChatCount){
+      showNewMessageIndicator();
+    }
   }
-  // Update unread badge
-  if(!chatOpen && msgs.length > lastChatCount){
-    const badge = document.getElementById('chat-unread');
-    if(badge) badge.style.display = 'flex';
-  }
+}
+
+function showNewMessageIndicator(){
+  const bubble = document.getElementById('chat-bubble');
+  if(bubble) bubble.classList.add('has-new-message');
+  const badge = document.getElementById('chat-unread');
+  if(badge) badge.style.display = 'flex';
+}
+
+function clearNewMessageIndicator(){
+  const bubble = document.getElementById('chat-bubble');
+  if(bubble) bubble.classList.remove('has-new-message');
+  const badge = document.getElementById('chat-unread');
+  if(badge) badge.style.display = 'none';
+  // Update lastChatCount so we don't keep triggering
+  loadChatState().then(msgs => { lastChatCount = msgs.length; });
 }
 
 async function renderChat(){
