@@ -1106,14 +1106,29 @@ async function processWaiverClaims(){
         continue;
       }
 
-      // Claim succeeds
+      // Claim succeeds — add new player, remove dropped player
       S.rosters[mid].push(claim.pid);
       S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
       claimedPids.add(claim.pid);
       managersWhoWon.add(mid);
+      // Remove the dropped player from roster and injured list
+      if(claim.dropPid){
+        S.rosters[mid] = S.rosters[mid].filter(p=>p!==claim.dropPid);
+        if(S.injured[mid]) S.injured[mid] = S.injured[mid].filter(p=>p!==claim.dropPid);
+      } else {
+        // Auto-drop: remove the first injured player from this manager's roster
+        const injuredOnRoster = (S.injured[mid]||[]).filter(p=>S.rosters[mid].includes(p));
+        if(injuredOnRoster.length>0){
+          const autoDrop = injuredOnRoster[0];
+          S.rosters[mid] = S.rosters[mid].filter(p=>p!==autoDrop);
+          S.injured[mid] = (S.injured[mid]||[]).filter(p=>p!==autoDrop);
+          claim.dropPid = autoDrop; // for results display
+        }
+      }
       const idx = remainingClaims.findIndex(c=>c.managerId===mid&&c.pid===claim.pid);
       if(idx>-1) remainingClaims.splice(idx,1);
-      results.push({mid, name:claim.managerName, pid:claim.pid, won:true});
+      const dropName = claim.dropPid ? getPlayer(claim.dropPid)?.name : null;
+      results.push({mid, name:claim.managerName, pid:claim.pid, dropPid:claim.dropPid, dropName, won:true});
       roundWinners.add(mid);
       anyProcessed=true;
       // Winners go to bottom within this round's processing
