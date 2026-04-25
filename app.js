@@ -2217,9 +2217,12 @@ function renderTopPlayersBanner(){
   if(!el) return;
 
   // Determine which day to show — today first, fall back to yesterday
-  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g,'');
-  const yestDate = new Date(); yestDate.setDate(yestDate.getDate()-1);
-  const yestStr = yestDate.toISOString().split('T')[0].replace(/-/g,'');
+  // Use ET date (games are scheduled in Eastern Time)
+  const etNow = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const fmt = d => d.toISOString().split('T')[0].replace(/-/g,'');
+  const todayStr = [etNow.getFullYear(), String(etNow.getMonth()+1).padStart(2,'0'), String(etNow.getDate()).padStart(2,'0')].join('');
+  const yestDate = new Date(etNow); yestDate.setDate(yestDate.getDate()-1);
+  const yestStr = [yestDate.getFullYear(), String(yestDate.getMonth()+1).padStart(2,'0'), String(yestDate.getDate()).padStart(2,'0')].join('');
 
   // Collect today's game IDs (live + saved with today's date)
   const todayGameIds = new Set();
