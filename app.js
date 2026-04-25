@@ -778,6 +778,7 @@ async function resetLeague(){
     rosters: Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     injured: Object.fromEntries(mgrs.map(m=>[m.id,[]])),
     waiverAdds: Object.fromEntries(mgrs.map(m=>[m.id,0])),
+    droppedFP: Object.fromEntries(mgrs.map(m=>[m.id,0])),
     waiverPriority: waiverPriorityR,
     waiverClaims: {},
     round: 1,
@@ -1111,8 +1112,12 @@ async function processWaiverClaims(){
       S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
       claimedPids.add(claim.pid);
       managersWhoWon.add(mid);
-      // Remove the dropped player from roster and injured list
+      // Remove the dropped player from roster — preserve their earned FP
       if(claim.dropPid){
+        // Save their FP before removing
+        const droppedFP = playerStatScore(claim.dropPid);
+        if(!S.droppedFP) S.droppedFP = {};
+        S.droppedFP[mid] = (S.droppedFP[mid]||0) + droppedFP;
         S.rosters[mid] = S.rosters[mid].filter(p=>p!==claim.dropPid);
         if(S.injured[mid]) S.injured[mid] = S.injured[mid].filter(p=>p!==claim.dropPid);
       } else {
@@ -1120,9 +1125,12 @@ async function processWaiverClaims(){
         const injuredOnRoster = (S.injured[mid]||[]).filter(p=>S.rosters[mid].includes(p));
         if(injuredOnRoster.length>0){
           const autoDrop = injuredOnRoster[0];
+          const droppedFP = playerStatScore(autoDrop);
+          if(!S.droppedFP) S.droppedFP = {};
+          S.droppedFP[mid] = (S.droppedFP[mid]||0) + droppedFP;
           S.rosters[mid] = S.rosters[mid].filter(p=>p!==autoDrop);
           S.injured[mid] = (S.injured[mid]||[]).filter(p=>p!==autoDrop);
-          claim.dropPid = autoDrop; // for results display
+          claim.dropPid = autoDrop;
         }
       }
       const idx = remainingClaims.findIndex(c=>c.managerId===mid&&c.pid===claim.pid);
@@ -2768,7 +2776,9 @@ function isPlayerLive(pid){
 }
 
 function managerStatScoreAuto(mid){
-  return +(S.rosters[mid]||[]).reduce((s,pid)=>s+playerStatScore(pid),0).toFixed(1);
+  const rosterFP = (S.rosters[mid]||[]).reduce((s,pid)=>s+playerStatScore(pid),0);
+  const droppedFP = (S.droppedFP&&S.droppedFP[mid])||0; // points from dropped players
+  return +(rosterFP + droppedFP).toFixed(1);
 }
 
 
