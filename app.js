@@ -1186,10 +1186,6 @@ async function markInjured(mid,pid){
   if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE MARKED INJURED');return;}
   if(!(S.injured[mid]||[]).includes(pid)){if(!S.injured[mid])S.injured[mid]=[];S.injured[mid].push(pid);}
   await saveState();
-  // Send email notification
-  const mgr = S.managers.find(m=>m.id===mid);
-  const player = getPlayer(pid);
-  sendInjuryEmail(mgr?.name||'Unknown', player?.name||'Unknown player');
   render();
 }
 async function clearInjury(mid,pid){
@@ -1198,10 +1194,10 @@ async function clearInjury(mid,pid){
   await saveState();render();
 }
 
-async function sendInjuryEmail(managerName, playerName){
+async function saveInjuryNotification(managerName, playerName){
   try{
     // Show in-app toast
-    showToast(`🤕 ${playerName} marked DTD — notification sent`, 'warn');
+    showToast(`🤕 ${playerName} marked DTD`, 'warn');
 
     // Store in Supabase so commissioner sees it
     if(!S.injuryNotifications) S.injuryNotifications = [];
@@ -1213,11 +1209,6 @@ async function sendInjuryEmail(managerName, playerName){
     if(S.injuryNotifications.length > 20) S.injuryNotifications = S.injuryNotifications.slice(0,20);
     await saveState();
 
-    // Open mailto so their email client fires off a notification email
-    const subject = encodeURIComponent(`[NBA ARCADE] ${managerName} marked ${playerName} as DTD`);
-    const body = encodeURIComponent(`${managerName} has marked ${playerName} as injured/OUT in NBA ARCADE.\n\nView the league: ${window.location.origin}`);
-    const mailto = `mailto:daveschachter@gmail.com?subject=${subject}&body=${body}`;
-    window.open(mailto, '_blank');
   }catch(e){ console.warn('Injury notification error:', e); }
 }
 
