@@ -871,10 +871,13 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- WAIVER -->
   <div id="tab-waiver" class="hidden">
-    <!-- Transaction Log at top -->
-    <div class="card" style="margin-bottom:.75rem">
-      <div class="section-title" style="margin-bottom:.625rem">📋 TRANSACTION LOG</div>
-      <div id="waiver-log"></div>
+    <!-- Transaction Log button -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3)">AVAILABLE PLAYERS</div>
+      <button onclick="openTransactionLog()" style="display:flex;align-items:center;gap:6px;background:var(--panel);border:2px solid var(--border);color:var(--text2);font-family:'Press Start 2P',monospace;font-size:8px;padding:.375rem .75rem;cursor:pointer">
+        📋 TRANSACTION LOG
+        <span id="waiver-log-count" style="display:none;background:var(--accent2);color:#000;font-size:7px;padding:1px 5px"></span>
+      </button>
     </div>
     <div id="waiver-header"></div>
     <div class="card">

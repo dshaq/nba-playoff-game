@@ -1967,43 +1967,74 @@ function renderScoring(){
 
 
 function renderWaiverLog(){
-  const el = document.getElementById('waiver-log');
-  if(!el) return;
-  const log = S.waiverLog||[];
-  if(!log.length){
-    el.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:.5rem 0">No transactions yet.</div>';
-    return;
+  // Just update the count badge on the button
+  const countEl = document.getElementById('waiver-log-count');
+  if(countEl){
+    const count = (S.waiverLog||[]).length;
+    if(count > 0){
+      countEl.textContent = count;
+      countEl.style.display = 'inline';
+    } else {
+      countEl.style.display = 'none';
+    }
   }
-  el.innerHTML = log.map(entry=>{
+}
+
+function closeTransactionLog(){ const m=document.getElementById("transaction-log-modal"); if(m) m.remove(); }
+function openTransactionLog(){
+  const existing = document.getElementById('transaction-log-modal');
+  if(existing) { existing.remove(); return; }
+
+  const log = S.waiverLog||[];
+  const modal = document.createElement('div');
+  modal.id = 'transaction-log-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+
+  const buildEntry = entry => {
     const aColor = getAvatarColor(entry.managerId);
     const addP = PLAYERS.find(p=>p.id===entry.addPid);
     const dropP = entry.dropPid ? PLAYERS.find(p=>p.id===entry.dropPid) : null;
     const addPortrait = addP ? getActivePortrait(addP.name) : null;
     const dropPortrait = dropP ? getActivePortrait(dropP.name) : null;
-    const teamColor = (p) => p ? (TEAM_LOGOS[p.team]?.color||'#4a9eff') : '#4a9eff';
+    const teamColor = p => p ? (TEAM_LOGOS[p.team]?.color||'#4a9eff') : '#4a9eff';
     const date = new Date(entry.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     const miniPortrait = (p, portrait) => portrait
-      ? '<img src="'+portrait+'" style="width:28px;height:28px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:1px solid '+teamColor(p)+';flex-shrink:0;vertical-align:middle"/>'
-      : '<div style="width:28px;height:28px;background:'+teamColor(p)+'22;border:1px solid '+teamColor(p)+'44;flex-shrink:0;display:inline-block;vertical-align:middle"></div>';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--border2)">'
-      +'<div style="width:28px;height:28px;border:2px solid '+aColor+';flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">'+getAvatar(entry.managerId,'sm')+'</div>'
+      ? '<img src="'+portrait+'" style="width:32px;height:32px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:1px solid '+teamColor(p)+';flex-shrink:0"/>'
+      : '<div style="width:32px;height:32px;background:'+teamColor(p)+'22;border:1px solid '+teamColor(p)+'44;flex-shrink:0"></div>';
+
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:.625rem 0;border-bottom:1px solid var(--border2)">'
+      +'<div style="width:32px;height:32px;border:2px solid '+aColor+';flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">'+getAvatar(entry.managerId,'sm')+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
-      +'<span style="font-size:13px;color:'+aColor+';font-weight:600">'+entry.managerName+'</span>'
-      +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--green)">+ADD</span>'
-      +miniPortrait(addP, addPortrait)
-      +'<span style="font-size:13px;color:var(--text)">'+entry.addName+'</span>'
-      +(dropP
-        ? '<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--red)"> −DROP</span>'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+          +'<span style="font-size:14px;color:'+aColor+';font-weight:600">'+entry.managerName+'</span>'
+          +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--green)">+ADD</span>'
+          +miniPortrait(addP, addPortrait)
+          +'<span style="font-size:13px;color:var(--text)">'+entry.addName+'</span>'
+        +'</div>'
+        +(dropP ? '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+          +'<span style="font-size:14px;color:transparent">'+entry.managerName+'</span>'
+          +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--red)">−DROP</span>'
           +miniPortrait(dropP, dropPortrait)
           +'<span style="font-size:13px;color:var(--text3)">'+entry.dropName+'</span>'
-          +(entry.droppedFP ? '<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--accent2)"> +'+entry.droppedFP.toFixed(0)+' FP KEPT</span>' : '')
-        : '')
-      +'</div>'
-      +'<div style="font-size:11px;color:var(--text3);margin-top:2px">R'+(entry.round||1)+' · '+date+'</div>'
+          +(entry.droppedFP ? '<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--accent2)">+'+entry.droppedFP.toFixed(0)+' FP KEPT</span>' : '')
+          +'</div>' : '')
+        +'<div style="font-size:11px;color:var(--text3)">Round '+( entry.round||1)+' · '+date+'</div>'
       +'</div>'
       +'</div>';
-  }).join('');
+  };
+
+  modal.innerHTML = '<div style="background:var(--panel);border:2px solid var(--border);width:100%;max-width:540px;max-height:85vh;display:flex;flex-direction:column">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:2px solid var(--border);flex-shrink:0">'
+      +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent3)">📋 TRANSACTION LOG</span>'
+      +"<button onclick=\"closeTransactionLog()\" style=\"background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1\">×</button>"
+    +'</div>'
+    +'<div style="overflow-y:auto;padding:.75rem 1rem;flex:1">'
+      +(log.length ? log.map(buildEntry).join('') : '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:13px">No transactions yet.</div>')
+    +'</div>'
+    +'</div>';
+
+  document.body.appendChild(modal);
 }
 
 // ── Teams Gallery ────────────────────────────────────────────────
