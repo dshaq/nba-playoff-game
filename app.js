@@ -835,7 +835,7 @@ function showMainScreen(){
   if(currentManagerId===null&&!isCommissioner){ showManagerPicker(); return; }
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
+  document.getElementById('league-sub').textContent = `2026 PLAYOFFS - ${S.managers.length} MANAGERS - ${ROSTER_SIZE} PICKS EACH`;
   if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
   if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
@@ -854,98 +854,124 @@ function showMainScreen(){
   startLiveStatsPolling();
 }
 
+// Manager PINs
+const MANAGER_PINS = {0:'3186',1:'9044',2:'7612',3:'4837',4:'5501',5:'0295'};
+
 function showManagerPicker(){
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.add('hidden');
   const picker = document.getElementById('manager-picker');
   picker.classList.remove('hidden');
   picker.innerHTML = `
-    <div style="max-width:420px;margin:2rem auto;padding:0 1rem">
-      <div class="topbar" style="margin-bottom:1.5rem">
-        <div>
-          <div class="topbar-title">🕹️ NBA ARCADE</div>
-          <div class="topbar-sub">2026 PLAYOFFS</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:.875rem">
-        <!-- Big pizza guy -->
-        <div style="flex-shrink:0;filter:drop-shadow(3px 3px 0 #000)">
-          <svg width="90" height="104" viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated">
-            <rect x="4" y="52" width="56" height="12" rx="6" fill="#d4884a"/>
-            <rect x="4" y="52" width="56" height="5" fill="#c47030"/>
-            <circle cx="12" cy="56" r="2" fill="#e8a060" opacity=".6"/>
-            <circle cx="22" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
-            <circle cx="32" cy="57" r="2" fill="#e8a060" opacity=".6"/>
-            <circle cx="42" cy="55" r="2.5" fill="#e8a060" opacity=".5"/>
-            <circle cx="52" cy="56" r="2" fill="#e8a060" opacity=".6"/>
-            <polygon points="32,4 58,52 6,52" fill="#f5a623"/>
-            <polygon points="32,10 54,50 10,50" fill="#ffdd55"/>
-            <polygon points="32,8 56,51 8,51" fill="none" stroke="#e05020" stroke-width="1.5"/>
-            <circle cx="32" cy="34" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
-            <circle cx="32" cy="34" r="2" fill="#dd3030" opacity=".5"/>
-            <circle cx="22" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
-            <circle cx="22" cy="43" r="2" fill="#dd3030" opacity=".5"/>
-            <circle cx="42" cy="43" r="4" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
-            <circle cx="42" cy="43" r="2" fill="#dd3030" opacity=".5"/>
-            <circle cx="27" cy="22" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
-            <circle cx="39" cy="27" r="3" fill="#cc2020" stroke="#aa1010" stroke-width="1"/>
-            <ellipse cx="18" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
-            <ellipse cx="46" cy="50" rx="4" ry="2" fill="#ffee77" opacity=".7"/>
-            <rect x="15" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
-            <rect x="30" y="14" width="13" height="8" rx="2" fill="#111" stroke="#444" stroke-width="1.5"/>
-            <line x1="28" y1="18" x2="30" y2="18" stroke="#444" stroke-width="1.5"/>
-            <rect x="16" y="15" width="4" height="2" fill="#555" rx="1"/>
-            <rect x="31" y="15" width="4" height="2" fill="#555" rx="1"/>
-            <path d="M21 26 Q32 34 43 26" stroke="#cc6600" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-            <circle cx="54" cy="62" r="8" fill="#e07020" stroke="#222" stroke-width="1.5"/>
-            <line x1="46" y1="62" x2="62" y2="62" stroke="#222" stroke-width="1"/>
-            <line x1="54" y1="54" x2="54" y2="70" stroke="#222" stroke-width="1"/>
-            <path d="M47 56 Q54 60 61 56" stroke="#222" stroke-width="1" fill="none"/>
-            <path d="M47 68 Q54 64 61 68" stroke="#222" stroke-width="1" fill="none"/>
-            <line x1="46" y1="48" x2="50" y2="57" stroke="#e8952a" stroke-width="4" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <!-- Speech bubble -->
-        <div style="position:relative;flex:1;background:var(--panel2);border:2px solid var(--accent3);padding:12px 14px;">
-          <!-- Bubble tail pointing left toward pizza guy -->
-          <div style="position:absolute;left:-10px;top:24px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:10px solid var(--accent3)"></div>
-          <div style="position:absolute;left:-7px;top:26px;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:8px solid var(--panel2)"></div>
-          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
-              <span style="font-size:16px;flex-shrink:0">🏀</span>
-              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">DRAFT</span>
-              <span style="font-size:14px;color:var(--text2)">Snake order, 8 players each. Everyone picks one at a time on their turn.</span>
-            </div>
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
-              <span style="font-size:16px;flex-shrink:0">📊</span>
-              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">SCORING</span>
-              <span style="font-size:14px;color:var(--text2)">PTS+REB+AST+STL+BLK minus misses &amp; TOs. Bonuses for each round survived: +5/+10/+20/+50.</span>
-            </div>
-            <div style="background:var(--bg2);border:1px solid var(--accent3);padding:8px 12px;display:flex;align-items:center;gap:10px">
-              <span style="font-size:16px;flex-shrink:0">🔄</span>
-              <span style="font-size:10px;color:var(--accent3);font-family:'Press Start 2P',monospace;flex-shrink:0;min-width:64px">WAIVERS</span>
-              <span style="font-size:14px;color:var(--text2)">Slot opens when your player's team is eliminated or injured. No voluntary drops. Claims process nightly.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="card card-accent">
-        <div class="section-title">► WHO ARE YOU?</div>
-        <p style="font-size:15px;color:var(--text2);margin-bottom:1rem">SELECT YOUR NAME TO JOIN THE DRAFT. YOU CAN ONLY PICK ON YOUR TURN.</p>
-        <div id="mgr-pick-list">
-          ${S.managers.map(m=>{
-          const ac=getAvatarColor(m.id);
-          return `<button class="mgr-pick-btn" onclick="selectManager(${m.id})">
-            <div style="width:36px;height:36px;border:2px solid ${ac};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id,'sm')}</div>
-            <span style="color:${ac}">${m.name}</span>
-          </button>`;
+    <div style="min-height:100vh;background:radial-gradient(ellipse at center, #0a1628 0%, #020810 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;position:relative;overflow:hidden">
+      <!-- Starfield -->
+      <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+        ${Array.from({length:40},(_,i)=>{
+          const x=Math.random()*100,y=Math.random()*100,s=Math.random()*2+0.5,o=Math.random()*0.7+0.3;
+          return '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+s+'px;height:'+s+'px;background:#fff;border-radius:50%;opacity:'+o+'"></div>';
         }).join('')}
+      </div>
+
+      <!-- Title -->
+      <div style="font-family:var(--font-pixel),monospace;font-size:clamp(20px,5vw,36px);color:#fff;text-shadow:0 0 20px #4a8fff,4px 4px 0 #000;margin-bottom:.25rem;letter-spacing:.1em;text-align:center">NBA ARCADE</div>
+      <div style="font-family:var(--font-pixel),monospace;font-size:clamp(7px,1.5vw,10px);color:var(--accent3);margin-bottom:1.5rem;letter-spacing:.15em;text-align:center">SELECT YOUR CHARACTER</div>
+
+      <!-- Character grid — 3x2 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:560px;width:100%;margin-bottom:12px">
+        ${S.managers.map((m,i)=>{
+          const ac = getAvatarColor(m.id);
+          const portrait = Object.values(PLAYER_PORTRAITS||{}).length > 0 ? null : null; // use avatar
+          const rank = managerTotal(m.id);
+          return '<div onclick="pickCharacter('+m.id+')" style="cursor:pointer;background:#0a1628;border:3px solid '+ac+';padding:4px;position:relative;transition:all .1s;box-shadow:0 0 12px '+ac+'44" class="char-card">'
+            +'<div style="background:#05101e;aspect-ratio:1;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid '+ac+'44;margin-bottom:4px">'
+            +getAvatar(m.id,'lg')
+            +'</div>'
+            +'<div style="font-family:var(--font-pixel),monospace;font-size:clamp(6px,1.5vw,9px);color:'+ac+';text-align:center;padding:3px 0;text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+m.name.toUpperCase()+'</div>'
+            +'</div>';
+        }).join('')}
+      </div>
+
+      <!-- Viewer shadow figure — bottom right of grid -->
+      <div onclick="selectManager('viewer')" style="cursor:pointer;opacity:.6;transition:opacity .2s;max-width:560px;width:100%;display:flex;justify-content:flex-end" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">
+        <div style="background:#050e1a;border:2px dashed #333;padding:4px;width:calc(33.33% - 7px)">
+          <div style="background:#030a12;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:1px solid #222">
+            <!-- Shadow silhouette -->
+            <svg width="70%" height="70%" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="30" cy="20" rx="12" ry="14" fill="#1a1a2e"/>
+              <rect x="18" y="32" width="24" height="20" rx="4" fill="#1a1a2e"/>
+              <ellipse cx="30" cy="54" rx="14" ry="4" fill="#111" opacity=".5"/>
+            </svg>
+          </div>
+          <div style="font-family:var(--font-pixel),monospace;font-size:clamp(5px,1.2vw,7px);color:#333;text-align:center;padding:3px 0">VIEWER</div>
         </div>
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);text-align:center">
-          <button onclick="selectManager('viewer')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-family:'VT323',monospace;font-size:16px">👀 JUST WATCHING (VIEW ONLY)</button>
+      </div>
+
+      <!-- PIN modal (hidden by default) -->
+      <div id="pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;align-items:center;justify-content:center">
+        <div style="background:#0a1628;border:3px solid var(--accent);padding:1.5rem;max-width:280px;width:90%;text-align:center">
+          <div style="font-family:var(--font-pixel),monospace;font-size:10px;color:var(--accent3);margin-bottom:1rem" id="pin-prompt-name">ENTER PIN</div>
+          <div id="pin-display" style="font-family:var(--font-pixel),monospace;font-size:24px;color:var(--accent2);letter-spacing:.5em;margin-bottom:1.25rem;min-height:36px">____</div>
+          <!-- Numpad -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:.75rem">
+            ${[1,2,3,4,5,6,7,8,9].map(n=>'<button onclick="pinKey('+n+')" style="background:#051020;border:2px solid #1a3a5e;color:var(--text);font-family:var(--font-pixel),monospace;font-size:14px;padding:.6rem;cursor:pointer">'+n+'</button>').join('')}
+            <button onclick="pinKey(0)" style="background:#051020;border:2px solid #1a3a5e;color:var(--text);font-family:var(--font-pixel),monospace;font-size:14px;padding:.6rem;cursor:pointer;grid-column:2">0</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="pinClear()" style="flex:1;background:#051020;border:2px solid #cc2020;color:#cc2020;font-family:var(--font-pixel),monospace;font-size:9px;padding:.5rem;cursor:pointer">CLEAR</button>
+            <button onclick="pinSubmit()" style="flex:1;background:#051020;border:2px solid var(--green);color:var(--green);font-family:var(--font-pixel),monospace;font-size:9px;padding:.5rem;cursor:pointer">GO</button>
+          </div>
+          <div id="pin-error" style="font-family:var(--font-pixel),monospace;font-size:8px;color:var(--red);margin-top:.75rem;min-height:16px"></div>
         </div>
       </div>
     </div>`;
+}
+
+// PIN system
+let _pinManagerId = null;
+let _pinEntry = '';
+
+function pickCharacter(mid){
+  // Check if PIN is needed
+  if(MANAGER_PINS[mid]){
+    _pinManagerId = mid;
+    _pinEntry = '';
+    const m = S.managers.find(x=>x.id===mid);
+    document.getElementById('pin-prompt-name').textContent = (m?.name||'').toUpperCase() + ' — ENTER PIN';
+    document.getElementById('pin-display').textContent = '____';
+    document.getElementById('pin-error').textContent = '';
+    document.getElementById('pin-modal').style.display = 'flex';
+  } else {
+    selectManager(mid);
+  }
+}
+
+function pinKey(n){
+  if(_pinEntry.length >= 4) return;
+  _pinEntry += String(n);
+  const masked = _pinEntry.padEnd(4,'_').split('').map((c,i)=>i<_pinEntry.length?'●':'_').join(' ');
+  document.getElementById('pin-display').textContent = masked;
+  if(_pinEntry.length === 4) setTimeout(pinSubmit, 200);
+}
+
+function pinClear(){
+  _pinEntry = '';
+  document.getElementById('pin-display').textContent = '_ _ _ _';
+  document.getElementById('pin-error').textContent = '';
+}
+
+function pinSubmit(){
+  if(_pinEntry === MANAGER_PINS[_pinManagerId]){
+    document.getElementById('pin-modal').style.display = 'none';
+    selectManager(_pinManagerId);
+  } else {
+    document.getElementById('pin-error').textContent = '✗ WRONG PIN';
+    _pinEntry = '';
+    document.getElementById('pin-display').textContent = '_ _ _ _';
+    // Shake animation
+    const modal = document.getElementById('pin-modal').firstElementChild;
+    modal.style.animation = 'pin-shake .3s ease';
+    setTimeout(()=>modal.style.animation='',350);
+  }
 }
 
 function selectManager(id){
@@ -953,7 +979,7 @@ function selectManager(id){
   try{ sessionStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('league-sub').textContent = `2026 PLAYOFFS · ${S.managers.length} MANAGERS · ${ROSTER_SIZE} PICKS EACH`;
+  document.getElementById('league-sub').textContent = `2026 PLAYOFFS - ${S.managers.length} MANAGERS - ${ROSTER_SIZE} PICKS EACH`;
   if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
   if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
