@@ -1898,7 +1898,10 @@ function renderScoring(){
           <tbody>
             ${players.map(p=>{
               const t=getTeam(p.team);
-              const statScore=playerStatScore(p.id);
+              const statScore=playerStatScore(p.id,m.id);
+              const acqDate = S.waiverAcquisitions?.[m.id+'_'+p.id]||null;
+              const fullStatScore=acqDate?playerStatScore(p.id):statScore;
+              const excludedFP=acqDate?+(fullStatScore-statScore).toFixed(1):0;
               const bonus=bonusForPlayer(p.id,m.id);
               const playerTotal=+(statScore+bonus).toFixed(1);
               const isLive=isPlayerLive(p.id);
