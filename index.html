@@ -778,10 +778,10 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   </div>
 
   <!-- Top Players Banner -->
-  <div id="top-players-banner" style="overflow:hidden;background:var(--panel);border-bottom:2px solid var(--border);height:36px;display:flex;align-items:center">
-    <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:0 10px;border-right:2px solid var(--border);white-space:nowrap">🔥 TODAY</div>
-    <div style="overflow:hidden;flex:1;position:relative">
-      <div id="top-players-ticker" style="display:flex;gap:0;position:absolute;white-space:nowrap;will-change:transform"></div>
+  <div id="top-players-banner" style="background:var(--panel);border-bottom:2px solid var(--border);height:36px;display:flex;align-items:center;overflow:hidden">
+    <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:0 10px;border-right:2px solid var(--border);white-space:nowrap;height:100%;display:flex;align-items:center">🔥 TODAY</div>
+    <div style="flex:1;overflow:hidden;height:100%;position:relative">
+      <div id="top-players-ticker" style="display:inline-flex;gap:0;position:absolute;top:0;left:0;height:100%;white-space:nowrap;will-change:transform;align-items:center"></div>
     </div>
   </div>
 
