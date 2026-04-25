@@ -120,6 +120,7 @@ select:focus{border-color:var(--accent3)}
 @keyframes blink{50%{opacity:0}}
 @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .scores-loading{padding:.75rem 1rem;font-size:14px;color:var(--text2)}
+@keyframes fp-float{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-24px)}}
 .ticker-item{display:inline-flex;align-items:center;gap:6px;padding:0 16px;border-right:1px solid var(--border2);height:36px;flex-shrink:0}
 .ticker-item-portrait{width:28px;height:28px;overflow:hidden;flex-shrink:0;image-rendering:pixelated}
 .ticker-item-portrait img{width:100%;height:100%;object-fit:cover;object-position:center top}
@@ -924,6 +925,23 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
         <div id="portrait-upload-status" style="font-size:13px;color:var(--text3)">No files selected</div>
       </div>
       <div id="portrait-upload-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:.75rem"></div>
+    </div>
+
+    <!-- Animation Uploader — Commissioner only -->
+    <div id="animation-uploader-card" class="card hidden" style="border-left:4px solid var(--green);margin-bottom:.75rem">
+      <div class="section-title" style="margin-bottom:.5rem">🎬 UPLOAD PLAYER ANIMATIONS</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:.75rem">
+        Upload 3 MP4/WebM files per player: idle, positive reaction, negative reaction.<br>
+        Name files like <span style="color:var(--accent3)">Victor_Wembanyama_idle.mp4</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;display:inline-block">
+          <input type="file" id="anim-file-input" multiple accept="video/mp4,video/webm" style="display:none" onchange="handleAnimationUpload(this)">
+          <span class="btn btn-green" style="display:inline-block">📁 CHOOSE VIDEOS</span>
+        </label>
+        <div id="anim-upload-status" style="font-size:13px;color:var(--text3)">No files selected</div>
+      </div>
+      <div id="anim-upload-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:.75rem"></div>
     </div>
     <div class="card" style="border-left:4px solid var(--accent3)">
       <div class="section-title">HOW TO PLAY</div>

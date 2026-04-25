@@ -1689,7 +1689,7 @@ function renderRosters(){
               transition:border-color .15s;
             ">
             <!-- Portrait -->
-            <div style="width:${IS_MOBILE?84:106}px;height:${IS_MOBILE?84:106}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
+            <div data-anim-pid="${p.id}" style="width:${IS_MOBILE?84:106}px;height:${IS_MOBILE?84:106}px;overflow:hidden;flex-shrink:0;background:#020c18;display:flex;align-items:center;justify-content:center;position:relative">
               ${hasPortrait
                 ? `<img src="${getActivePortrait(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
                 : logo
@@ -1795,6 +1795,8 @@ function renderScoring(){
   // Show portrait uploader for commissioner (on rules tab)
   const uploaderCard = document.getElementById('portrait-uploader-card');
   if(uploaderCard) uploaderCard.classList.toggle('hidden', !isCommissioner);
+  const animCard = document.getElementById('animation-uploader-card');
+  if(animCard) animCard.classList.toggle('hidden', !isCommissioner);
 
   // Show injury notifications for commissioner
   const notifCard = document.getElementById('injury-notifications-card');
@@ -2686,6 +2688,7 @@ async function refreshLiveStats(){
     render();
     updateLiveStatsIndicator();
     rebuildGameTopPlayer(); // Update top player map with fresh live data
+    detectFPEvents(); // Trigger portrait animations
     fetchScores(); // Re-render scoreboard portraits with latest live FP leaders
     renderTopPlayersBanner(); // Update ticker with fresh live FP
   }catch(e){ console.warn('refreshLiveStats error:', e); }
@@ -3013,6 +3016,110 @@ function injuryBadgeHtml(playerName, small=false){
   </div>`;
 }
 
+
+// ── Player Animations ─────────────────────────────────────────────
+// Stored in Supabase under 'nba-animations-2026'
+// Format: {"Player Name": {idle:"data:video/mp4;base64,...", pos:"...", neg:"..."}}
+let PLAYER_ANIMATIONS = {};
+let prevLiveFP = {}; // pid -> fp from last poll, for delta detection
+let activeAnimations = {}; // pid -> 'idle'|'pos'|'neg' currently playing
+
+async function loadAnimations(){
+  try{
+    const {data} = await db.from('leagues').select('state').eq('id','nba-animations-2026').single();
+    if(data?.state){
+      PLAYER_ANIMATIONS = JSON.parse(data.state);
+      console.log('Loaded animations for:', Object.keys(PLAYER_ANIMATIONS).length, 'players');
+    }
+  }catch(e){ /* no animations yet */ }
+}
+
+function getAnimation(playerName, type){
+  const a = PLAYER_ANIMATIONS[playerName];
+  if(!a) return null;
+  return a[type] || null;
+}
+
+function hasAnimations(playerName){
+  return !!PLAYER_ANIMATIONS[playerName];
+}
+
+// Called after each refreshLiveStats — detect FP changes and trigger animations
+function detectFPEvents(){
+  for(const [pidStr, stat] of Object.entries(livePlayerStats||{})){
+    const pid = parseInt(pidStr);
+    const currentFP = stat.fp||0;
+    const prev = prevLiveFP[pid];
+    if(prev === undefined){
+      prevLiveFP[pid] = currentFP;
+      continue;
+    }
+    const delta = currentFP - prev;
+    if(delta > 0){
+      triggerPlayerAnimation(pid, 'pos', delta);
+    } else if(delta < 0){
+      triggerPlayerAnimation(pid, 'neg', delta);
+    }
+    prevLiveFP[pid] = currentFP;
+  }
+}
+
+function triggerPlayerAnimation(pid, type, delta){
+  const p = PLAYERS.find(x=>x.id===pid);
+  if(!p || !hasAnimations(p.name)) return;
+  activeAnimations[pid] = {type, delta, ts: Date.now()};
+  // Auto-clear after 6s (animation duration), revert to idle
+  setTimeout(()=>{
+    if(activeAnimations[pid]?.ts && Date.now() - activeAnimations[pid].ts >= 5800){
+      activeAnimations[pid] = {type:'idle', delta:0, ts: Date.now()};
+    }
+    // Re-render affected cards
+    renderAnimatedCards();
+  }, 6100);
+  renderAnimatedCards();
+}
+
+function renderAnimatedCards(){
+  // Update all visible animated portrait containers
+  document.querySelectorAll('[data-anim-pid]').forEach(el => {
+    const pid = parseInt(el.dataset.animPid);
+    updateAnimatedPortrait(el, pid);
+  });
+}
+
+function updateAnimatedPortrait(container, pid){
+  const p = PLAYERS.find(x=>x.id===pid);
+  if(!p || !hasAnimations(p.name)) return;
+  const anim = activeAnimations[pid];
+  const isLiveNow = isPlayerLive(pid);
+  if(!isLiveNow){ container.innerHTML = buildStaticPortrait(p, container.dataset); return; }
+
+  const type = anim?.type || 'idle';
+  const delta = anim?.delta || 0;
+  const videoSrc = getAnimation(p.name, type) || getAnimation(p.name, 'idle');
+  if(!videoSrc){ container.innerHTML = buildStaticPortrait(p, container.dataset); return; }
+
+  const deltaColor = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text3)';
+  const deltaStr = delta > 0 ? '+'+delta.toFixed(1) : delta < 0 ? delta.toFixed(1) : '';
+
+  container.innerHTML = \`
+    <video autoplay loop=\${type==='idle'?'true':'false'} muted playsinline
+      style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"
+      onended="activeAnimations[\${pid}]={type:'idle',delta:0,ts:Date.now()};updateAnimatedPortrait(this.parentElement,\${pid})">
+      <source src="\${videoSrc}" type="video/mp4">
+    </video>
+    \${deltaStr ? \`<div style="position:absolute;top:2px;left:2px;font-family:'Press Start 2P',monospace;font-size:8px;color:\${deltaColor};text-shadow:0 0 6px \${deltaColor};animation:fp-float 1.5s ease-out forwards">\${deltaStr} FP</div>\` : ''}
+  \`;
+}
+
+function buildStaticPortrait(p, dataset){
+  const portrait = getActivePortrait(p.name);
+  const logo = TEAM_LOGOS[p.team];
+  if(portrait) return \`<img src="\${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>\`;
+  if(logo) return \`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:12px">\${logo.svg}</div>\`;
+  return '';
+}
+
 function rebuildGameTopPlayer(){
   gameTopPlayer = {};
   // Include ALL players — even fp=0 so we show someone for low-scoring early games
@@ -3038,6 +3145,62 @@ function rebuildGameTopPlayer(){
 
 
 // ── Portrait Uploader ─────────────────────────────────────────────
+
+async function handleAnimationUpload(input){
+  const files = [...input.files];
+  if(!files.length) return;
+  const status = document.getElementById('anim-upload-status');
+  const preview = document.getElementById('anim-upload-preview');
+  status.textContent = 'Processing ' + files.length + ' video(s)...';
+  status.style.color = 'var(--accent3)';
+  preview.innerHTML = '';
+  let processed = 0;
+
+  for(const file of files){
+    // Parse filename: "Victor_Wembanyama_idle.mp4" -> name="Victor Wembanyama", type="idle"
+    const base = file.name.replace(/\.[^.]+$/, '');
+    const parts = base.split('_');
+    const type = parts.pop().toLowerCase(); // last segment is type
+    const playerName = parts.join(' ');
+    if(!['idle','pos','neg','positive','negative'].includes(type)){
+      status.textContent = 'Bad filename: ' + file.name + ' (must end in _idle, _pos, or _neg)';
+      status.style.color = 'var(--red)';
+      continue;
+    }
+    const normType = type==='positive'?'pos':type==='negative'?'neg':type;
+
+    const dataUri = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+
+    if(!PLAYER_ANIMATIONS[playerName]) PLAYER_ANIMATIONS[playerName] = {};
+    PLAYER_ANIMATIONS[playerName][normType] = dataUri;
+    processed++;
+
+    // Show preview
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;width:80px';
+    div.innerHTML = `<video src="${dataUri}" autoplay muted loop style="width:80px;height:80px;object-fit:cover;border:2px solid var(--green)"></video><div style="font-size:9px;color:var(--text3);margin-top:3px">${playerName}<br>${normType.toUpperCase()}</div>`;
+    preview.appendChild(div);
+    status.textContent = 'Processed ' + processed + '/' + files.length + '...';
+  }
+
+  // Save to Supabase
+  status.textContent = 'Saving...';
+  try{
+    const result = await db.from('leagues').upsert({id:'nba-animations-2026', state:JSON.stringify(PLAYER_ANIMATIONS)});
+    if(result.error) throw new Error(result.error.message);
+    status.textContent = '✓ Saved animations for ' + Object.keys(PLAYER_ANIMATIONS).length + ' player(s)';
+    status.style.color = 'var(--green)';
+  }catch(e){
+    status.textContent = '✗ Save failed: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+  input.value = '';
+}
+
 async function resizePortrait(file){
   // Resize to 300x300 at 70% quality — keeps total DB size manageable
   return new Promise(resolve => {
@@ -3381,6 +3544,8 @@ async function boot(){
   backfillMissingStats();
   // Fetch ESPN injury report
   fetchInjuryReport();
+  // Load player animations
+  loadAnimations();
   setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
