@@ -1137,6 +1137,9 @@ async function processWaiverClaims(){
       if(idx>-1) remainingClaims.splice(idx,1);
       const dropName = claim.dropPid ? getPlayer(claim.dropPid)?.name : null;
       results.push({mid, name:claim.managerName, pid:claim.pid, dropPid:claim.dropPid, dropName, won:true});
+      if(!S.waiverLog) S.waiverLog = [];
+      S.waiverLog.unshift({ts:new Date().toISOString(),managerId:mid,managerName:claim.managerName,addPid:claim.pid,addName:getPlayer(claim.pid)?.name||'?',dropPid:claim.dropPid||null,dropName:dropName||null,droppedFP:claim.dropPid?playerStatScore(claim.dropPid):0,round:S.round||1});
+      if(S.waiverLog.length>50) S.waiverLog=S.waiverLog.slice(0,50);
       roundWinners.add(mid);
       anyProcessed=true;
       // Winners go to bottom within this round's processing
@@ -1245,7 +1248,7 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();
+  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -1952,6 +1955,47 @@ function renderScoring(){
 }
 
 
+
+
+function renderWaiverLog(){
+  const el = document.getElementById('waiver-log');
+  if(!el) return;
+  const log = S.waiverLog||[];
+  if(!log.length){
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:.5rem 0">No transactions yet.</div>';
+    return;
+  }
+  el.innerHTML = log.map(entry=>{
+    const aColor = getAvatarColor(entry.managerId);
+    const addP = PLAYERS.find(p=>p.id===entry.addPid);
+    const dropP = entry.dropPid ? PLAYERS.find(p=>p.id===entry.dropPid) : null;
+    const addPortrait = addP ? getActivePortrait(addP.name) : null;
+    const dropPortrait = dropP ? getActivePortrait(dropP.name) : null;
+    const teamColor = (p) => p ? (TEAM_LOGOS[p.team]?.color||'#4a9eff') : '#4a9eff';
+    const date = new Date(entry.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const miniPortrait = (p, portrait) => portrait
+      ? '<img src="'+portrait+'" style="width:28px;height:28px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:1px solid '+teamColor(p)+';flex-shrink:0;vertical-align:middle"/>'
+      : '<div style="width:28px;height:28px;background:'+teamColor(p)+'22;border:1px solid '+teamColor(p)+'44;flex-shrink:0;display:inline-block;vertical-align:middle"></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--border2)">'
+      +'<div style="width:28px;height:28px;border:2px solid '+aColor+';flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">'+getAvatar(entry.managerId,'sm')+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
+      +'<span style="font-size:13px;color:'+aColor+';font-weight:600">'+entry.managerName+'</span>'
+      +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--green)">+ADD</span>'
+      +miniPortrait(addP, addPortrait)
+      +'<span style="font-size:13px;color:var(--text)">'+entry.addName+'</span>'
+      +(dropP
+        ? '<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--red)"> −DROP</span>'
+          +miniPortrait(dropP, dropPortrait)
+          +'<span style="font-size:13px;color:var(--text3)">'+entry.dropName+'</span>'
+          +(entry.droppedFP ? '<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--accent2)"> +'+entry.droppedFP.toFixed(0)+' FP KEPT</span>' : '')
+        : '')
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--text3);margin-top:2px">R'+(entry.round||1)+' · '+date+'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
 
 // ── Teams Gallery ────────────────────────────────────────────────
 function renderTeams(){
