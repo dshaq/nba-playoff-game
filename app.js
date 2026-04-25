@@ -1110,6 +1110,10 @@ async function processWaiverClaims(){
       // Claim succeeds — add new player, remove dropped player
       S.rosters[mid].push(claim.pid);
       S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+      // Record acquisition date so we only count stats earned AFTER pickup
+      if(!S.waiverAcquisitions) S.waiverAcquisitions={};
+      const acqDate = new Date().toISOString().split('T')[0].replace(/-/g,'');
+      S.waiverAcquisitions[mid+'_'+claim.pid] = acqDate;
       claimedPids.add(claim.pid);
       managersWhoWon.add(mid);
       // Remove the dropped player from roster — preserve their earned FP
@@ -1927,15 +1931,17 @@ function renderScoring(){
                       <span style="color:var(--text);cursor:pointer" onclick="openPlayerModal(${p.id})">${p.name}</span>
                       <span class="pos-badge" style="font-size:9px">${p.pos}</span>
                       ${isLive?'<span class="score-live" style="font-size:7px;margin-left:3px">LIVE</span>':''}
+                      ${acqDate?'<span style="font-size:9px;color:var(--text3);margin-left:4px">picked up R'+((S.round)||1)+'</span>':''}
                       ${t.eliminated?'<span class="badge badge-elim" style="font-size:9px">ELIM</span>':inj?'<span class="badge badge-inj" style="font-size:9px">INJ</span>':''}
                     </div>
                   </div>
                 </td>
                 <td style="text-align:center">
                   <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isLive?'var(--red)':hasStats?'var(--accent)':'var(--text3)'}">
-                    ${hasStats?(playerFPPG(p.id)>0?'+':'')+playerFPPG(p.id).toFixed(1):'—'}
+                    ${hasStats?(statScore>0?'+':'')+statScore.toFixed(1):'—'}
                   </div>
-                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${statScore>0?'+':''}${statScore.toFixed(1)} tot</div>`:''}
+                  ${hasStats&&playerGamesPlayed(p.id)>1?`<div style="font-size:10px;color:var(--text3)">${(playerFPPG(p.id,m.id)||0).toFixed(1)}/g</div>`:''}
+                  ${excludedFP>0?`<div style="font-size:9px;color:var(--red)" title="Stats before pickup not counted">-${excludedFP} excl</div>`:''}
                 </td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.pts:'—'}</td>
                 <td style="text-align:center;color:var(--text2)">${hasStats?agg.reb:'—'}</td>
@@ -2792,10 +2798,26 @@ function playerGamesPlayed(pid){
   return gameIds.size;
 }
 
-function playerFPPG(pid){
-  const gp = playerGamesPlayed(pid);
+function playerFPPG(pid, mid=null){
+  const gp = playerGamesPlayedForManager(pid, mid);
   if(!gp) return 0;
-  return +(playerStatScore(pid)/gp).toFixed(1);
+  return +(playerStatScore(pid, mid)/gp).toFixed(1);
+}
+
+function playerGamesPlayedForManager(pid, mid=null){
+  let acqDate = null;
+  if(mid !== null && S.waiverAcquisitions){
+    acqDate = S.waiverAcquisitions[mid+'_'+pid] || null;
+  }
+  const saved = Object.values(S.playerStats||{}).filter(s=>{
+    if(s.pid !== pid) return false;
+    if(acqDate && s.date && s.date < acqDate) return false;
+    return true;
+  });
+  const live = livePlayerStats[pid];
+  const gameIds = new Set(saved.map(s=>s.gameId).filter(Boolean));
+  if(live && !gameIds.has(live.gameId)) return gameIds.size + 1;
+  return gameIds.size;
 }
 
 function playerStatScore(pid){
@@ -2820,7 +2842,8 @@ function isPlayerLive(pid){
 }
 
 function managerStatScoreAuto(mid){
-  const rosterFP = (S.rosters[mid]||[]).reduce((s,pid)=>s+playerStatScore(pid),0);
+  // Pass mid so playerStatScore can filter pre-acquisition stats
+  const rosterFP = (S.rosters[mid]||[]).reduce((s,pid)=>s+playerStatScore(pid,mid),0);
   const droppedFP = (S.droppedFP&&S.droppedFP[mid])||0; // points from dropped players
   return +(rosterFP + droppedFP).toFixed(1);
 }
