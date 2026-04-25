@@ -3130,10 +3130,8 @@ function detectFPEvents(){
       continue;
     }
     const delta = currentFP - prev;
-    if(delta > 0){
-      triggerPlayerAnimation(pid, 'pos', delta);
-    } else if(delta < 0){
-      triggerPlayerAnimation(pid, 'neg', delta);
+    if(Math.abs(delta) > 0){
+      triggerPlayerAnimation(pid, delta > 0 ? 'pos' : 'neg', delta);
     }
     prevLiveFP[pid] = currentFP;
   }
@@ -3177,10 +3175,16 @@ function updateAnimatedPortrait(container, pid){
   const deltaColor = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text3)';
   const deltaStr = delta > 0 ? '+'+delta.toFixed(1) : delta < 0 ? delta.toFixed(1) : '';
 
-  const fpOverlay = deltaStr ? `<div style="position:absolute;top:2px;left:2px;font-family:'Press Start 2P',monospace;font-size:8px;color:${deltaColor};text-shadow:0 0 6px ${deltaColor};animation:fp-float 1.5s ease-out forwards">${deltaStr} FP</div>` : '';
-  const isLooping = type === 'idle' ? 'true' : 'false';
-  const onEnded = type !== 'idle' ? `this.parentElement.__anim=${pid};activeAnimations[${pid}]={type:'idle',delta:0,ts:Date.now()};updateAnimatedPortrait(this.parentElement,${pid})` : '';
-  container.innerHTML = `<video autoplay ${type==='idle'?'loop':''}  muted playsinline onended="${onEnded}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"><source src="${videoSrc}" type="video/mp4"></video>${fpOverlay}`;
+  // LIVE badge — always visible while animating
+  const liveTag = '<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:var(--font-pixel),monospace;font-size:5px;padding:2px 3px;color:#fff;z-index:2;animation:blink .8s step-end infinite">LIVE</div>';
+
+  // FP delta overlay — big, centered, dramatic float
+  const fpOverlay = deltaStr ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:3">'
+    + '<div style="font-family:var(--font-pixel),monospace;font-size:14px;color:'+deltaColor+';text-shadow:0 0 10px '+deltaColor+',0 0 20px '+deltaColor+';animation:fp-float 1.8s ease-out forwards;background:rgba(0,0,0,.5);padding:4px 8px">'+deltaStr+'</div>'
+    + '</div>' : '';
+
+  const onEnded = type !== 'idle' ? 'activeAnimations['+pid+']={type:"idle",delta:0,ts:Date.now()};updateAnimatedPortrait(this.parentElement,'+pid+')' : '';
+  container.innerHTML = '<video autoplay '+(type==='idle'?'loop':'')+' muted playsinline onended="'+onEnded+'" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"><source src="'+videoSrc+'" type="video/mp4"></video>'+liveTag+fpOverlay;
 }
 
 function buildStaticPortrait(p, dataset){
