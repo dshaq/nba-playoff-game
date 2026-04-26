@@ -3750,14 +3750,37 @@ async function handleLogoUpload(input){
       reader.readAsDataURL(file);
     });
 
-    // Pick a vibrant color from the image center
-    const canvas2 = document.createElement('canvas'); canvas2.width=1; canvas2.height=1;
+    // Sample multiple points, pick most vibrant color
+    const canvas2 = document.createElement('canvas'); canvas2.width=80; canvas2.height=80;
     const ctx2 = canvas2.getContext('2d');
     const img2 = new Image(); img2.src = dataUri;
     await new Promise(r=>img2.onload=r);
-    ctx2.drawImage(img2, 30, 10, 20, 20, 0, 0, 1, 1);
-    const [r,g,b] = ctx2.getImageData(0,0,1,1).data;
-    const color = '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+    ctx2.drawImage(img2, 0, 0, 80, 80);
+    // Sample a grid of pixels and find most saturated
+    let bestColor = null, bestSat = -1;
+    for(let sx=5; sx<=75; sx+=7){
+      for(let sy=5; sy<=75; sy+=7){
+        const px = ctx2.getImageData(sx,sy,1,1).data;
+        const r2=px[0],g2=px[1],b2=px[2],a2=px[3];
+        if(a2 < 128) continue; // skip transparent
+        const max=Math.max(r2,g2,b2), min=Math.min(r2,g2,b2);
+        const sat = max===0 ? 0 : (max-min)/max;
+        const lum = (max+min)/2/255;
+        // Must be bright enough and saturated enough
+        if(sat > bestSat && lum > 0.2 && lum < 0.9){
+          bestSat = sat;
+          // Boost saturation: amplify towards max channel
+          const boost = Math.min(255/max, 1.8);
+          const br = Math.min(255, Math.round(r2*boost));
+          const bg = Math.min(255, Math.round(g2*boost));
+          const bb = Math.min(255, Math.round(b2*boost));
+          bestColor = '#'+[br,bg,bb].map(x=>x.toString(16).padStart(2,'0')).join('');
+        }
+      }
+    }
+    // Fallback palette if image is too dark/desaturated
+    const fallbackColors = ['#ff6b35','#00d4aa','#4a9eff','#cc44ff','#ffcc00','#ff3366','#00ff88','#ff8800'];
+    const color = bestColor || fallbackColors[CUSTOM_LOGOS.length % fallbackColors.length];
 
     // Remove existing logo with same name
     CUSTOM_LOGOS = CUSTOM_LOGOS.filter(l=>l.name!==name);
@@ -3799,6 +3822,18 @@ function renderExistingLogos(){
         <button onclick="deleteCustomLogo(${i})" style="font-size:8px;background:none;border:1px solid var(--red);color:var(--red);cursor:pointer;padding:1px 4px;margin-top:2px">✕</button>
       </div>`).join('')
     + '</div>';
+}
+
+
+async function editLogoColor(i){
+  const logo = CUSTOM_LOGOS[i];
+  if(!logo) return;
+  const newColor = prompt('Enter hex color for "'+logo.name+'" (e.g. #ff6600):', logo.color);
+  if(!newColor || !newColor.startsWith('#')) return;
+  CUSTOM_LOGOS[i].color = newColor;
+  await saveCustomLogos();
+  renderExistingLogos();
+  render();
 }
 
 async function deleteCustomLogo(i){
