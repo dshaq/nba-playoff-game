@@ -760,22 +760,26 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 <div id="main-screen" class="hidden">
 
   <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-title">🏀 NBA ARCADE</div>
-      <div class="topbar-sub" id="league-sub">2026 PLAYOFFS</div>
+  <div class="topbar" style="justify-content:space-between;align-items:center">
+    <!-- Left: back to character select -->
+    <button onclick="backToCharacterSelect()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 8px;cursor:pointer;white-space:nowrap" title="Switch character">◀ EXIT</button>
+    <!-- Center: title -->
+    <div style="text-align:center;flex:1">
+      <div style="font-family:'Press Start 2P',monospace;font-size:clamp(10px,2vw,18px);color:#fff;text-shadow:0 0 12px #4a8fff,2px 2px 0 #000;letter-spacing:.1em">NBA ARCADE</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:clamp(6px,1vw,9px);color:var(--accent3);letter-spacing:.08em" id="league-sub">2026 PLAYOFFS</div>
     </div>
-    <div class="topbar-right">
-      <div class="energy-widget">
-        <div class="energy-label">ROUND</div>
-        <select id="round-sel" onchange="setRound(parseInt(this.value))">
-          <option value="1">ROUND 1</option>
-          <option value="2">ROUND 2</option>
-          <option value="3">CONF FINALS</option>
-          <option value="4">NBA FINALS</option>
-        </select>
-      </div>
+    <!-- Right: current user avatar (hidden until logged in) -->
+    <div id="topbar-user" style="display:flex;align-items:center;gap:6px;opacity:0;pointer-events:none">
+      <div id="topbar-avatar" style="width:32px;height:32px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden"></div>
+      <div id="topbar-name" style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text2)"></div>
     </div>
+    <!-- Hidden round selector kept for commissioner functionality -->
+    <select id="round-sel" onchange="setRound(parseInt(this.value))" style="display:none">
+      <option value="1">ROUND 1</option>
+      <option value="2">ROUND 2</option>
+      <option value="3">CONF FINALS</option>
+      <option value="4">NBA FINALS</option>
+    </select>
   </div>
 
   <!-- Live scores -->
@@ -800,7 +804,13 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <div id="bracket-section" style="margin-bottom:.75rem"></div>
 
   <!-- Tab bar -->
+  <!-- Mini standings above tabs -->
+  <div id="mini-standings" style="display:flex;gap:4px;overflow-x:auto;padding:4px 0;background:var(--bg2);border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch">
+    <div id="mini-standings-content" style="display:flex;gap:4px;padding:0 8px;width:100%"></div>
+  </div>
+
   <div class="tab-bar">
+    <button class="tab" id="tab-btn-my-team" onclick="showTab('my-team')">MY TEAM</button>
     <button class="tab active" onclick="showTab('live-score')">LIVE SCORE</button>
     <button class="tab" onclick="showTab('standings')">STANDINGS</button>
     <button class="tab" onclick="showTab('rosters')">ROSTERS</button>
@@ -897,6 +907,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- SCORING -->
   <!-- LIVE SCORE TAB -->
+  <!-- MY TEAM TAB -->
+  <div id="tab-my-team" class="hidden">
+    <div id="my-team-content"></div>
+  </div>
+
   <div id="tab-live-score" class="hidden">
     <div class="card"><div class="section-title">LIVE SCORE BREAKDOWN</div><div id="scoring-breakdown"></div></div>
   </div>

@@ -857,6 +857,14 @@ function showMainScreen(){
 // Manager PINs
 const MANAGER_PINS = {0:'3186',1:'9044',2:'7612',3:'4837',4:'5501',5:'0295'};
 
+
+function backToCharacterSelect(){
+  currentManagerId = null;
+  try{ sessionStorage.removeItem('nba_mgr_2026'); }catch(e){}
+  document.getElementById('main-screen').classList.add('hidden');
+  showManagerPicker();
+}
+
 function showManagerPicker(){
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.add('hidden');
@@ -979,6 +987,23 @@ function selectManager(id){
   try{ sessionStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
+  // Show topbar user identity
+  const topbarUser = document.getElementById('topbar-user');
+  const topbarAvatar = document.getElementById('topbar-avatar');
+  const topbarName = document.getElementById('topbar-name');
+  if(topbarUser && id !== 'viewer'){
+    const m = S.managers.find(x=>x.id===id);
+    if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(id,'sm');
+    if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(id);
+    if(topbarName) topbarName.textContent = m?.name?.toUpperCase()||'';
+    topbarUser.style.opacity = '1';
+    topbarUser.style.pointerEvents = 'auto';
+    // Default to MY TEAM tab if logged in as manager
+    showTab('my-team');
+  } else if(topbarUser){
+    topbarUser.style.opacity = '0';
+    topbarUser.style.pointerEvents = 'none';
+  }
   document.getElementById('league-sub').textContent = `2026 PLAYOFFS - ${S.managers.length} MANAGERS - ${ROSTER_SIZE} PICKS EACH`;
   if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
@@ -1269,7 +1294,7 @@ function showTab(name){
 }
 
 function render(){
-  renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();renderMiniStandings();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -1314,6 +1339,255 @@ function renderDraftBanner(){
   banner.classList.add('active');
 }
 
+
+// ── MY TEAM TAB ──────────────────────────────────────────────────
+
+function renderMiniStandings(){
+  const el = document.getElementById('mini-standings-content');
+  if(!el) return;
+  const sorted = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  el.innerHTML = sorted.map((m,i)=>{
+    const aColor = getAvatarColor(m.id);
+    const total = managerTotal(m.id);
+    const isMe = currentManagerId !== 'viewer' && currentManagerId === m.id;
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    return `<div onclick="showTab('standings')" style="display:flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid ${isMe?aColor:'var(--border2)'};background:${isMe?aColor+'18':'transparent'};cursor:pointer;flex-shrink:0;border-radius:2px">
+      <div style="width:20px;height:20px;border:1px solid ${aColor};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">${getAvatar(m.id,'sm')}</div>
+      <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${aColor}">${total}</span>
+      ${medal?`<span style="font-size:10px">${medal}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderMyTeam(){
+  const el = document.getElementById('my-team-content');
+  if(!el) return;
+  const mid = currentManagerId;
+  if(mid === null || mid === 'viewer'){
+    el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text3);font-family:var(--font-pixel),monospace;font-size:9px">LOG IN TO SEE YOUR TEAM</div>';
+    return;
+  }
+  const m = S.managers.find(x=>x.id===mid);
+  if(!m){ el.innerHTML=''; return; }
+  const aColor = getAvatarColor(mid);
+  const roster = S.rosters[mid]||[];
+  const total = managerTotal(mid);
+  const stat = managerStatScore(mid);
+  const bonus = managerBonusScore(mid);
+
+  // ── Today's FP (saved + live) ──
+  const etNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const todayStr = [etNow.getFullYear(),String(etNow.getMonth()+1).padStart(2,'0'),String(etNow.getDate()).padStart(2,'0')].join('');
+  const yestDate = new Date(etNow); yestDate.setDate(yestDate.getDate()-1);
+  const yestStr = [yestDate.getFullYear(),String(yestDate.getMonth()+1).padStart(2,'0'),String(yestDate.getDate()).padStart(2,'0')].join('');
+
+  // Build today game IDs
+  const todayGameIds = new Set();
+  Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) todayGameIds.add(s.gameId); });
+  Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStr && s.gameId) todayGameIds.add(s.gameId); });
+  if(!todayGameIds.size) Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr && s.gameId) todayGameIds.add(s.gameId); });
+
+  const todayFP = roster.reduce((sum,pid)=>{
+    const acqDate = S.waiverAcquisitions?.[mid+'_'+pid]||null;
+    let fp=0;
+    Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&todayGameIds.has(s.gameId)).forEach(s=>{
+      if(!acqDate||s.date>=acqDate) fp+=s.fp||0;
+    });
+    const live = livePlayerStats[pid];
+    if(live && todayGameIds.has(live.gameId)){
+      const saved = Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId);
+      if(!saved) fp+=live.fp||0;
+    }
+    return sum+fp;
+  },0);
+
+  // ── Per-round FP breakdown ──
+  const roundDates = {1:[],2:[],3:[],4:[]};
+  Object.values(S.playerStats||{}).forEach(s=>{
+    const p=getPlayer(s.pid); if(!p||!roster.includes(s.pid)) return;
+    const t=getTeam(p.team); if(!t) return;
+    // approximate round by game date vs round start dates
+    const d=parseInt(s.date||0);
+    const r = d>=20260510?4:d>=20260501?3:d>=20260426?2:1;
+    if(!roundDates[r]) roundDates[r]=[];
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
+    if(!acqDate||s.date>=acqDate) roundDates[r].push(s.fp||0);
+  });
+  const roundFP = {1:0,2:0,3:0,4:0};
+  Object.entries(roundDates).forEach(([r,fps])=>roundFP[r]=fps.reduce((a,b)=>a+b,0));
+
+  // ── Best game day ──
+  const dayTotals = {};
+  Object.values(S.playerStats||{}).filter(s=>roster.includes(s.pid)).forEach(s=>{
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
+    if(acqDate&&s.date<acqDate) return;
+    dayTotals[s.date] = (dayTotals[s.date]||0)+(s.fp||0);
+  });
+  const bestDay = Object.entries(dayTotals).sort((a,b)=>b[1]-a[1])[0];
+  const bestDayFmt = bestDay ? new Date(bestDay[0].replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
+
+  // ── Best individual game ──
+  const allPlayerGames = Object.values(S.playerStats||{}).filter(s=>roster.includes(s.pid)).map(s=>{
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
+    if(acqDate&&s.date<acqDate) return null;
+    return {pid:s.pid,fp:s.fp||0,date:s.date,name:getPlayer(s.pid)?.name||''};
+  }).filter(Boolean);
+  const bestGame = allPlayerGames.sort((a,b)=>b.fp-a.fp)[0];
+  const bestGameFmt = bestGame ? new Date(bestGame.date.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
+
+  // ── Round MVP (best FPPG) ──
+  const mvpData = roster.map(pid=>{
+    const p=getPlayer(pid); if(!p) return null;
+    return {pid, name:p.name, fppg:playerFPPG(pid,mid), gp:playerGamesPlayedForManager(pid,mid)};
+  }).filter(x=>x&&x.gp>0).sort((a,b)=>b.fppg-a.fppg)[0];
+
+  // ── Live players right now ──
+  const livePids = roster.filter(pid=>isPlayerLive(pid));
+
+  // ── Watchlist ──
+  const watchlist = S.watchlist?.[mid]||[];
+
+  // ── Render ──
+  el.innerHTML = `
+  <div style="padding:.75rem 0">
+
+    <!-- Team header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding:.75rem;background:var(--panel);border:1px solid ${aColor}44;border-left:4px solid ${aColor}">
+      <div style="width:52px;height:52px;border:2px solid ${aColor};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">${getAvatar(mid,'lg')}</div>
+      <div style="flex:1">
+        <div style="font-family:'Press Start 2P',monospace;font-size:12px;color:${aColor}" id="my-team-name-display">${m.name.toUpperCase()}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:3px">${stat.toFixed(0)} stat + ${bonus} bonus</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Press Start 2P',monospace;font-size:24px;color:${aColor}">${total}</div>
+        <div style="font-size:10px;color:var(--text3)">TOTAL FP</div>
+        ${todayFP!==0?`<div style="font-size:11px;color:${todayFP>0?'var(--green)':'var(--red)'};">${todayFP>0?'+':''}${todayFP.toFixed(1)} today</div>`:''}
+      </div>
+    </div>
+
+    <!-- Live now -->
+    ${livePids.length?`
+    <div style="background:rgba(255,51,68,.08);border:1px solid #ff334488;padding:.625rem .75rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--red);animation:blink .8s step-end infinite">● LIVE</span>
+      ${livePids.map(pid=>{
+        const p=getPlayer(pid); const live=livePlayerStats[pid];
+        const tc=TEAM_LOGOS[p.team]?.color||'#4a9eff';
+        const portrait=getActivePortrait(p.name);
+        return `<div style="display:flex;align-items:center;gap:5px">
+          ${portrait?`<img src="${portrait}" style="width:28px;height:28px;object-fit:cover;object-position:center top;border:1px solid ${tc};image-rendering:pixelated"/>`:``}
+          <span style="font-size:13px;color:var(--text)">${p.name.split(' ').pop()}</span>
+          <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--red)">${live?`+${(live.fp||0).toFixed(1)}`:''}</span>
+        </div>`;
+      }).join('')}
+    </div>`:''}
+
+    <!-- Stats cards row -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:.75rem">
+
+      <!-- Round FP breakdown -->
+      <div style="background:var(--panel);border:1px solid var(--border);padding:.625rem .75rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3);margin-bottom:.5rem">FP BY ROUND</div>
+        ${[1,2,3,4].map(r=>{
+          const fp=roundFP[r]; if(!fp&&r>1) return '';
+          const labels=['','R1','R2','CONF','FINALS'];
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--border2)">
+            <span style="font-size:11px;color:var(--text3)">${labels[r]}</span>
+            <span style="font-family:'Press Start 2P',monospace;font-size:9px;color:${fp>0?'var(--accent2)':'var(--text3)'}">${fp>0?'+':''}${fp.toFixed(0)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Best nights -->
+      <div style="background:var(--panel);border:1px solid var(--border);padding:.625rem .75rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3);margin-bottom:.5rem">HIGHLIGHTS</div>
+        ${bestDay?`<div style="padding:3px 0;border-bottom:1px solid var(--border2)">
+          <div style="font-size:10px;color:var(--text3)">Best Night</div>
+          <div style="font-size:13px;color:var(--text)">${bestDayFmt}: <span style="color:var(--accent2);font-family:'Press Start 2P',monospace;font-size:9px">${bestDay[1].toFixed(0)} FP</span></div>
+        </div>`:''}
+        ${bestGame?`<div style="padding:3px 0;border-bottom:1px solid var(--border2)">
+          <div style="font-size:10px;color:var(--text3)">Best Player Game</div>
+          <div style="font-size:13px;color:var(--text)">${bestGame.name.split(' ').pop()} <span style="color:var(--accent2);font-family:'Press Start 2P',monospace;font-size:9px">${bestGame.fp.toFixed(0)} FP</span> <span style="font-size:10px;color:var(--text3)">${bestGameFmt}</span></div>
+        </div>`:''}
+        ${mvpData?`<div style="padding:3px 0">
+          <div style="font-size:10px;color:var(--text3)">Round MVP</div>
+          <div style="font-size:13px;color:var(--text)">${mvpData.name.split(' ').pop()} <span style="color:var(--accent2);font-family:'Press Start 2P',monospace;font-size:9px">${mvpData.fppg.toFixed(1)}/g</span></div>
+        </div>`:''}
+      </div>
+    </div>
+
+    <!-- Roster -->
+    <div style="background:var(--panel);border:1px solid var(--border);padding:.625rem .75rem;margin-bottom:.75rem">
+      <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3);margin-bottom:.5rem">MY ROSTER</div>
+      <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px">
+        ${roster.map(pid=>{
+          const p=getPlayer(pid); if(!p) return '';
+          const t=getTeam(p.team);
+          const tc=TEAM_LOGOS[p.team]?.color||'#4a9eff';
+          const portrait=getActivePortrait(p.name);
+          const isLive=isPlayerLive(pid);
+          const elim=t?.eliminated;
+          const espnInj=getESPNInjury(p.name);
+          const fp=playerStatScore(pid,mid);
+          const fppg=playerFPPG(pid,mid);
+          return `<div onclick="openPlayerModal(${pid})" style="flex-shrink:0;width:72px;cursor:pointer;opacity:${elim?.45:1}">
+            <div style="width:72px;height:72px;overflow:hidden;background:#020c18;border:2px solid ${isLive?'var(--red)':elim?'#333':tc};position:relative">
+              ${portrait?`<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:${tc}">${p.team}</div>`}
+              ${isLive?`<div style="position:absolute;top:2px;left:2px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:4px;padding:2px 3px;color:#fff">LIVE</div>`:''}
+              ${espnInj&&espnInj.status==='Out'?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.8);text-align:center;font-family:'Press Start 2P',monospace;font-size:5px;color:#fff;padding:2px">OUT</div>`:''}
+            </div>
+            <div style="font-size:9px;color:${tc};text-overflow:ellipsis;overflow:hidden;white-space:nowrap;padding:2px 0">${p.name.split(' ').pop()}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:${isLive?'var(--red)':fp>0?'var(--accent2)':'var(--text3)'}">${fp>0?'+':''}${fp.toFixed(0)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Watchlist -->
+    <div style="background:var(--panel);border:1px solid var(--border);padding:.625rem .75rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3)">WAIVER WATCHLIST</div>
+        <div style="font-size:11px;color:var(--text3)">Players you're eyeing</div>
+      </div>
+      <div id="watchlist-content">
+        ${watchlist.length===0?
+          '<div style="font-size:12px;color:var(--text3);padding:.25rem 0">No players on watchlist. Add them from the Player Directory.</div>':
+          watchlist.map(pid=>{
+            const p=getPlayer(pid); if(!p) return '';
+            const tc=TEAM_LOGOS[p.team]?.color||'#4a9eff';
+            const portrait=getActivePortrait(p.name);
+            const fp=playerStatScore(pid);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2)">
+              ${portrait?`<img src="${portrait}" style="width:28px;height:28px;object-fit:cover;object-position:center top;border:1px solid ${tc};image-rendering:pixelated"/>`:``}
+              <span style="font-size:13px;color:var(--text);flex:1">${p.name}</span>
+              <span style="font-size:11px;color:var(--text3)">${p.team}</span>
+              <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2)">${fp>0?'+':''}${fp.toFixed(0)}</span>
+              <button onclick="event.stopPropagation();removeFromWatchlist(${mid},${pid})" style="background:none;border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 5px;cursor:pointer">✕</button>
+            </div>`;
+          }).join('')
+        }
+      </div>
+    </div>
+  </div>`;
+}
+
+async function addToWatchlist(mid, pid){
+  if(mid===null||mid==='viewer') return;
+  if(!S.watchlist) S.watchlist={};
+  if(!S.watchlist[mid]) S.watchlist[mid]=[];
+  if(S.watchlist[mid].includes(pid)){ showToast('Already on watchlist','info'); return; }
+  S.watchlist[mid].push(pid);
+  await saveState();
+  render();
+  showToast(getPlayer(pid)?.name+' added to watchlist','info');
+}
+
+async function removeFromWatchlist(mid, pid){
+  if(!S.watchlist?.[mid]) return;
+  S.watchlist[mid]=S.watchlist[mid].filter(p=>p!==pid);
+  await saveState();
+  render();
+}
+
 function renderStandings(){
   const draftDone = S.draftIdx >= S.snakeOrder.length;
   const playoffsStarted = S.teams.some(t=>t.survivedRounds>0||t.eliminated);
@@ -1342,14 +1616,27 @@ function renderStandings(){
       .map(pid => { const p=getPlayer(pid); return p ? p.name.split(' ').pop() : ''; })
       .filter(Boolean);
 
-    // Today's live gain for this manager
+    // Today's FP — all saved stats from today + current live (not-yet-saved)
+    const etNowS = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const todayStrS = [etNowS.getFullYear(),String(etNowS.getMonth()+1).padStart(2,'0'),String(etNowS.getDate()).padStart(2,'0')].join('');
+    const yestDateS = new Date(etNowS); yestDateS.setDate(yestDateS.getDate()-1);
+    const yestStrS = [yestDateS.getFullYear(),String(yestDateS.getMonth()+1).padStart(2,'0'),String(yestDateS.getDate()).padStart(2,'0')].join('');
+    const todayGameIdsS = new Set();
+    Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) todayGameIdsS.add(s.gameId); });
+    Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStrS && s.gameId) todayGameIdsS.add(s.gameId); });
+    if(!todayGameIdsS.size) Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStrS && s.gameId) todayGameIdsS.add(s.gameId); });
     const todayLive = (S.rosters[m.id]||[]).reduce((sum,pid) => {
+      const acqDate = S.waiverAcquisitions?.[m.id+'_'+pid]||null;
+      let fp=0;
+      Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&todayGameIdsS.has(s.gameId)).forEach(s=>{
+        if(!acqDate||s.date>=acqDate) fp+=s.fp||0;
+      });
       const live = livePlayerStats[pid];
-      if(!live) return sum;
-      const alreadySaved = S.playerStats && Object.values(S.playerStats).some(
-        s => s.pid===pid && s.gameId && s.gameId===live.gameId
-      );
-      return sum + (alreadySaved ? 0 : (live.fp||0));
+      if(live && todayGameIdsS.has(live.gameId)){
+        const saved = Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId);
+        if(!saved) fp+=live.fp||0;
+      }
+      return sum+fp;
     }, 0);
 
     return `<div style="margin-bottom:.5rem;background:var(--panel);border:1px solid var(--border);border-left:4px solid ${aColor};padding:.75rem 1rem">
@@ -1784,7 +2071,7 @@ function renderRosters(){
                 // Check if team has played games but player has 0 stats in any of them
                 // ESPN injury status overrides everything — show button if ESPN says Out/DTD
                 const espnInj = getESPNInjury(p.name);
-                const isESPNOut = espnInj && (espnInj.status==='Out' || espnInj.status==='Day-To-Day' || espnInj.status==='Questionable');
+                const isESPNOut = espnInj && espnInj.status==='Out'; // only show DROP for confirmed Out
 
                 // Also check if player missed a game
                 const teamGameIds = new Set(Object.values(S.playerStats||{}).filter(s=>{
@@ -1796,9 +2083,9 @@ function renderRosters(){
                 const latestTeamGame = sortedTeamGames[sortedTeamGames.length-1];
                 const missedGame = [...teamGameIds].some(gid=>!playerGameIds.has(gid));
                 const playedLatest = latestTeamGame && playerGameIds.has(latestTeamGame);
-                const eligible = isESPNOut || (missedGame && !playedLatest);
+                const eligible = isESPNOut; // only for ESPN Out — missed game check removed per new rules
                 if(!eligible) return '';
-                const btnLabel = espnInj?.status==='Out' ? 'OUT' : 'DTD';
+                const btnLabel = 'DROP';
                 return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">${btnLabel}</button></div>`;
               })()}
             </div>
@@ -2154,6 +2441,7 @@ function renderTeams(){
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
           ${injuryBadgeHtml(p.name,true)}
+          ${currentManagerId!==null&&currentManagerId!=='viewer'?`<span onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" title="Add to watchlist" style="cursor:pointer;font-size:10px;margin-left:3px;opacity:.6" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">👁</span>`:''}
         <div style="text-align:right">
           <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
             ${fppg>0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
@@ -3629,19 +3917,19 @@ async function openGameModal(espnId, homeTricode, awayTricode, statusText){
         return `<tr style="border-bottom:1px solid var(--bg2)">
           <td style="padding:3px 6px;font-size:11px;white-space:nowrap">${nameCell}</td>
           <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${s[0]}</td>
-          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[1]}</td>
-          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm}-${fga}</td>
-          <td style="padding:3px 4px;font-size:10px;text-align:center">${tpm}-${tpa}</td>
-          <td style="padding:3px 4px;font-size:10px;text-align:center">${fgm2}-${fga2}</td>
+          <td style="padding:3px 4px;font-size:11px;font-weight:600;color:var(--accent2);text-align:center">${s[1]}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${fgm}-${fga}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${tpm}-${tpa}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${fgm2}-${fga2}</td>
           <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${efg}</td>
-          <td style="padding:3px 4px;font-size:10px;text-align:center">${ftm}-${fta}</td>
+          <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${ftm}-${fta}</td>
           <td style="padding:3px 4px;font-size:10px;color:var(--text3);text-align:center">${ftpct}</td>
-          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[5]}</td>
-          <td style="padding:3px 4px;font-size:11px;text-align:center">${s[6]}</td>
+          <td style="padding:3px 4px;font-size:11px;font-weight:600;color:var(--accent2);text-align:center">${s[5]}</td>
+          <td style="padding:3px 4px;font-size:11px;font-weight:600;color:var(--accent2);text-align:center">${s[6]}</td>
           <td style="padding:3px 4px;font-size:11px;color:${toN>0?'var(--red)':'inherit'};text-align:center">${s[7]}</td>
           <td style="padding:3px 4px;font-size:11px;text-align:center">${s[8]}</td>
           <td style="padding:3px 4px;font-size:11px;text-align:center">${s[9]}</td>
-          <td style="padding:3px 4px;font-size:11px;color:${pmN>0?'var(--green)':pmN<0?'var(--red)':'inherit'};text-align:center">${pmN>0?'+':''}${pm}</td>
+          <td style="padding:3px 4px;font-size:10px;color:${pmN>0?'var(--green)':pmN<0?'var(--red)':'var(--text3)'};text-align:center">${pmN>0?'+':''}${pm}</td>
           <td style="padding:3px 4px;font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'var(--accent2)':fp<0?'var(--red)':'var(--text3)'};text-align:center">${fp!=null?(fp>0?'+':'')+fp:'-'}</td>
         </tr>`;
       }).join('');
@@ -3808,8 +4096,8 @@ async function boot(){
   fetchInjuryReport();
   // Load player animations
   loadAnimations();
-  // Load custom logos
-  loadCustomLogos().then(()=>render());
+  // Load custom logos — reload picker after they arrive
+  loadCustomLogos().then(()=>{ render(); if(document.getElementById('manager-picker') && !document.getElementById('manager-picker').classList.contains('hidden')) showManagerPicker(); });
   setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
