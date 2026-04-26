@@ -1458,15 +1458,23 @@ function renderMyTeam(){
 
     <!-- Team header -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding:.75rem;background:var(--panel);border:1px solid ${aColor}44;border-left:4px solid ${aColor}">
-      <div style="width:52px;height:52px;border:2px solid ${aColor};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">${getAvatar(mid,'lg')}</div>
-      <div style="flex:1">
-        <div style="font-family:'Press Start 2P',monospace;font-size:12px;color:${aColor}" id="my-team-name-display">${m.name.toUpperCase()}</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:3px">${stat.toFixed(0)} stat + ${bonus} bonus</div>
+      <!-- Avatar — click to change -->
+      <div onclick="openAvatarModal(${mid})" title="Change icon" style="width:52px;height:52px;border:2px solid ${aColor};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;cursor:pointer;position:relative">
+        ${getAvatar(mid,'lg')}
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.65);text-align:center;font-size:8px;padding:2px">✏</div>
       </div>
-      <div style="text-align:right">
+      <div style="flex:1;min-width:0">
+        <!-- Name — click to edit -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:${aColor}" id="my-team-name-display">${m.name.toUpperCase()}</div>
+          <button onclick="editMyTeamName(${mid})" style="background:none;border:1px solid ${aColor}66;color:${aColor};font-size:9px;padding:1px 5px;cursor:pointer" title="Edit name">✏</button>
+        </div>
+        <div style="font-size:12px;color:var(--text3)">${stat.toFixed(0)} stat + ${bonus} bonus</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
         <div style="font-family:'Press Start 2P',monospace;font-size:24px;color:${aColor}">${total}</div>
         <div style="font-size:10px;color:var(--text3)">TOTAL FP</div>
-        ${todayFP!==0?`<div style="font-size:11px;color:${todayFP>0?'var(--green)':'var(--red)'};">${todayFP>0?'+':''}${todayFP.toFixed(1)} today</div>`:''}
+        ${todayFP!==0?`<div style="font-size:11px;color:${todayFP>0?'var(--green)':'var(--red)'}">${todayFP>0?'+':''}${todayFP.toFixed(1)} today</div>`:''}
       </div>
     </div>
 
@@ -1573,6 +1581,21 @@ function renderMyTeam(){
       </div>
     </div>
   </div>`;
+}
+
+
+async function editMyTeamName(mid){
+  const m = S.managers.find(x=>x.id===mid);
+  if(!m) return;
+  const newName = prompt('Enter your team name:', m.name);
+  if(!newName || !newName.trim() || newName.trim()===m.name) return;
+  m.name = newName.trim();
+  await saveState();
+  render();
+  // Update topbar name too
+  const topbarName = document.getElementById('topbar-name');
+  if(topbarName) topbarName.textContent = m.name.toUpperCase();
+  showToast('Name updated!', 'info');
 }
 
 async function addToWatchlist(mid, pid){

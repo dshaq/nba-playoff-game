@@ -761,19 +761,17 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- Topbar -->
   <div class="topbar" style="justify-content:space-between;align-items:center">
-    <!-- Left: back to character select -->
-    <button onclick="backToCharacterSelect()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 8px;cursor:pointer;white-space:nowrap" title="Switch character">◀ EXIT</button>
-    <!-- Center: title -->
+    <!-- Left: exit button -->
+    <button onclick="backToCharacterSelect()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0" title="Switch character">◀ EXIT</button>
+    <!-- Center: title only -->
     <div style="text-align:center;flex:1">
-      <div style="font-family:'Press Start 2P',monospace;font-size:clamp(10px,2vw,18px);color:#fff;text-shadow:0 0 12px #4a8fff,2px 2px 0 #000;letter-spacing:.1em">NBA ARCADE</div>
-      <div style="font-family:'Press Start 2P',monospace;font-size:clamp(6px,1vw,9px);color:var(--accent3);letter-spacing:.08em" id="league-sub">2026 PLAYOFFS</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:clamp(12px,2.5vw,22px);color:#fff;text-shadow:0 0 14px #4a8fff,2px 2px 0 #000;letter-spacing:.12em">NBA ARCADE</div>
     </div>
-    <!-- Right: current user avatar (hidden until logged in) -->
-    <div id="topbar-user" style="display:flex;align-items:center;gap:6px;opacity:0;pointer-events:none">
-      <div id="topbar-avatar" style="width:32px;height:32px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden"></div>
-      <div id="topbar-name" style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text2)"></div>
+    <!-- Right: current user avatar -->
+    <div id="topbar-user" style="display:flex;align-items:center;gap:6px;opacity:0;pointer-events:none;flex-shrink:0">
+      <div id="topbar-avatar" style="width:32px;height:32px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="showTab('my-team')"></div>
+      <div id="topbar-name" style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text2);cursor:pointer" onclick="showTab('my-team')"></div>
     </div>
-    <!-- Hidden round selector kept for commissioner functionality -->
     <select id="round-sel" onchange="setRound(parseInt(this.value))" style="display:none">
       <option value="1">ROUND 1</option>
       <option value="2">ROUND 2</option>
@@ -1062,6 +1060,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 
 <!-- ── Chat bubble button ── -->
+  <!-- Copyright footer -->
+  <div style="text-align:center;padding:.75rem;font-size:11px;color:var(--text3);border-top:1px solid var(--border2);margin-top:1rem">
+    © David Schachter 2026 · NBA ARCADE
+  </div>
+
 <div id="chat-bubble" onclick="toggleChat()" title="Open chat">
   💬
   <div id="chat-unread"></div>
