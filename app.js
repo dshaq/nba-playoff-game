@@ -836,10 +836,8 @@ function showMainScreen(){
   if(currentManagerId===null&&!isCommissioner){ showManagerPicker(); return; }
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('league-sub').textContent = `2026 PLAYOFFS - ${S.managers.length} MANAGERS - ${ROSTER_SIZE} PICKS EACH`;
-  if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
-  document.getElementById('round-sel').value = S.round||1;
-  if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
+  const leagueSubEl = document.getElementById('league-sub'); if(leagueSubEl) leagueSubEl.textContent = `2026 PLAYOFFS`;
+  const roundSelEl = document.getElementById('round-sel'); if(roundSelEl) roundSelEl.value = S.round||1;
   if(isCommissioner){
     document.getElementById('comm-active-bar').classList.remove('hidden');
     document.getElementById('comm-login-bar').classList.add('hidden');
@@ -1005,10 +1003,8 @@ function selectManager(id){
     topbarUser.style.opacity = '0';
     topbarUser.style.pointerEvents = 'none';
   }
-  document.getElementById('league-sub').textContent = `2026 PLAYOFFS - ${S.managers.length} MANAGERS - ${ROSTER_SIZE} PICKS EACH`;
-  if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
-  document.getElementById('round-sel').value = S.round||1;
-  if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
+  const leagueSubEl = document.getElementById('league-sub'); if(leagueSubEl) leagueSubEl.textContent = `2026 PLAYOFFS`;
+  const roundSelEl = document.getElementById('round-sel'); if(roundSelEl) roundSelEl.value = S.round||1;
   // Auto-commissioner for Dave (id=4)
   if(id === 4){
     isCommissioner = true;
