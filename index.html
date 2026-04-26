@@ -800,14 +800,17 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
     </div>
   </div>
 
-  <!-- Bracket -->
-  <div id="bracket-section" style="margin-bottom:.75rem"></div>
-
-  <!-- Tab bar -->
-  <!-- Mini standings above tabs -->
-  <div id="mini-standings" style="display:flex;gap:4px;overflow-x:auto;padding:4px 0;background:var(--bg2);border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch">
-    <div id="mini-standings-content" style="display:flex;gap:4px;padding:0 8px;width:100%"></div>
+  <!-- Live Leaderboard (replaces bracket) -->
+  <div id="top-leaderboard-section" style="border-bottom:2px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem .375rem;background:var(--bg2);border-bottom:1px solid var(--border2)">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3)">🏆 LIVE LEADERBOARD</div>
+      <button onclick="openBracketModal()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">🗓 BRACKET</button>
+    </div>
+    <div id="top-leaderboard-list"></div>
   </div>
+
+  <!-- Hidden bracket section (used by renderBracket) -->
+  <div id="bracket-section" style="display:none"></div>
 
   <div class="tab-bar">
     <button class="tab" id="tab-btn-my-team" onclick="showTab('my-team')">MY TEAM</button>

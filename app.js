@@ -1294,7 +1294,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderStandings();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();renderMiniStandings();
+  renderMyTeam();renderStandings();renderTopLeaderboard();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -2592,6 +2592,87 @@ function renderTopPlayersBanner(){
   });
 }
 // ── Bracket ───────────────────────────────────────────────────────
+
+function renderTopLeaderboard(){
+  const el = document.getElementById('top-leaderboard-list');
+  if(!el) return;
+  const sorted = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  const maxTotal = Math.max(1,...sorted.map(m=>managerTotal(m.id)));
+
+  el.innerHTML = sorted.map((m,i)=>{
+    const aColor = getAvatarColor(m.id);
+    const total = managerTotal(m.id);
+    const barPct = Math.round((total/maxTotal)*100);
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const isMe = currentManagerId!==null && currentManagerId!=='viewer' && m.id===currentManagerId;
+
+    // Today FP
+    const etNow2 = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const todayStr2 = [etNow2.getFullYear(),String(etNow2.getMonth()+1).padStart(2,'0'),String(etNow2.getDate()).padStart(2,'0')].join('');
+    const yestDate2 = new Date(etNow2); yestDate2.setDate(yestDate2.getDate()-1);
+    const yestStr2 = [yestDate2.getFullYear(),String(yestDate2.getMonth()+1).padStart(2,'0'),String(yestDate2.getDate()).padStart(2,'0')].join('');
+    const tgids = new Set();
+    Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) tgids.add(s.gameId); });
+    Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStr2 && s.gameId) tgids.add(s.gameId); });
+    if(!tgids.size) Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr2 && s.gameId) tgids.add(s.gameId); });
+    const todayFP2 = (S.rosters[m.id]||[]).reduce((sum,pid)=>{
+      const acqDate=S.waiverAcquisitions?.[m.id+'_'+pid]||null;
+      let fp=0;
+      Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&tgids.has(s.gameId)).forEach(s=>{if(!acqDate||s.date>=acqDate) fp+=s.fp||0;});
+      const live=livePlayerStats[pid];
+      if(live&&tgids.has(live.gameId)){const saved=Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId);if(!saved) fp+=live.fp||0;}
+      return sum+fp;
+    },0);
+
+    // Live players
+    const liveNames = (S.rosters[m.id]||[]).filter(pid=>isPlayerLive(pid))
+      .map(pid=>getPlayer(pid)?.name.split(' ').pop()).filter(Boolean);
+
+    return `<div style="padding:.5rem .75rem;border-bottom:1px solid var(--border2);${isMe?'background:'+aColor+'10;':''}" onclick="showTab('standings')" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Rank -->
+        <div style="min-width:24px;text-align:center;font-size:22px">${medal||('<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--text3)">#'+(i+1)+'</span>')}</div>
+        <!-- Avatar -->
+        <div style="width:32px;height:32px;border:2px solid ${aColor};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${getAvatar(m.id,'sm')}</div>
+        <!-- Name + live -->
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;color:${aColor};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.name}</div>
+          ${liveNames.length?`<div style="font-size:10px;color:var(--red)">● ${liveNames.join(', ')}</div>`:''}
+        </div>
+        <!-- Today -->
+        ${todayFP2!==0?`<div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${todayFP2>0?'var(--green)':'var(--red)'};white-space:nowrap">${todayFP2>0?'+':''}${todayFP2.toFixed(0)}</div>`:''}
+        <!-- Total -->
+        <div style="font-family:'Press Start 2P',monospace;font-size:${i===0?'18':'14'}px;color:${aColor};min-width:50px;text-align:right">${total}</div>
+      </div>
+      <!-- Bar -->
+      <div style="height:3px;background:var(--border);margin-top:5px;margin-left:64px;position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${barPct}%;background:${aColor};transition:width .3s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeBracketModal(){ const m=document.getElementById("bracket-modal"); if(m) m.remove(); }
+function openBracketModal(){
+  const existing = document.getElementById('bracket-modal');
+  if(existing){ existing.remove(); return; }
+  // Make sure bracket is rendered
+  renderBracket();
+  const bracketHtml = document.getElementById('bracket-section')?.innerHTML||'';
+  const modal = document.createElement('div');
+  modal.id = 'bracket-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  modal.innerHTML = '<div style="background:var(--panel);border:2px solid var(--border);width:100%;max-width:900px;max-height:90vh;overflow:auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.625rem .875rem;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--panel)">'
+    +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent3)">🗓 2026 PLAYOFF BRACKET</span>'
+    +"<button onclick=\"closeBracketModal()\" style=\"background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1\">×</button>"
+    +'</div>'
+    +'<div style="padding:.75rem">'+bracketHtml+'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
 function renderBracket(){
   const el = document.getElementById('bracket-section');
   if(!el) return;
@@ -3117,6 +3198,7 @@ async function refreshLiveStats(){
     render();
     updateLiveStatsIndicator();
     rebuildGameTopPlayer(); // Update top player map with fresh live data
+    renderTopLeaderboard(); // Update top leaderboard
     detectFPEvents(); // Trigger portrait animations
     fetchScores(); // Re-render scoreboard portraits with latest live FP leaders
     renderTopPlayersBanner(); // Update ticker with fresh live FP
