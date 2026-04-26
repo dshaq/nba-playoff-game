@@ -1299,7 +1299,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderStandings();renderTopLeaderboard();renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
