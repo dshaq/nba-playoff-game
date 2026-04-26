@@ -627,10 +627,10 @@ async function fetchScores(){
     });
   }
 
-  // Today
+  // Today — use ET timezone
   try{
-    const d = new Date();
-    const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    const etNowF = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const dateStr = `${etNowF.getFullYear()}${String(etNowF.getMonth()+1).padStart(2,'0')}${String(etNowF.getDate()).padStart(2,'0')}`;
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
     const data = await res.json();
     todayGames = parseESPNEvents(data?.events||[], 'today');
@@ -639,8 +639,9 @@ async function fetchScores(){
   // Yesterday — only if no games today
   if(!todayGames.length){
     try{
-      const yd = new Date(); yd.setDate(yd.getDate()-1);
-      const dateStr = `${yd.getFullYear()}${String(yd.getMonth()+1).padStart(2,'0')}${String(yd.getDate()).padStart(2,'0')}`;
+      const etYF = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+      etYF.setDate(etYF.getDate()-1);
+      const dateStr = `${etYF.getFullYear()}${String(etYF.getMonth()+1).padStart(2,'0')}${String(etYF.getDate()).padStart(2,'0')}`;
       const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
       const data = await res.json();
       yGames = parseESPNEvents(data?.events||[], 'yesterday').filter(g=>g.gameStatus===3);
@@ -651,7 +652,7 @@ async function fetchScores(){
   const allGames = [...todayGames, ...yGames].sort((a,b) => gameOrder(a)-gameOrder(b));
 
   if(!allGames.length){
-    document.getElementById('scores-content').innerHTML = `<div class="score-item"><span style="color:var(--text3);font-size:14px">PLAYOFFS START TODAY — FIRST TIP AT 1PM ET 🏀</span></div>`;
+    document.getElementById('scores-content').innerHTML = `<div style="padding:.625rem 1rem;font-size:13px;color:var(--text3)">No games found — check back later</div>`;
     return;
   }
 
@@ -1008,8 +1009,16 @@ function selectManager(id){
   if(document.getElementById('m-mgrs')) document.getElementById('m-mgrs').textContent = S.managers.length;
   document.getElementById('round-sel').value = S.round||1;
   if(document.getElementById('m-round')) document.getElementById('m-round').textContent = 'R'+(S.round||1);
-  document.getElementById('comm-login-bar').classList.remove('hidden');
-  document.getElementById('comm-active-bar').classList.add('hidden');
+  // Auto-commissioner for Dave (id=4)
+  if(id === 4){
+    isCommissioner = true;
+    document.getElementById('comm-active-bar').classList.remove('hidden');
+    document.getElementById('comm-login-bar').classList.add('hidden');
+  } else {
+    isCommissioner = false;
+    document.getElementById('comm-login-bar').classList.remove('hidden');
+    document.getElementById('comm-active-bar').classList.add('hidden');
+  }
   render();
   startPolling();
   fetchScores();
