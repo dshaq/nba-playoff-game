@@ -12,7 +12,7 @@ const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.
 const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
 const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
-const ALL_TABS = ['live-score','standings','manage-names','draft','waiver','rosters','rules','teams'];
+const ALL_TABS = ['my-team','live-score','standings','manage-names','draft','waiver','rosters','rules','teams'];
 const LEAGUE_ID = 'nba-2026';
 
 // 2026 NBA Playoff Teams — BRACKET SET
@@ -1289,7 +1289,12 @@ async function setSurvivedRounds(tid,r){
 
 // ── UI ────────────────────────────────────────────────────────────
 function showTab(name){
-  ALL_TABS.forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden',t!==name));
+  // Handle all known tabs including my-team
+  const allTabIds = [...ALL_TABS, 'my-team'].filter((v,i,a)=>a.indexOf(v)===i);
+  allTabIds.forEach(t=>{
+    const el=document.getElementById('tab-'+t);
+    if(el) el.classList.toggle('hidden',t!==name);
+  });
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active', el.id==='draft-tab' ? name==='draft' : el.getAttribute('onclick')?.includes(`'${name}'`)));
 }
 
