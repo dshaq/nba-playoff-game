@@ -855,8 +855,8 @@ function showMainScreen(){
     const topbarAvatar = document.getElementById('topbar-avatar');
     const topbarName = document.getElementById('topbar-name');
     if(topbarUser && m){
-      if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(currentManagerId,'sm');
-      if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(currentManagerId);
+      // Show name immediately, avatar fills in after logos load
+      if(topbarAvatar){ topbarAvatar.innerHTML=''; topbarAvatar.style.borderColor = getAvatarColor(currentManagerId); }
       if(topbarName) topbarName.textContent = m.name.toUpperCase();
       topbarUser.style.opacity = '1';
       topbarUser.style.pointerEvents = 'auto';
@@ -1041,8 +1041,8 @@ function selectManager(id){
     const topbarAvatar = document.getElementById('topbar-avatar');
     const topbarName = document.getElementById('topbar-name');
     if(topbarUser && m){
-      if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(currentManagerId,'sm');
-      if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(currentManagerId);
+      // Show name immediately, avatar fills in after logos load
+      if(topbarAvatar){ topbarAvatar.innerHTML=''; topbarAvatar.style.borderColor = getAvatarColor(currentManagerId); }
       if(topbarName) topbarName.textContent = m.name.toUpperCase();
       topbarUser.style.opacity = '1';
       topbarUser.style.pointerEvents = 'auto';
@@ -2727,9 +2727,9 @@ function renderTopPlayersBanner(){
 
   // Duplicate items for seamless loop
   const itemsHtml = top5.join('');
-  // Update label
+  // Update label — only show TODAY/YESTERDAY once live stats have loaded
   const _labelEl = document.getElementById('top-players-label');
-  if(_labelEl) _labelEl.textContent = isYesterday ? '📅 YESTERDAY' : '🔥 TODAY';
+  if(_labelEl) _labelEl.textContent = _liveStatsReady ? (isYesterday ? '📅 YESTERDAY' : '🔥 TODAY') : '🔥 TOP SCORERS';
   el.innerHTML = itemsHtml + itemsHtml; // doubled for seamless scroll
 
   // Measure single set width and animate
