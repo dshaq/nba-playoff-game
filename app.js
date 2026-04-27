@@ -2784,7 +2784,7 @@ function renderTopLeaderboard(){
     const liveNames = (S.rosters[m.id]||[]).filter(pid=>isPlayerLive(pid))
       .map(pid=>getPlayer(pid)?.name.split(' ').pop()).filter(Boolean);
 
-    return `<div style="padding:.5rem .75rem;border-bottom:1px solid var(--border2);${isMe?'background:'+aColor+'10;':''}" onclick="showTab('standings')" style="cursor:pointer">
+    return `<div style="padding:.5rem .75rem;border-bottom:1px solid var(--border2);${isMe?'background:'+aColor+'10;':''}cursor:pointer" onclick="openManagerProfile(${m.id})">
       <div style="display:flex;align-items:center;gap:8px">
         <!-- Rank -->
         <div style="min-width:24px;text-align:center;font-size:22px">${medal||('<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--text3)">#'+(i+1)+'</span>')}</div>
@@ -2806,6 +2806,141 @@ function renderTopLeaderboard(){
       </div>
     </div>`;
   }).join('');
+}
+
+
+function openManagerProfile(mid){
+  const existing = document.getElementById('mgr-profile-modal');
+  if(existing){ existing.remove(); return; }
+
+  const m = S.managers.find(x=>x.id===mid);
+  if(!m) return;
+  const aColor = getAvatarColor(mid);
+  const roster = S.rosters[mid]||[];
+  const total = managerTotal(mid);
+  const stat = managerStatScore(mid);
+  const bonus = managerBonusScore(mid);
+
+  // Today FP
+  const etNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const todayStr = [etNow.getFullYear(),String(etNow.getMonth()+1).padStart(2,'0'),String(etNow.getDate()).padStart(2,'0')].join('');
+  const yestDate = new Date(etNow); yestDate.setDate(yestDate.getDate()-1);
+  const yestStr = [yestDate.getFullYear(),String(yestDate.getMonth()+1).padStart(2,'0'),String(yestDate.getDate()).padStart(2,'0')].join('');
+  const tgids = new Set();
+  Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) tgids.add(s.gameId); });
+  Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStr && s.gameId) tgids.add(s.gameId); });
+  if(!tgids.size) Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr && s.gameId) tgids.add(s.gameId); });
+  const todayFP = roster.reduce((sum,pid)=>{
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+pid]||null;
+    let fp=0;
+    Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&tgids.has(s.gameId)).forEach(s=>{if(!acqDate||s.date>=acqDate) fp+=s.fp||0;});
+    const live=livePlayerStats[pid];
+    if(live&&tgids.has(live.gameId)){const saved=Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId);if(!saved) fp+=live.fp||0;}
+    return sum+fp;
+  },0);
+
+  // Best player game
+  const allGames = Object.values(S.playerStats||{}).filter(s=>roster.includes(s.pid)).map(s=>{
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
+    if(acqDate&&s.date<acqDate) return null;
+    return {pid:s.pid,fp:s.fp||0,date:s.date,name:getPlayer(s.pid)?.name||''};
+  }).filter(Boolean);
+  const bestGame = allGames.sort((a,b)=>b.fp-a.fp)[0];
+  const bestGameFmt = bestGame ? new Date(bestGame.date.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
+
+  // Round MVP
+  const mvp = roster.map(pid=>{
+    const p=getPlayer(pid); if(!p) return null;
+    return {pid,name:p.name,fppg:playerFPPG(pid,mid),gp:playerGamesPlayedForManager(pid,mid)};
+  }).filter(x=>x&&x.gp>0).sort((a,b)=>b.fppg-a.fppg)[0];
+
+  // Live players
+  const livePids = roster.filter(pid=>isPlayerLive(pid));
+
+  // Build roster rows
+  const rosterHtml = roster.map(pid=>{
+    const p=getPlayer(pid); if(!p) return '';
+    const t=getTeam(p.team);
+    const tc=TEAM_LOGOS[p.team]?.color||'#4a9eff';
+    const portrait=getActivePortrait(p.name);
+    const isLive=isPlayerLive(pid);
+    const elim=t?.eliminated;
+    const fp=playerStatScore(pid,mid);
+    const fppg=playerFPPG(pid,mid);
+    const acqDate=S.waiverAcquisitions?.[mid+'_'+pid];
+    const espnInj=getESPNInjury(p.name);
+    return '<div onclick="closeManagerProfile();openPlayerModal('+pid+')" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);cursor:pointer;opacity:'+(elim?.5:1)+'">'
+      +'<div style="width:36px;height:36px;overflow:hidden;flex-shrink:0;border:1px solid '+(isLive?'var(--red)':elim?'#333':tc)+';position:relative">'
+      +(portrait?'<img src="'+portrait+'" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>'
+        :'<div style="width:100%;height:100%;background:'+tc+'22;display:flex;align-items:center;justify-content:center;font-size:9px;color:'+tc+'">'+p.team+'</div>')
+      +(isLive?'<div style="position:absolute;top:0;left:0;right:0;background:rgba(255,51,68,.8);text-align:center;font-size:4px;font-family:var(--font-pixel),monospace;color:#fff">LIVE</div>':'')
+      +'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;color:'+(elim?'var(--text3)':'var(--text)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          +p.name
+          +(espnInj&&espnInj.status==='Out'?'<span style="font-family:var(--font-pixel),monospace;font-size:5px;padding:1px 3px;background:var(--red);color:#fff;margin-left:4px">OUT</span>':'')
+          +(acqDate?'<span style="font-size:9px;color:var(--text3);margin-left:4px">pickup</span>':'')
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--text3)">'+(elim?'ELIM · ':'')+p.team+' · '+fppg.toFixed(1)+'/g</div>'
+      +'</div>'
+      +'<div style="font-family:var(--font-pixel),monospace;font-size:9px;color:'+(isLive?'var(--red)':fp>0?'var(--accent2)':'var(--text3)')+';text-align:right">'
+        +(fp>0?'+':'')+fp.toFixed(0)
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'mgr-profile-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+
+  modal.innerHTML = '<div style="background:var(--panel);border:2px solid '+aColor+';width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">'
+    // Header
+    +'<div style="display:flex;align-items:center;gap:10px;padding:.75rem 1rem;border-bottom:2px solid var(--border);flex-shrink:0;background:'+aColor+'18">'
+      +'<div style="width:44px;height:44px;border:2px solid '+aColor+';display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+getAvatar(mid,'sm')+'</div>'
+      +'<div style="flex:1">'
+        +'<div style="font-family:var(--font-pixel),monospace;font-size:11px;color:'+aColor+'">'+m.name.toUpperCase()+'</div>'
+        +'<div style="font-size:11px;color:var(--text3)">'+stat.toFixed(0)+' stat + '+bonus+' bonus</div>'
+      +'</div>'
+      +'<div style="text-align:right">'
+        +'<div style="font-family:var(--font-pixel),monospace;font-size:22px;color:'+aColor+'">'+total+'</div>'
+        +(todayFP!==0?'<div style="font-size:11px;color:'+(todayFP>0?'var(--green)':'var(--red)')+'"">'+(todayFP>0?'+':'')+todayFP.toFixed(0)+' today</div>':'')
+      +'</div>'
+      +"<button onclick=\"closeManagerProfile()\" style=\"background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;margin-left:4px;flex-shrink:0\">×</button>"
+    +'</div>'
+    // Live strip
+    +(livePids.length?'<div style="background:rgba(255,51,68,.08);border-bottom:1px solid #ff334433;padding:5px 1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0">'
+      +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--red)">● LIVE NOW</span>'
+      +livePids.map(pid=>{
+        const p=getPlayer(pid);const live=livePlayerStats[pid];
+        return '<span style="font-size:12px;color:var(--text)">'+p.name.split(' ').pop()+'</span>'
+          +'<span style="font-family:var(--font-pixel),monospace;font-size:7px;color:var(--red)">'+(live?'+'+(live.fp||0).toFixed(0):'')+'</span>';
+      }).join('<span style="color:var(--border2)"> · </span>')
+      +'</div>':'')
+    // Highlights bar
+    +'<div style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0">'
+      +(bestGame?'<div style="flex:1;padding:6px 10px;border-right:1px solid var(--border);text-align:center">'
+        +'<div style="font-size:9px;color:var(--text3)">Best Game</div>'
+        +'<div style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent2)">'+bestGame.fp+' FP</div>'
+        +'<div style="font-size:10px;color:var(--text)">'+bestGame.name.split(' ').pop()+' · '+bestGameFmt+'</div>'
+        +'</div>':'')
+      +(mvp?'<div style="flex:1;padding:6px 10px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--text3)">Round MVP</div>'
+        +'<div style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent2)">'+mvp.fppg.toFixed(1)+'/g</div>'
+        +'<div style="font-size:10px;color:var(--text)">'+mvp.name.split(' ').pop()+'</div>'
+        +'</div>':'')
+    +'</div>'
+    // Roster list
+    +'<div style="overflow-y:auto;padding:.5rem 1rem;flex:1">'
+      +rosterHtml
+    +'</div>'
+    +'</div>';
+
+  document.body.appendChild(modal);
+}
+
+function closeManagerProfile(){
+  document.getElementById('mgr-profile-modal')?.remove();
 }
 
 function closeBracketModal(){ const m=document.getElementById("bracket-modal"); if(m) m.remove(); }
