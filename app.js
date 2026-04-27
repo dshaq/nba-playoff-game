@@ -2819,7 +2819,8 @@ function renderTopLeaderboard(){
 function shouldShowTodayFP(todayFP, isFromYesterday){
   if(!todayFP || todayFP === 0) return false;
   if(!isFromYesterday) return true; // Always show real today FP
-  // Yesterday's FP — only show before noon ET
+  // Yesterday's FP — only show after live stats have loaded (avoids flash) AND before noon ET
+  if(!_liveStatsReady) return false; // Still loading — don't show yesterday yet
   const etNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   return etNow.getHours() < 12;
 }
@@ -3358,7 +3359,8 @@ function espnTeamToOurs(abbr){ return ESPN_TEAM_MAP[abbr]||abbr; }
 
 // Live stats are stored in memory (not Supabase) — refreshed each poll
 // Completed game stats ARE saved to Supabase via playerStats
-let livePlayerStats = {}; // pid -> {fp, pts, reb, ast, stl, blk, fgm, fga, ftm, fta, to, live, gameId}
+let livePlayerStats = {};
+let _liveStatsReady = false; // set after first successful poll // pid -> {fp, pts, reb, ast, stl, blk, fgm, fga, ftm, fta, to, live, gameId}
 let liveStatsLastUpdate = null;
 let liveStatsPolling = null;
 let liveGamesActive = false;
@@ -4527,8 +4529,17 @@ async function boot(){
   fetchInjuryReport();
   // Load player animations
   loadAnimations();
-  // Load custom logos — reload picker after they arrive
-  loadCustomLogos().then(()=>{ render(); if(document.getElementById('manager-picker') && !document.getElementById('manager-picker').classList.contains('hidden')) showManagerPicker(); });
+  // Load custom logos — then re-render and update topbar avatar
+  loadCustomLogos().then(()=>{
+    render();
+    // Update topbar avatar now that custom logos are available
+    if(currentManagerId !== null && currentManagerId !== 'viewer'){
+      const topbarAvatar = document.getElementById('topbar-avatar');
+      if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(currentManagerId,'sm');
+      if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(currentManagerId);
+    }
+    if(document.getElementById('manager-picker') && !document.getElementById('manager-picker').classList.contains('hidden')) showManagerPicker();
+  });
   setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
