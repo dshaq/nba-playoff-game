@@ -1240,9 +1240,16 @@ async function addFromWaiver(pid,mid){
 async function markInjured(mid,pid){
   // Allow manager of that roster OR commissioner
   if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE MARKED INJURED');return;}
+  const p = getPlayer(pid);
+  const m = S.managers.find(x=>x.id===mid);
+  if(!confirm(`Mark ${p?.name||pid} as OUT?
+
+This opens a waiver slot so you can claim a replacement.`)) return;
   if(!(S.injured[mid]||[]).includes(pid)){if(!S.injured[mid])S.injured[mid]=[];S.injured[mid].push(pid);}
   await saveState();
   render();
+  showToast(`${p?.name} marked OUT — waiver slot opened`, 'warn');
+  await saveInjuryNotification(m?.name||'Unknown', p?.name||'Unknown');
 }
 async function clearInjury(mid,pid){
   if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE CLEARED');return;}
@@ -1584,7 +1591,7 @@ function renderMyTeam(){
             const espnInj = getESPNInjury(p.name);
             const injBadge = espnInj ? `<span style="font-family:'Press Start 2P',monospace;font-size:6px;padding:1px 3px;background:${espnInj.status==='Out'?'var(--red)':'#ff9900'};color:#000;margin-right:2px">${espnInj.status==='Out'?'OUT':'DTD'}</span>` : '';
             const claimBtn = isAvailable && hasSlot && !alreadyClaimed
-              ? `<button onclick="event.stopPropagation();submitWaiverClaim(${pid},${mid})" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:3px 6px;background:rgba(0,180,255,.15);border:1px solid var(--accent);color:var(--accent);cursor:pointer">CLAIM</button>`
+              ? `<button onclick="event.stopPropagation();submitClaim(${pid},${mid})" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:3px 6px;background:rgba(0,180,255,.15);border:1px solid var(--accent);color:var(--accent);cursor:pointer">CLAIM</button>`
               : alreadyClaimed
                 ? `<span style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent3)">CLAIMED</span>`
                 : isAvailable && !hasSlot
@@ -2138,10 +2145,12 @@ function renderRosters(){
                 const latestTeamGame = sortedTeamGames[sortedTeamGames.length-1];
                 const missedGame = [...teamGameIds].some(gid=>!playerGameIds.has(gid));
                 const playedLatest = latestTeamGame && playerGameIds.has(latestTeamGame);
-                const eligible = isESPNOut; // only for ESPN Out — missed game check removed per new rules
+                // Show DROP if: ESPN says Out, OR player already marked injured
+                const alreadyMarked = (S.injured[m.id]||[]).includes(p.id);
+                const eligible = isESPNOut || alreadyMarked;
                 if(!eligible) return '';
-                const btnLabel = 'DROP';
-                return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff9900;border:none;cursor:pointer;color:#000;font-family:'Press Start 2P',monospace" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">${btnLabel}</button></div>`;
+                if(alreadyMarked) return ''; // Already marked, show ✓ OK button instead
+                return `<div style="display:flex;gap:2px;margin-top:2px"><button style="flex:1;font-size:5px;padding:2px;background:#ff3344;border:none;cursor:pointer;color:#fff;font-family:'Press Start 2P',monospace;font-weight:bold" onclick="event.stopPropagation();markInjured(${m.id},${p.id})">DROP</button></div>`;
               })()}
             </div>
           </div>`;
