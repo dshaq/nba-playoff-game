@@ -846,6 +846,22 @@ function showMainScreen(){
     document.getElementById('comm-active-bar').classList.add('hidden');
   }
   render();
+  // Default to My Team tab if logged in as a real manager
+  if(currentManagerId !== null && currentManagerId !== 'viewer'){
+    showTab('my-team');
+    // Update topbar user identity
+    const m = S.managers.find(x=>x.id===currentManagerId);
+    const topbarUser = document.getElementById('topbar-user');
+    const topbarAvatar = document.getElementById('topbar-avatar');
+    const topbarName = document.getElementById('topbar-name');
+    if(topbarUser && m){
+      if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(currentManagerId,'sm');
+      if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(currentManagerId);
+      if(topbarName) topbarName.textContent = m.name.toUpperCase();
+      topbarUser.style.opacity = '1';
+      topbarUser.style.pointerEvents = 'auto';
+    }
+  }
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
@@ -859,7 +875,7 @@ const MANAGER_PINS = {0:'3186',1:'9044',2:'7612',3:'4837',4:'5501',5:'0295'};
 
 function backToCharacterSelect(){
   currentManagerId = null;
-  try{ sessionStorage.removeItem('nba_mgr_2026'); }catch(e){}
+  try{ localStorage.removeItem('nba_mgr_2026'); }catch(e){}
   document.getElementById('main-screen').classList.add('hidden');
   showManagerPicker();
 }
@@ -983,7 +999,7 @@ function pinSubmit(){
 
 function selectManager(id){
   currentManagerId = id;
-  try{ sessionStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
+  try{ localStorage.setItem('nba_mgr_2026', String(id)); }catch(e){}
   document.getElementById('manager-picker').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
   // Show topbar user identity
@@ -1016,6 +1032,22 @@ function selectManager(id){
     document.getElementById('comm-active-bar').classList.add('hidden');
   }
   render();
+  // Default to My Team tab if logged in as a real manager
+  if(currentManagerId !== null && currentManagerId !== 'viewer'){
+    showTab('my-team');
+    // Update topbar user identity
+    const m = S.managers.find(x=>x.id===currentManagerId);
+    const topbarUser = document.getElementById('topbar-user');
+    const topbarAvatar = document.getElementById('topbar-avatar');
+    const topbarName = document.getElementById('topbar-name');
+    if(topbarUser && m){
+      if(topbarAvatar) topbarAvatar.innerHTML = getAvatar(currentManagerId,'sm');
+      if(topbarAvatar) topbarAvatar.style.borderColor = getAvatarColor(currentManagerId);
+      if(topbarName) topbarName.textContent = m.name.toUpperCase();
+      topbarUser.style.opacity = '1';
+      topbarUser.style.pointerEvents = 'auto';
+    }
+  }
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
@@ -4337,7 +4369,7 @@ async function backfillMissingStats(){
 }
 async function boot(){
   initSupabase();
-  try{ const s=sessionStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
+  try{ const s=localStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
   const hasState=await loadState();
   // Backfill any missing playoff game stats in background
   backfillMissingStats();
