@@ -508,7 +508,7 @@ function managerStatScore(mid){
 }
 function managerBonusScore(mid){return S.rosters[mid].reduce((s,pid)=>s+bonusForPlayer(pid,mid),0);}
 function managerTotal(mid){return +(managerStatScore(mid)+managerBonusScore(mid)).toFixed(1);}
-function waiverSlotsForManager(mid){return S.rosters[mid].filter(pid=>getTeam(getPlayer(pid).team).eliminated).length+(S.injured[mid]||[]).length;}
+function waiverSlotsForManager(mid){return (S.rosters[mid]||[]).filter(pid=>{const p=getPlayer(pid);return p&&getTeam(p.team)?.eliminated;}).length+(S.injured[mid]||[]).length;}
 function waiverSlotsOpen(mid){return Math.max(0,waiverSlotsForManager(mid)-(S.waiverAdds[mid]||0));}
 
 // ── Token system ──────────────────────────────────────────────────
@@ -1290,7 +1290,22 @@ function showToast(msg, type='info'){
 }
 async function toggleElim(tid){
   if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
-  const t=S.teams.find(x=>x.id===tid); t.eliminated=!t.eliminated;
+  const t=S.teams.find(x=>x.id===tid);
+  t.eliminated=!t.eliminated;
+  if(t.eliminated){
+    // Find managers with players on this team
+    const affected = S.managers.filter(m=>
+      (S.rosters[m.id]||[]).some(pid=>getPlayer(pid)?.team===tid)
+    ).map(m=>m.name);
+    // Post a chat message notifying everyone
+    const msg = `🚨 ${t.name} ELIMINATED — waiver slots now open for: ${affected.length?affected.join(', '):'no drafted players'}`;
+    try{
+      const chatState = await loadChatState();
+      chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,text:msg,ts:new Date().toISOString()});
+      await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
+    }catch(e){}
+    showToast(t.name+' eliminated! Waiver slots opened.','warn');
+  }
   await saveState();render();
 }
 async function setSurvivedRounds(tid,r){
@@ -1834,7 +1849,8 @@ function renderDraft(){
 }
 
 function renderWaiver(){
-  const elimNames=S.teams.filter(t=>t.eliminated).map(t=>t.name).join(', ');
+  const elimTeams=S.teams.filter(t=>t.eliminated);
+  const elimNames=elimTeams.map(t=>t.name).join(', ');
   const slots=S.managers.map(m=>({m,open:waiverSlotsOpen(m.id)})).filter(x=>x.open>0);
   const claimsArr=S.waiverClaims||[];
   const pendingCount=claimsArr.length;
@@ -1846,7 +1862,7 @@ function renderWaiver(){
 
   // ── Header ──
   let headerHtml='';
-  if(!elimNames){
+  if(!elimNames.length){
     headerHtml=`<div class="notice">NO TEAMS ELIMINATED YET. WAIVERS OPEN ONCE A TEAM IS OUT OR A PLAYER IS INJURED.</div>`;
   } else {
   
@@ -1858,8 +1874,17 @@ function renderWaiver(){
       return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px"><strong>${m.name}</strong>: ${coins}${tkns>5?`<span class="token-count">×${tkns}</span>`:''}`;
     }).filter(Boolean).join(' ');
 
+    // Show which managers have open slots from eliminated players
+    const affectedMgrs = S.managers.filter(m=>
+      (S.rosters[m.id]||[]).some(pid=>{const p=getPlayer(pid);return p&&getTeam(p.team)?.eliminated;})
+    );
+    const openSlotMgrs = affectedMgrs.filter(m=>waiverSlotsOpen(m.id)>0);
+    const needsDropMgrs = affectedMgrs.filter(m=>waiverSlotsOpen(m.id)===0&&waiverSlotsForManager(m.id)>0);
+
     headerHtml=`<div class="info-box" style="margin-bottom:.75rem">
-      <div style="margin-bottom:6px">ELIMINATED TEAMS: <strong>${elimNames}</strong></div>
+      <div style="margin-bottom:6px">🚨 ELIMINATED: <strong>${elimNames}</strong></div>
+      ${openSlotMgrs.length?`<div style="margin-bottom:4px;color:var(--green);font-size:13px">✓ Ready to claim: ${openSlotMgrs.map(m=>m.name).join(', ')}</div>`:''}
+      ${needsDropMgrs.length?`<div style="margin-bottom:4px;color:#ff9900;font-size:13px">⚠ Must drop first (go to Rosters): ${needsDropMgrs.map(m=>m.name).join(', ')}</div>`:''}
       ${tokenDisplay?`<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px">🏀 TOKENS: ${tokenDisplay}</div>`:''}
       <div>PENDING CLAIMS: ${pendingCount>0?`<strong style="color:var(--accent2)">${pendingCount} claim${pendingCount>1?'s':''} queued</strong>`:'none yet'}</div>
     </div>`;
