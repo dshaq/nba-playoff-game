@@ -1077,6 +1077,7 @@ function managerAllClaims(mid){
 }
 
 async function submitClaim(pid,mid){
+  if(!isCommissioner && currentManagerId !== mid){showToast('You can only submit claims for your own team','error');return;}
   if(waiverSlotsOpen(mid)<=0){alert('YOU HAVE NO OPEN WAIVER SLOTS');return;}
   // Check how many claims this manager already has vs how many slots they have
   const existingClaims = managerClaimsCount(mid);
@@ -1634,6 +1635,7 @@ function renderMyTeam(){
 
 
 async function editMyTeamName(mid){
+  if(!isCommissioner && currentManagerId !== mid){showToast('You can only edit your own name','error');return;}
   const m = S.managers.find(x=>x.id===mid);
   if(!m) return;
   const newName = prompt('Enter your team name:', m.name);
@@ -1649,6 +1651,7 @@ async function editMyTeamName(mid){
 
 async function addToWatchlist(mid, pid){
   if(mid===null||mid==='viewer') return;
+  if(!isCommissioner && currentManagerId !== mid){showToast('You can only edit your own watchlist','error');return;}
   if(!S.watchlist) S.watchlist={};
   if(!S.watchlist[mid]) S.watchlist[mid]=[];
   if(S.watchlist[mid].includes(pid)){ showToast('Already on watchlist','info'); return; }
@@ -1659,6 +1662,7 @@ async function addToWatchlist(mid, pid){
 }
 
 async function removeFromWatchlist(mid, pid){
+  if(!isCommissioner && currentManagerId !== mid){showToast('You can only edit your own watchlist','error');return;}
   if(!S.watchlist?.[mid]) return;
   S.watchlist[mid]=S.watchlist[mid].filter(p=>p!==pid);
   await saveState();

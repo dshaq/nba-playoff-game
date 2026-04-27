@@ -1161,6 +1161,10 @@ let pendingAvatarMgr = null;
 let pendingAvatarIdx = null;
 
 function openAvatarModal(mid){
+  if(!isCommissioner && currentManagerId !== mid){
+    if(typeof showToast !== 'undefined') showToast('You can only change your own icon','error');
+    return;
+  }
   pendingAvatarMgr = mid;
   pendingAvatarIdx = (S.avatars && S.avatars[mid] !== undefined) ? S.avatars[mid] : (mid % AVATAR_THEMES.length);
   const grid = document.getElementById('avatar-grid');
@@ -1193,6 +1197,10 @@ function selectAvatarChoice(i){
 function closeAvatarModal(){ document.getElementById('avatar-modal').classList.add('hidden'); }
 
 async function saveAvatar(){
+  if(!isCommissioner && currentManagerId !== pendingAvatarMgr){
+    if(typeof showToast !== 'undefined') showToast('You can only change your own icon','error');
+    closeAvatarModal(); return;
+  }
   if(!S.avatars) S.avatars={};
   S.avatars[pendingAvatarMgr] = pendingAvatarIdx;
   closeAvatarModal();
