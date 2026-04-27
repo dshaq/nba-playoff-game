@@ -1576,11 +1576,31 @@ function renderMyTeam(){
             const tc=TEAM_LOGOS[p.team]?.color||'#4a9eff';
             const portrait=getActivePortrait(p.name);
             const fp=playerStatScore(pid);
+            // Check if player is claimable
+            const allRostered = new Set(Object.values(S.rosters||{}).flat());
+            const isAvailable = !allRostered.has(pid);
+            const hasSlot = waiverSlotsOpen(mid) > 0;
+            const alreadyClaimed = (S.waiverClaims||[]).some(c=>c.pid===pid&&c.managerId===mid);
+            const espnInj = getESPNInjury(p.name);
+            const injBadge = espnInj ? `<span style="font-family:'Press Start 2P',monospace;font-size:6px;padding:1px 3px;background:${espnInj.status==='Out'?'var(--red)':'#ff9900'};color:#000;margin-right:2px">${espnInj.status==='Out'?'OUT':'DTD'}</span>` : '';
+            const claimBtn = isAvailable && hasSlot && !alreadyClaimed
+              ? `<button onclick="event.stopPropagation();submitWaiverClaim(${pid},${mid})" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:3px 6px;background:rgba(0,180,255,.15);border:1px solid var(--accent);color:var(--accent);cursor:pointer">CLAIM</button>`
+              : alreadyClaimed
+                ? `<span style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent3)">CLAIMED</span>`
+                : isAvailable && !hasSlot
+                  ? `<span style="font-size:10px;color:var(--text3)">NO SLOT</span>`
+                  : '';
             return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2)">
               ${portrait?`<img src="${portrait}" style="width:28px;height:28px;object-fit:cover;object-position:center top;border:1px solid ${tc};image-rendering:pixelated"/>`:``}
-              <span style="font-size:13px;color:var(--text);flex:1">${p.name}</span>
-              <span style="font-size:11px;color:var(--text3)">${p.team}</span>
-              <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent2)">${fp>0?'+':''}${fp.toFixed(0)}</span>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="font-size:13px;color:${isAvailable?'var(--text)':'var(--text3)'}">${p.name}</span>
+                  ${injBadge}
+                  ${!isAvailable?'<span style="font-size:10px;color:var(--text3)">(rostered)</span>':''}
+                </div>
+                <div style="font-size:10px;color:var(--text3)">${p.team} · ${fp>0?'+':''}${fp.toFixed(0)} FP · ${playerFPPG(pid).toFixed(1)}/g</div>
+              </div>
+              ${claimBtn}
               <button onclick="event.stopPropagation();removeFromWatchlist(${mid},${pid})" style="background:none;border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 5px;cursor:pointer">✕</button>
             </div>`;
           }).join('')
