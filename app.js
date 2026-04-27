@@ -2717,7 +2717,9 @@ function renderTopPlayersBanner(){
     }).filter(Boolean);
 
   if(!top5.length){
-    el.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--text3)">No games yet today</div>';
+    const labelEl = document.getElementById('top-players-label');
+  if(labelEl) labelEl.textContent = isYesterday ? '📅 YESTERDAY' : '🔥 TODAY';
+  el.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--text3)">No games yet today</div>';
     el.style.animation = 'none';
     el.style.transform = '';
     return;
@@ -2725,6 +2727,9 @@ function renderTopPlayersBanner(){
 
   // Duplicate items for seamless loop
   const itemsHtml = top5.join('');
+  // Update label
+  const _labelEl = document.getElementById('top-players-label');
+  if(_labelEl) _labelEl.textContent = isYesterday ? '📅 YESTERDAY' : '🔥 TODAY';
   el.innerHTML = itemsHtml + itemsHtml; // doubled for seamless scroll
 
   // Measure single set width and animate
@@ -2770,7 +2775,8 @@ function renderTopLeaderboard(){
     const tgids = new Set();
     Object.values(livePlayerStats||{}).forEach(s=>{ if(s.gameId) tgids.add(s.gameId); });
     Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===todayStr2 && s.gameId) tgids.add(s.gameId); });
-    if(!tgids.size) Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr2 && s.gameId) tgids.add(s.gameId); });
+    let _isYestLB = false;
+    if(!tgids.size){ Object.values(S.playerStats||{}).forEach(s=>{ if(s.date===yestStr2 && s.gameId) tgids.add(s.gameId); }); _isYestLB = tgids.size>0; }
     const todayFP2 = (S.rosters[m.id]||[]).reduce((sum,pid)=>{
       const acqDate=S.waiverAcquisitions?.[m.id+'_'+pid]||null;
       let fp=0;
@@ -2796,7 +2802,7 @@ function renderTopLeaderboard(){
           ${liveNames.length?`<div style="font-size:10px;color:var(--red)">● ${liveNames.join(', ')}</div>`:''}
         </div>
         <!-- Today -->
-        ${todayFP2!==0?`<div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${todayFP2>0?'var(--green)':'var(--red)'};white-space:nowrap">${todayFP2>0?'+':''}${todayFP2.toFixed(0)}</div>`:''}
+        ${shouldShowTodayFP(todayFP2,_isYestLB)?`<div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${todayFP2>0?'var(--green)':'var(--red)'};white-space:nowrap">${todayFP2>0?'+':''}${todayFP2.toFixed(0)}</div>`:''}
         <!-- Total -->
         <div style="font-family:'Press Start 2P',monospace;font-size:${i===0?'18':'14'}px;color:${aColor};min-width:50px;text-align:right">${total}</div>
       </div>
@@ -2808,6 +2814,15 @@ function renderTopLeaderboard(){
   }).join('');
 }
 
+
+
+function shouldShowTodayFP(todayFP, isFromYesterday){
+  if(!todayFP || todayFP === 0) return false;
+  if(!isFromYesterday) return true; // Always show real today FP
+  // Yesterday's FP — only show before noon ET
+  const etNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  return etNow.getHours() < 12;
+}
 
 function openManagerProfile(mid){
   const existing = document.getElementById('mgr-profile-modal');
