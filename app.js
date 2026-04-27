@@ -1425,6 +1425,8 @@ function renderMyTeam(){
   });
   const roundFP = {1:0,2:0,3:0,4:0};
   Object.entries(roundDates).forEach(([r,fps])=>roundFP[r]=fps.reduce((a,b)=>a+b,0));
+  // Add droppedFP to R1 (dropped players like KD earned those points in R1)
+  roundFP[1] = +(roundFP[1] + ((S.droppedFP&&S.droppedFP[mid])||0)).toFixed(1);
 
   // ── Best game day ──
   const dayTotals = {};
@@ -2889,7 +2891,7 @@ function renderBracket(){
 const CHAT_REACTIONS = ['🔥','💀','👀','🏀','😂'];
 let chatOpen = false;
 let chatPollingInterval = null;
-let lastChatCount = 0;
+let lastChatCount = -1; // -1 = uninitialized, set on first poll
 
 function toggleChat(){
   chatOpen = !chatOpen;
@@ -2980,15 +2982,19 @@ async function saveChatState(msgs){
 
 async function pollChat(){
   const msgs = await loadChatState();
+  if(lastChatCount === -1){
+    // First poll — initialize silently, no blink
+    lastChatCount = msgs.length;
+    if(chatOpen) renderChatMessages(msgs);
+    return;
+  }
   if(chatOpen){
-    // Chat is open — update messages and clear new-message indicator
     if(msgs.length !== lastChatCount){
       lastChatCount = msgs.length;
       renderChatMessages(msgs);
     }
     clearNewMessageIndicator();
   } else {
-    // Chat is closed — check for new messages and blink if so
     if(msgs.length > lastChatCount){
       showNewMessageIndicator();
     }
@@ -3025,11 +3031,13 @@ function renderChatMessages(msgs){
     return;
   }
   list.innerHTML = msgs.map(e=>{
-    // Always use current avatar for known managers, fall back to stored avatarIdx
+    // Always use current avatar for known managers
     const mid = e.managerId;
     const currentIdx = (S && S.avatars && mid !== null && mid !== 'viewer' && S.avatars[mid] !== undefined)
       ? S.avatars[mid] : (e.avatarIdx || 0);
-    const t = AVATAR_THEMES[currentIdx] || AVATAR_THEMES[0];
+    const av = getAvatarByIndex(currentIdx);
+    const t = av.type==='ball' ? av.theme : AVATAR_THEMES[0];
+    const aColor = av.type==='custom' ? (av.logo.color||'#4a9eff') : t.c1;
     const time = new Date(e.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     const myUid = String(currentManagerId);
     const reactionHtml = CHAT_REACTIONS.map(emoji=>{
@@ -3046,10 +3054,12 @@ function renderChatMessages(msgs){
     const canDelete = isCommissioner;
     return `<div style="padding:10px 0;border-bottom:1px solid rgba(26,74,122,.4)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <div style="width:24px;height:24px;border:2px solid ${t.c1};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">
-          ${makeBallSVG(t,22)}
+        <div style="width:24px;height:24px;border:2px solid ${aColor};flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">
+          ${av.type==='custom'
+            ? `<img src="${av.logo.dataUri}" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated"/>`
+            : makeBallSVG(t,22)}
         </div>
-        <span style="font-size:14px;color:${t.c1};font-family:'Press Start 2P',monospace;font-size:7px">${e.name}</span>
+        <span style="font-size:14px;color:${aColor};font-family:'Press Start 2P',monospace;font-size:7px">${e.name}</span>
         <span style="font-size:12px;color:var(--text3);margin-left:auto">${time}</span>
         ${canDelete?`<button onclick="deleteChat('${e.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 4px" title="Delete">✕</button>`:''}
       </div>
