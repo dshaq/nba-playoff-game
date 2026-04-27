@@ -1418,7 +1418,7 @@ function renderMyTeam(){
     const t=getTeam(p.team); if(!t) return;
     // approximate round by game date vs round start dates
     const d=parseInt(s.date||0);
-    const r = d>=20260510?4:d>=20260501?3:d>=20260426?2:1;
+    const r = d>=20260604?4:d>=20260519?3:d>=20260505?2:1;
     if(!roundDates[r]) roundDates[r]=[];
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(!acqDate||s.date>=acqDate) roundDates[r].push(s.fp||0);
@@ -2201,7 +2201,11 @@ function renderScoring(){
     }
   }
 
-  const sortedMgrs = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  // Put current manager first, then sort rest by total
+  const _allSorted = [...S.managers].sort((a,b)=>managerTotal(b.id)-managerTotal(a.id));
+  const sortedMgrs = currentManagerId !== null && currentManagerId !== 'viewer'
+    ? [S.managers.find(m=>m.id===currentManagerId), ..._allSorted.filter(m=>m.id!==currentManagerId)].filter(Boolean)
+    : _allSorted;
   document.getElementById('scoring-breakdown').innerHTML=sortedMgrs.map(m=>{
     const players=S.rosters[m.id].map(pid=>getPlayer(pid)).filter(Boolean).sort((a,b)=>playerStatScore(b.id)-playerStatScore(a.id));
     const aColor=getAvatarColor(m.id);
