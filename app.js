@@ -2409,10 +2409,30 @@ function renderTeams(){
   });
 
   // Team selector chips
-  const chipHtml = TEAMS.map(t=>{
+  const showAvailable = window._showAvailableOnly || false;
+
+  // Count available players
+  const allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
+  const availableCount = PLAYERS.filter(p=>!allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)).length;
+
+  const availChip = `<button onclick="window._showAvailableOnly=!window._showAvailableOnly;window._teamGalleryFilter=null;renderTeams()" style="
+    padding:4px 10px;border:2px solid ${showAvailable?'var(--green)':'var(--border)'};
+    background:${showAvailable?'rgba(0,255,136,.15)':'transparent'};
+    color:${showAvailable?'var(--green)':'var(--text3)'};
+    font-family:'VT323',monospace;font-size:14px;cursor:pointer;font-weight:${showAvailable?'bold':'normal'}
+  ">🟢 AVAILABLE (${availableCount})</button>`;
+
+  const allChip = `<button onclick="window._showAvailableOnly=false;window._teamGalleryFilter=null;renderTeams()" style="
+    padding:4px 10px;border:2px solid ${!teamFilter&&!showAvailable?'var(--accent2)':'var(--border)'};
+    background:${!teamFilter&&!showAvailable?'rgba(255,204,0,.1)':'transparent'};
+    color:${!teamFilter&&!showAvailable?'var(--accent2)':'var(--text3)'};
+    font-family:'VT323',monospace;font-size:14px;cursor:pointer;
+  ">ALL</button>`;
+
+  const chipHtml = allChip + availChip + TEAMS.map(t=>{
     const tc = (TEAM_LOGOS[t.id]?.color)||'#4a9eff';
-    const active = teamFilter===t.id;
-    return `<button onclick="setTeamGalleryFilter('${t.id}')" style="
+    const active = teamFilter===t.id && !showAvailable;
+    return `<button onclick="window._showAvailableOnly=false;setTeamGalleryFilter('${t.id}')" style="
       padding:4px 10px;border:2px solid ${active?tc:'var(--border)'};
       background:${active?tc+'22':'transparent'};color:${active?tc:'var(--text3)'};
       font-family:'VT323',monospace;font-size:14px;cursor:pointer;
@@ -2421,9 +2441,12 @@ function renderTeams(){
   }).join('');
 
   // Players to show
-  const playersToShow = teamFilter
-    ? PLAYERS.filter(p=>p.team===teamFilter)
-    : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team));
+  const _allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
+  const playersToShow = showAvailable
+    ? PLAYERS.filter(p=>!_allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team))
+    : teamFilter
+      ? PLAYERS.filter(p=>p.team===teamFilter)
+      : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team));
 
   // Sort
   const sorted = [...playersToShow].sort((a,b)=>{
@@ -2480,7 +2503,11 @@ function renderTeams(){
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
           ${injuryBadgeHtml(p.name,true)}
-          ${currentManagerId!==null&&currentManagerId!=='viewer'?`<span onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" title="Add to watchlist" style="cursor:pointer;font-size:10px;margin-left:3px;opacity:.6" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">👁</span>`:''}
+          ${currentManagerId!==null&&currentManagerId!=='viewer'
+            ? (showAvailable
+              ? `<button onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 4px;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);cursor:pointer;margin-left:4px">+ WATCH</button>`
+              : `<span onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" title="Add to watchlist" style="cursor:pointer;font-size:10px;margin-left:3px;opacity:.6" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">👁</span>`)
+            : ''}
         <div style="text-align:right">
           <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
             ${fppg>0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
