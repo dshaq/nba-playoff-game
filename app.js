@@ -2557,7 +2557,7 @@ function renderTeams(){
 
   // Count available players
   const allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
-  const availableCount = PLAYERS.filter(p=>!allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)).length;
+  const availableCount = PLAYERS.filter(p=>!allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)&&!getTeam(p.team)?.eliminated).length;
 
   const availChip = `<button onclick="window._showAvailableOnly=!window._showAvailableOnly;window._teamGalleryFilter=null;renderTeams()" style="
     padding:4px 10px;border:2px solid ${showAvailable?'var(--green)':'var(--border)'};
@@ -2587,7 +2587,7 @@ function renderTeams(){
   // Players to show
   const _allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
   const playersToShow = showAvailable
-    ? PLAYERS.filter(p=>!_allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team))
+    ? PLAYERS.filter(p=>!_allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)&&!getTeam(p.team)?.eliminated)
     : teamFilter
       ? PLAYERS.filter(p=>p.team===teamFilter)
       : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team));
@@ -2647,11 +2647,14 @@ function renderTeams(){
       <div style="padding:3px 5px 4px;background:#041428;border-top:1px solid ${tc}40;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:var(--text3)">${p.team}</span>
           ${injuryBadgeHtml(p.name,true)}
-          ${currentManagerId!==null&&currentManagerId!=='viewer'
-            ? (showAvailable
+          ${(()=>{
+            const _elim = getTeam(p.team)?.eliminated;
+            if(_elim) return `<span style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 4px;background:#33333388;border:1px solid #555;color:#666;margin-left:4px;cursor:default">ELIM</span>`;
+            if(currentManagerId===null||currentManagerId==='viewer') return '';
+            return showAvailable
               ? `<button onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 4px;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);cursor:pointer;margin-left:4px">+ WATCH</button>`
-              : `<span onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" title="Add to watchlist" style="cursor:pointer;font-size:10px;margin-left:3px;opacity:.6" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">👁</span>`)
-            : ''}
+              : `<span onclick="event.stopPropagation();addToWatchlist(currentManagerId,${p.id})" title="Add to watchlist" style="cursor:pointer;font-size:10px;margin-left:3px;opacity:.6" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">👁</span>`;
+          })()}
         <div style="text-align:right">
           <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isLive?'var(--red)':statScore!==0?'var(--accent2)':'var(--text3)'}">
             ${fppg>0||isLive?`${fppg>0?'+':''}${fppg.toFixed(1)}`:'—'}
