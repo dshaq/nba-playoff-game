@@ -508,8 +508,57 @@ function managerStatScore(mid){
 }
 function managerBonusScore(mid){return S.rosters[mid].reduce((s,pid)=>s+bonusForPlayer(pid,mid),0);}
 function managerTotal(mid){return +(managerStatScore(mid)+managerBonusScore(mid)).toFixed(1);}
-function waiverSlotsForManager(mid){return (S.rosters[mid]||[]).filter(pid=>{const p=getPlayer(pid);return p&&getTeam(p.team)?.eliminated;}).length+(S.injured[mid]||[]).length;}
-function waiverSlotsOpen(mid){return Math.max(0,waiverSlotsForManager(mid)-(S.waiverAdds[mid]||0));}
+// ── Waiver Slot System (per-source tracking) ─────────────────────
+// Each eliminated/injured player creates exactly one slot for that manager
+// Slots are tracked individually so they can't bleed into each other
+
+function getWaiverSlots(mid){
+  const slots = [];
+  const usage = S.waiverSlotUsage||{};
+
+  // Slots from eliminated players currently on roster
+  (S.rosters[mid]||[]).forEach(pid=>{
+    const p=getPlayer(pid); if(!p) return;
+    if(getTeam(p.team)?.eliminated){
+      const key='elim_'+pid;
+      slots.push({key, type:'elim', pid, playerName:p.name, usedByPid:usage[mid+'_'+key]||null});
+    }
+  });
+
+  // Slots from injured players (marked by manager, still on roster)
+  (S.injured[mid]||[]).forEach(pid=>{
+    if(!(S.rosters[mid]||[]).includes(pid)) return; // dropped player — slot handled as legacy
+    const p=getPlayer(pid); if(!p) return;
+    const key='inj_'+pid;
+    slots.push({key, type:'inj', pid, playerName:p.name, usedByPid:usage[mid+'_'+key]||null});
+  });
+
+  // Legacy slots (from dropped players, pre-migration waiverAdds)
+  // Count legacy_* usage entries as pre-used closed slots
+  const legacyUsed = Object.keys(usage).filter(k=>k.startsWith(mid+'_legacy_')).length;
+  // Remaining old waiverAdds (fallback for any not yet migrated)
+  const oldAdds = S.waiverAdds?.[mid]||0;
+  // These are already-spent slots that no longer have a source player to show
+  // They don't add open slots — they just mean slots were already used
+  // (No need to add them since they don't affect open count)
+
+  return slots;
+}
+
+function waiverSlotsForManager(mid){ return getWaiverSlots(mid).length; }
+function waiverSlotsOpen(mid){ return getWaiverSlots(mid).filter(s=>!s.usedByPid).length; }
+function getOpenSlot(mid){
+  // Returns the first open slot key, or null
+  const open = getWaiverSlots(mid).find(s=>!s.usedByPid);
+  return open ? open.key : null;
+}
+function useSlot(mid, slotKey, claimedPid){
+  if(!S.waiverSlotUsage) S.waiverSlotUsage={};
+  S.waiverSlotUsage[mid+'_'+slotKey] = claimedPid;
+}
+function tokensSpent(mid){ return getWaiverSlots(mid).filter(s=>s.usedByPid).length; }
+
+
 
 // ── Token system ──────────────────────────────────────────────────
 // Managers earn 1 token per player whose team was eliminated. Tokens spent on waivers.
@@ -519,7 +568,6 @@ function tokensEarned(mid){
     return getTeam(p.team)?.eliminated;
   }).length + ((S.injured[mid]||[]).length);
 }
-function tokensSpent(mid){ return S.waiverAdds[mid]||0; }
 function tokensAvailable(mid){ return Math.max(0, tokensEarned(mid)-tokensSpent(mid)); }
 function draftedIds(){return Object.values(S.rosters).flat();}
 function availablePlayers(){
@@ -1198,7 +1246,10 @@ async function processWaiverClaims(){
 
       // Claim succeeds — add new player, remove dropped player
       S.rosters[mid].push(claim.pid);
-      S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+      // Use the open slot (per-source tracking)
+      const openSlotKey = getOpenSlot(mid);
+      if(openSlotKey) useSlot(mid, openSlotKey, claim.pid);
+      else S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1; // fallback
       // Record acquisition date so we only count stats earned AFTER pickup
       if(!S.waiverAcquisitions) S.waiverAcquisitions={};
       const acqDate = new Date().toISOString().split('T')[0].replace(/-/g,'');
@@ -1265,7 +1316,10 @@ async function processWaiverClaims(){
 
 async function addFromWaiver(pid,mid){
   if(waiverSlotsOpen(mid)<=0){alert(`${S.managers[mid].name} HAS NO OPEN WAIVER SLOTS`);return;}
-  S.rosters[mid].push(pid); S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
+  S.rosters[mid].push(pid);
+  const _openKey = getOpenSlot(mid);
+  if(_openKey) useSlot(mid, _openKey, pid);
+  else S.waiverAdds[mid]=(S.waiverAdds[mid]||0)+1;
   if(!S.waiverAcquisitions) S.waiverAcquisitions={};
   S.waiverAcquisitions[mid+'_'+pid] = S.round||1;
   await saveState(); render();
