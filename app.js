@@ -12,7 +12,7 @@ const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.
 const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
 const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
-const ALL_TABS = ['my-team','live-score','standings','manage-names','draft','waiver','rosters','rules','teams'];
+const ALL_TABS = ['my-team','live-score','boss','standings','manage-names','draft','waiver','rosters','rules','teams'];
 const LEAGUE_ID = 'nba-2026';
 
 // 2026 NBA Playoff Teams — BRACKET SET
@@ -1429,7 +1429,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -3051,6 +3051,387 @@ function openBracketModal(){
     +'<div style="padding:.75rem">'+bracketHtml+'</div>'
     +'</div>';
   document.body.appendChild(modal);
+}
+
+// ── BOSS BATTLE SYSTEM ───────────────────────────────────────────
+// S.bossBattle = {
+//   active: bool,
+//   round: 2|3|4,
+//   bossName: "Jayson Tatum",
+//   bossPid: 1,
+//   bossHP: 175,
+//   bossPortraitIdx: 1, // which portrait index to use (0=normal, 1=boss)
+//   bossLabel: "THE CELTICS EMPEROR",  // flavor text
+//   reward: 25, // FP reward for winning
+//   champions: {0:pid, 1:pid, ...}, // managerId -> champion pid
+//   defeated: false,
+//   defeatedTs: null,
+//   badgesAwarded: false,
+// }
+
+function getBossBattle(){ return S.bossBattle||null; }
+
+function getBossHP(){
+  const bb = getBossBattle(); if(!bb) return 0;
+  return bb.bossHP||0;
+}
+
+function getBossDamage(){
+  // Sum FP of all selected champions
+  const bb = getBossBattle(); if(!bb) return 0;
+  return S.managers.reduce((sum,m)=>{
+    const champPid = bb.champions?.[m.id];
+    if(!champPid) return sum;
+    return sum + playerStatScore(champPid, m.id);
+  }, 0);
+}
+
+function getBossPortrait(){
+  const bb = getBossBattle(); if(!bb) return null;
+  const portraits = PLAYER_PORTRAITS[bb.bossName];
+  if(!portraits) return null;
+  const arr = Array.isArray(portraits) ? portraits : [portraits];
+  const idx = Math.min(bb.bossPortraitIdx||0, arr.length-1);
+  return arr[idx];
+}
+
+async function checkBossVictory(){
+  const bb = getBossBattle();
+  if(!bb||!bb.active||bb.defeated) return;
+  const damage = getBossDamage();
+  if(damage >= bb.bossHP){
+    // VICTORY!
+    bb.defeated = true;
+    bb.defeatedTs = new Date().toISOString();
+    // Award FP to all participants
+    if(!S.droppedFP) S.droppedFP={};
+    for(const m of S.managers){
+      if(bb.champions?.[m.id]){
+        S.droppedFP[m.id] = (S.droppedFP[m.id]||0) + (bb.reward||0);
+      }
+    }
+    // Award badges
+    if(!S.badges) S.badges={};
+    const badgeName = bb.round===4?'final_boss':'boss_battle_r'+bb.round;
+    for(const m of S.managers){
+      if(bb.champions?.[m.id]){
+        if(!S.badges[m.id]) S.badges[m.id]=[];
+        if(!S.badges[m.id].includes(badgeName)) S.badges[m.id].push(badgeName);
+      }
+    }
+    bb.badgesAwarded = true;
+    await saveState();
+    render();
+    // Victory chat notification
+    try{
+      const chatState = await loadChatState();
+      const dmg = getBossDamage().toFixed(0);
+      chatState.push({
+        id:Date.now(), name:'NBA ARCADE', managerId:'system', avatarIdx:0,
+        text:`🏆 BOSS DEFEATED! ${bb.bossName} (${bb.bossHP} HP) has been slain! Combined damage: ${dmg} FP. +${bb.reward} FP awarded to all Champions! Badges earned! 🗡️`,
+        ts: new Date().toISOString()
+      });
+      await db.from('leagues').upsert({id:'nba-chat-2026', state:JSON.stringify(chatState)});
+    }catch(e){}
+    showToast(`🏆 BOSS DEFEATED! +${bb.reward} FP awarded!`, 'warn');
+  }
+}
+
+async function selectChampion(mid, pid){
+  if(currentManagerId !== mid && !isCommissioner){showToast('You can only pick your own champion','error');return;}
+  const bb = getBossBattle();
+  if(!bb||!bb.active){showToast('No active Boss Battle','error');return;}
+  if(bb.defeated){showToast('Battle is already over!','error');return;}
+  if(!(S.rosters[mid]||[]).includes(pid)){showToast('Player must be on your roster','error');return;}
+  const p = getPlayer(pid);
+  const m = S.managers.find(x=>x.id===mid);
+  if(!confirm(`Set ${p?.name} as your Champion for the Boss Battle?\n\nYou can change this until the battle ends.`)) return;
+  if(!S.bossBattle.champions) S.bossBattle.champions={};
+  S.bossBattle.champions[mid] = pid;
+  await saveState();
+  render();
+  showToast(`${p?.name} is now your Champion! ⚔`, 'info');
+}
+
+async function setBossConfig(bossData){
+  if(!isCommissioner){showToast('Commissioner only','error');return;}
+  S.bossBattle = {...(S.bossBattle||{}), ...bossData};
+  await saveState();
+  render();
+  showToast('Boss Battle updated!','info');
+}
+
+function renderBossBattle(){
+  const el = document.getElementById('boss-battle-content');
+  if(!el) return;
+  const bb = getBossBattle();
+  const mid = currentManagerId;
+  const isViewer = mid===null||mid==='viewer';
+  const aColor = !isViewer ? getAvatarColor(mid) : '#4a9eff';
+
+  // Commissioner setup panel
+  const commPanel = isCommissioner ? renderBossCommPanel(bb) : '';
+
+  if(!bb||!bb.active){
+    el.innerHTML = `<div style="padding:2rem;text-align:center">
+      <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.5rem">⚔ BOSS BATTLE</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:1.5rem">No active Boss Battle. Check back soon.</div>
+      ${commPanel}
+    </div>`;
+    return;
+  }
+
+  const bossPortrait = getBossPortrait();
+  const bossHP = getBossHP();
+  const damage = getBossDamage();
+  const pct = Math.min(100, Math.round(damage/bossHP*100));
+  const remaining = Math.max(0, bossHP-damage);
+  const bossColor = '#ff3344';
+  const roundLabel = bb.round===4?'🔥 FINAL BOSS':'⚔ BOSS BATTLE';
+  const roundName = bb.round===4?'NBA Finals':bb.round===3?'Conf Finals':'Round '+bb.round;
+  const myChampPid = bb.champions?.[mid];
+  const myChamp = myChampPid ? getPlayer(myChampPid) : null;
+
+  // HP bar color
+  const barColor = pct>=100?'var(--green)':pct>=66?'var(--accent2)':pct>=33?'#ff9900':'var(--red)';
+
+  el.innerHTML = `<div style="padding:.75rem 0">
+
+    <!-- Boss Card -->
+    <div style="background:rgba(255,51,68,.06);border:2px solid ${bossColor};padding:1rem;margin-bottom:.875rem;position:relative;overflow:hidden">
+      <!-- Scanline effect -->
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.05) 2px,rgba(0,0,0,.05) 4px);pointer-events:none"></div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:.875rem">
+        <!-- Boss portrait -->
+        <div style="flex-shrink:0">
+          <div style="width:${IS_MOBILE?80:110}px;height:${IS_MOBILE?80:110}px;border:3px solid ${bossColor};overflow:hidden;box-shadow:0 0 20px ${bossColor}55;position:relative">
+            ${bossPortrait
+              ? `<img src="${bossPortrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
+              : `<div style="width:100%;height:100%;background:#1a0a0a;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:10px;color:${bossColor}">BOSS</div>`}
+            <div style="position:absolute;top:0;left:0;right:0;background:rgba(255,51,68,.9);text-align:center;font-family:'Press Start 2P',monospace;font-size:6px;padding:2px;color:#fff">${roundLabel}</div>
+          </div>
+        </div>
+
+        <!-- Boss info -->
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?10:13}px;color:${bossColor};margin-bottom:3px">${bb.bossName?.toUpperCase()}</div>
+          ${bb.bossLabel?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-style:italic">"${bb.bossLabel}"</div>`:''}
+          <div style="font-size:12px;color:var(--text2)">${roundName} · ${bb.bossHP} HP</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Reward: <span style="color:var(--accent2);font-family:'Press Start 2P',monospace;font-size:9px">+${bb.reward} FP</span> + Badge for all Champions</div>
+        </div>
+
+        <!-- HP remaining -->
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?14:20}px;color:${remaining===0?'var(--green)':bossColor}">${remaining===0?'☠':'⚡'+remaining}</div>
+          <div style="font-size:10px;color:var(--text3)">HP LEFT</div>
+        </div>
+      </div>
+
+      <!-- HP Bar -->
+      <div style="margin-bottom:.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${bossColor}">BOSS HP</span>
+          <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${barColor}">${damage.toFixed(0)} / ${bossHP} DMG</span>
+        </div>
+        <div style="height:14px;background:#1a0808;border:1px solid ${bossColor}44;position:relative;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barColor};transition:width .5s;box-shadow:0 0 8px ${barColor}"></div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:7px;color:#fff;text-shadow:1px 1px 0 #000">${pct}%</div>
+        </div>
+      </div>
+
+      ${bb.defeated?`
+      <div style="text-align:center;padding:.75rem;background:rgba(0,255,136,.1);border:2px solid var(--green);font-family:'Press Start 2P',monospace;font-size:10px;color:var(--green)">
+        🏆 BOSS DEFEATED! +${bb.reward} FP AWARDED!
+      </div>`:''}
+    </div>
+
+    <!-- Champions section -->
+    <div style="background:var(--panel);border:1px solid var(--border);padding:.75rem;margin-bottom:.875rem">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3);margin-bottom:.625rem">⚔ CHAMPIONS (${Object.keys(bb.champions||{}).length}/${S.managers.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(${IS_MOBILE?2:3},1fr);gap:6px">
+        ${S.managers.map(m=>{
+          const champPid = bb.champions?.[m.id];
+          const champ = champPid ? getPlayer(champPid) : null;
+          const mColor = getAvatarColor(m.id);
+          const champFP = champ ? playerStatScore(champPid, m.id) : 0;
+          const champPortrait = champ ? getActivePortrait(champ.name) : null;
+          const isLive = champ ? isPlayerLive(champPid) : false;
+          const isMe = m.id === mid;
+          return `<div style="border:2px solid ${champ?mColor:'var(--border2)'};padding:6px;background:${champ?mColor+'0d':'transparent'};${isMe?'box-shadow:0 0 8px '+mColor+'44':''}">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+              <div style="width:18px;height:18px;border:1px solid ${mColor};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">${getAvatar(m.id,'sm')}</div>
+              <span style="font-family:'Press Start 2P',monospace;font-size:6px;color:${mColor}">${m.name.toUpperCase()}</span>
+            </div>
+            ${champ?`
+              <div style="display:flex;align-items:center;gap:5px">
+                ${champPortrait?`<img src="${champPortrait}" style="width:32px;height:32px;object-fit:cover;object-position:center top;border:1px solid ${isLive?'var(--red)':mColor};image-rendering:pixelated;flex-shrink:0"/>`:''}
+                <div>
+                  <div style="font-size:10px;color:var(--text)">${champ.name.split(' ').pop()}</div>
+                  <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${isLive?'var(--red)':'var(--accent2)'}">+${champFP.toFixed(0)}⚔</div>
+                </div>
+              </div>
+              ${isMe&&!bb.defeated?`<button onclick="openChampionPicker(${m.id})" style="width:100%;margin-top:4px;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:${mColor}22;border:1px solid ${mColor};color:${mColor};cursor:pointer">CHANGE</button>`:''}
+            `:`
+              ${isMe&&!bb.defeated?`<button onclick="openChampionPicker(${m.id})" style="width:100%;font-family:'Press Start 2P',monospace;font-size:6px;padding:4px;background:rgba(255,51,68,.1);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ PICK CHAMPION</button>`:'<div style="font-size:10px;color:var(--text3);font-style:italic">No champion yet</div>'}
+            `}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Badges section -->
+    ${renderBadges(mid)}
+
+    ${commPanel}
+  </div>`;
+}
+
+function renderBadges(mid){
+  if(mid===null||mid==='viewer') return '';
+  const badges = S.badges?.[mid]||[];
+  if(!badges.length) return '';
+  const badgeInfo = {
+    'boss_battle_r2': {label:'BOSS SLAYER R2', color:'#4a9eff', icon:'⚔'},
+    'boss_battle_r3': {label:'BOSS SLAYER R3', color:'#cc44ff', icon:'⚔'},
+    'final_boss': {label:'FINAL BOSS SLAYER', color:'#ffcc00', icon:'👑'},
+  };
+  return `<div style="background:var(--panel);border:1px solid var(--border);padding:.75rem;margin-bottom:.875rem">
+    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3);margin-bottom:.5rem">🏅 MY BADGES</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${badges.map(b=>{
+        const info = badgeInfo[b]||{label:b.toUpperCase(),color:'var(--accent2)',icon:'🏅'};
+        return `<div style="padding:4px 8px;border:2px solid ${info.color};background:${info.color}18;font-family:'Press Start 2P',monospace;font-size:6px;color:${info.color}">${info.icon} ${info.label}</div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function renderBossCommPanel(bb){
+  const activated = bb?.active;
+  return `<div style="background:rgba(255,153,0,.06);border:1px solid #ff990044;padding:.75rem;margin-top:.875rem">
+    <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;margin-bottom:.625rem">🔓 COMMISSIONER CONTROLS</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Boss Player:</label>
+        <select id="boss-pid-select" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px">
+          ${PLAYERS.filter(p=>!getTeam(p.team)?.eliminated&&TEAMS.some(t=>t.id===p.team)).map(p=>`<option value="${p.id}" ${bb?.bossPid===p.id?'selected':''}>${p.name} (${p.team})</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Boss HP:</label>
+        <input id="boss-hp-input" type="number" value="${bb?.bossHP||175}" min="50" max="500" style="width:80px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+        <label style="font-size:12px;color:var(--text2)">Portrait #:</label>
+        <input id="boss-portrait-idx" type="number" value="${bb?.bossPortraitIdx||0}" min="0" max="9" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Round:</label>
+        <select id="boss-round-select" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px">
+          <option value="2" ${bb?.round===2?'selected':''}>Round 2</option>
+          <option value="3" ${bb?.round===3?'selected':''}>Conf Finals</option>
+          <option value="4" ${bb?.round===4?'selected':''}>NBA Finals</option>
+        </select>
+        <label style="font-size:12px;color:var(--text2)">Reward FP:</label>
+        <input id="boss-reward-input" type="number" value="${bb?.reward||25}" min="0" max="200" style="width:60px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Flavor text:</label>
+        <input id="boss-label-input" type="text" value="${bb?.bossLabel||''}" placeholder="e.g. THE CELTICS EMPEROR" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+        <button onclick="saveBossConfig()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,153,0,.2);border:1px solid #ff9900;color:#ff9900;cursor:pointer">💾 SAVE CONFIG</button>
+        <button onclick="startBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,51,68,.2);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ ${activated?'UPDATE':'START'} BATTLE</button>
+        ${activated?`<button onclick="endBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(100,100,100,.2);border:1px solid #666;color:#666;cursor:pointer">■ END BATTLE</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function openChampionPicker(mid){
+  const existing = document.getElementById('champion-picker-modal');
+  if(existing){ existing.remove(); return; }
+  const bb = getBossBattle();
+  if(!bb||!bb.active){ showToast('No active battle','error'); return; }
+  const roster = S.rosters[mid]||[];
+  const modal = document.createElement('div');
+  modal.id = 'champion-picker-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  const rows = roster.map(pid=>{
+    const p = getPlayer(pid); if(!p) return '';
+    const tc = TEAM_LOGOS[p.team]?.color||'#4a9eff';
+    const portrait = getActivePortrait(p.name);
+    const fp = playerStatScore(pid, mid);
+    const fppg = playerFPPG(pid, mid);
+    const isLive = isPlayerLive(pid);
+    const isCurrent = bb.champions?.[mid]===pid;
+    return '<div onclick="selectChampion('+mid+','+pid+');document.getElementById(\'champion-picker-modal\')?.remove()" '
+      +'style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border2);cursor:pointer;background:'+(isCurrent?tc+'18':'transparent')+'">'
+      +(portrait?'<img src="'+portrait+'" style="width:36px;height:36px;object-fit:cover;object-position:center top;border:2px solid '+(isLive?'var(--red)':tc)+';image-rendering:pixelated;flex-shrink:0"/>':'')
+      +'<div style="flex:1">'
+        +'<div style="font-size:13px;color:var(--text)">'+p.name+'</div>'
+        +'<div style="font-size:10px;color:var(--text3)">'+p.team+' · '+fppg.toFixed(1)+'/g · +'+fp.toFixed(0)+' total</div>'
+      +'</div>'
+      +(isCurrent?'<span style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:var(--accent2)">CURRENT</span>':'')
+      +'<span style="font-family:\'Press Start 2P\',monospace;font-size:8px;color:var(--red)">⚔</span>'
+      +'</div>';
+  }).join('');
+  modal.innerHTML = '<div style="background:var(--panel);border:2px solid var(--red);width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.625rem .875rem;border-bottom:2px solid var(--border);flex-shrink:0;background:rgba(255,51,68,.08)">'
+    +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--red)">⚔ PICK YOUR CHAMPION</span>'
+    +'<button onclick="document.getElementById(\'champion-picker-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0">Your champion\'s FP counts as damage against the Boss.</div>'
+    +'<div style="overflow-y:auto;flex:1">'+rows+'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
+async function saveBossConfig(){
+  const pid = parseInt(document.getElementById('boss-pid-select')?.value);
+  const p = getPlayer(pid);
+  if(!p){ showToast('Invalid player','error'); return; }
+  const config = {
+    bossPid: pid,
+    bossName: p.name,
+    bossHP: parseInt(document.getElementById('boss-hp-input')?.value)||175,
+    bossPortraitIdx: parseInt(document.getElementById('boss-portrait-idx')?.value)||0,
+    round: parseInt(document.getElementById('boss-round-select')?.value)||2,
+    reward: parseInt(document.getElementById('boss-reward-input')?.value)||25,
+    bossLabel: document.getElementById('boss-label-input')?.value||'',
+  };
+  await setBossConfig(config);
+}
+
+async function startBossBattle(){
+  await saveBossConfig();
+  if(!S.bossBattle?.bossPid){ showToast('Set a boss player first','error'); return; }
+  if(!S.bossBattle.champions) S.bossBattle.champions={};
+  S.bossBattle.active = true;
+  S.bossBattle.defeated = false;
+  S.bossBattle.defeatedTs = null;
+  S.bossBattle.badgesAwarded = false;
+  await saveState();
+  render();
+  // Chat announcement
+  try{
+    const chatState = await loadChatState();
+    const bb = S.bossBattle;
+    chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,
+      text:`⚔ BOSS BATTLE BEGINS! ${bb.bossName} (${bb.bossHP} HP) has appeared! Pick your Champion in the ⚔ BOSS tab. Reward: +${bb.reward} FP + Badge for all participants! 🗡️`,
+      ts:new Date().toISOString()});
+    await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
+  }catch(e){}
+  showToast('⚔ Boss Battle started!','warn');
+}
+
+async function endBossBattle(){
+  if(!isCommissioner) return;
+  if(!confirm('End the Boss Battle?')) return;
+  S.bossBattle.active = false;
+  await saveState();
+  render();
+  showToast('Boss Battle ended','info');
 }
 
 function renderBracket(){

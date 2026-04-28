@@ -813,6 +813,7 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <div class="tab-bar">
     <button class="tab" id="tab-btn-my-team" onclick="showTab('my-team')">MY TEAM</button>
     <button class="tab active" onclick="showTab('live-score')">LIVE SCORE</button>
+    <button class="tab" id="tab-btn-boss" onclick="showTab('boss')">⚔ BOSS</button>
     <button class="tab" onclick="showTab('rosters')">ROSTERS</button>
     <button class="tab" onclick="showTab('waiver')">WAIVERS</button>
     <button class="tab" onclick="showTab('teams')">PLAYER DIRECTORY</button>
@@ -907,6 +908,11 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- SCORING -->
   <!-- LIVE SCORE TAB -->
+  <!-- BOSS BATTLE TAB -->
+  <div id="tab-boss" class="hidden">
+    <div id="boss-battle-content"></div>
+  </div>
+
   <!-- MY TEAM TAB -->
   <div id="tab-my-team" class="hidden">
     <div id="my-team-content"></div>
