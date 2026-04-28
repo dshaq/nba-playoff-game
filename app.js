@@ -2221,7 +2221,7 @@ function renderRosters(){
                   : `<div style="font-size:11px;color:${teamColor}">${p.team}</div>`
               }
               ${isLive?`<div style="position:absolute;top:3px;left:3px;background:#ff3344;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 3px;color:#fff">LIVE</div>`:''}
-              ${getPortraitCount(p.name)>1?`<div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.7);border:1px solid var(--accent2);font-family:'Press Start 2P',monospace;font-size:5px;padding:1px 3px;color:var(--accent2)">${getPortraitIndex(p.name)+1}/${getPortraitCount(p.name)}</div>`:''}
+
               ${t.eliminated?`<div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)"><span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff3344;text-shadow:0 0 8px #ff3344">OUT</span></div>`:''}
               ${(()=>{
                 if(t.eliminated) return '';
@@ -3813,10 +3813,18 @@ function openPlayerModal(pid){
   modal.innerHTML = `
     <div class="player-modal-inner">
       <div class="player-modal-header">
-        <div class="player-modal-portrait" style="border-color:${teamColor}">
-          ${hasPortrait
-            ? `<img src="${getActivePortrait(p.name)}" />`
-            : logo ? logo.svg : `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#020c18;font-family:'Press Start 2P',monospace;font-size:10px;color:${teamColor}">${p.team}</div>`}
+        <div style="position:relative;flex-shrink:0">
+          <div class="player-modal-portrait" style="border-color:${teamColor}">
+            ${hasPortrait
+              ? `<img src="${getActivePortrait(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:center top"/>`
+              : logo ? logo.svg : `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#020c18;font-family:'Press Start 2P',monospace;font-size:10px;color:${teamColor}">${p.team}</div>`}
+          </div>
+          ${getPortraitCount(p.name)>1?`
+          <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.75);padding:3px 6px">
+            <button onclick="event.stopPropagation();cyclePortrait('${p.name.replace(/'/g,"\'")}', -1)" style="background:none;border:none;color:var(--accent2);font-size:18px;cursor:pointer;padding:0;line-height:1">‹</button>
+            <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3)">${getPortraitIndex(p.name)+1} / ${getPortraitCount(p.name)}</span>
+            <button onclick="event.stopPropagation();cyclePortrait('${p.name.replace(/'/g,"\'")}', 1)" style="background:none;border:none;color:var(--accent2);font-size:18px;cursor:pointer;padding:0;line-height:1">›</button>
+          </div>`:''}
         </div>
         <div style="flex:1">
           <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:${teamColor}">${p.name.toUpperCase()}</div>
