@@ -4288,6 +4288,73 @@ async function resizePortrait(file){
   });
 }
 
+
+function openPortraitManager(){
+  const existing = document.getElementById('portrait-mgr-modal');
+  if(existing){ existing.remove(); return; }
+
+  const names = Object.keys(PLAYER_PORTRAITS).sort();
+  const modal = document.createElement('div');
+  modal.id = 'portrait-mgr-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+
+  const buildGrid = () => {
+    const sorted = Object.keys(PLAYER_PORTRAITS).sort();
+    return sorted.map(name => {
+      const portraits = Array.isArray(PLAYER_PORTRAITS[name])
+        ? PLAYER_PORTRAITS[name]
+        : [PLAYER_PORTRAITS[name]];
+      const thumbs = portraits.map((src, idx) =>
+        '<div style="position:relative;display:inline-block;margin:2px">'
+        +'<img src="'+src+'" style="width:52px;height:52px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:2px solid var(--border)"/>'
+        +'<button data-pname="'+name+'" data-pidx="'+idx+'" onclick="deletePortrait(this.dataset.pname,parseInt(this.dataset.pidx))" '
+        +'style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;background:var(--red);border:none;color:#fff;font-size:9px;cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>'
+        +(portraits.length>1?'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);font-size:8px;text-align:center;color:#fff">'+(idx+1)+'/'+portraits.length+'</div>':'')
+        +'</div>'
+      ).join('');
+      return '<div style="padding:6px;border-bottom:1px solid var(--border2)">'
+        +'<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+name+'</div>'
+        +'<div>'+thumbs+'</div>'
+        +'</div>';
+    }).join('');
+  };
+
+  modal.innerHTML = '<div style="background:var(--panel);border:2px solid var(--border);width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.625rem .875rem;border-bottom:2px solid var(--border);flex-shrink:0">'
+    +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent3)">🖼 PORTRAIT MANAGER</span>'
+    +"<button onclick=\"document.getElementById('portrait-mgr-modal').remove()\" style=\"background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1\">×</button>"
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0">Click ✕ on a portrait to delete it. Portraits numbered left to right.</div>'
+    +'<div id="portrait-mgr-grid" style="overflow-y:auto;flex:1;padding:.5rem .875rem">'+buildGrid()+'</div>'
+    +'</div>';
+
+  document.body.appendChild(modal);
+}
+
+async function deletePortrait(playerName, idx){
+  if(!confirm('Delete portrait '+(idx+1)+' for '+playerName+'?')) return;
+  const existing = PLAYER_PORTRAITS[playerName];
+  if(!existing) return;
+  if(Array.isArray(existing)){
+    existing.splice(idx, 1);
+    if(existing.length === 1) PLAYER_PORTRAITS[playerName] = existing[0]; // back to string
+    else if(existing.length === 0) delete PLAYER_PORTRAITS[playerName];
+  } else {
+    delete PLAYER_PORTRAITS[playerName];
+  }
+  // Save
+  await db.from('leagues').upsert({id:'nba-portraits-2026', state:JSON.stringify(PLAYER_PORTRAITS)});
+  render();
+  // Refresh the manager modal grid
+  const grid = document.getElementById('portrait-mgr-grid');
+  if(grid){
+    const names = Object.keys(PLAYER_PORTRAITS).sort();
+    // rebuild
+    openPortraitManager(); openPortraitManager(); // toggle to refresh
+  }
+}
+
 async function handlePortraitUpload(input){
   const files = [...input.files];
   if(!files.length) return;
@@ -4315,15 +4382,26 @@ async function handlePortraitUpload(input){
     status.textContent = 'Processed ' + processed + '/' + files.length + '...';
   }
 
-  // Merge into PLAYER_PORTRAITS — append as array if player already has portrait
+  // Merge into PLAYER_PORTRAITS
+  const replaceMode = document.getElementById('portrait-replace-mode')?.checked || false;
   for(const [name, dataUri] of Object.entries(newPortraits)){
     const existing = PLAYER_PORTRAITS[name];
     if(!existing){
-      PLAYER_PORTRAITS[name] = dataUri; // first portrait — store as string
-    } else if(Array.isArray(existing)){
-      existing.push(dataUri); // already array — append
+      PLAYER_PORTRAITS[name] = dataUri; // first portrait
+    } else if(replaceMode){
+      // REPLACE: swap the most recent portrait (last in array, or the single string)
+      if(Array.isArray(existing)){
+        existing[existing.length - 1] = dataUri; // replace last portrait
+      } else {
+        PLAYER_PORTRAITS[name] = dataUri; // replace single portrait
+      }
     } else {
-      PLAYER_PORTRAITS[name] = [existing, dataUri]; // upgrade to array
+      // ADD: append as new alternate portrait
+      if(Array.isArray(existing)){
+        existing.push(dataUri);
+      } else {
+        PLAYER_PORTRAITS[name] = [existing, dataUri];
+      }
     }
   }
 
