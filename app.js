@@ -407,11 +407,14 @@ async function loadPortraits(){
 
 // Per-user portrait selection (localStorage so it's personal per device)
 function getPortraitIndex(playerName){
-  try{ return parseInt(localStorage.getItem('pi_'+playerName)||'0')||0; }
+  // Per-manager storage — key includes manager ID so each user has their own preference
+  const mid = typeof currentManagerId !== 'undefined' ? currentManagerId : 'viewer';
+  try{ return parseInt(localStorage.getItem('pi_'+mid+'_'+playerName)||'0')||0; }
   catch(e){ return 0; }
 }
 function setPortraitIndex(playerName, idx){
-  try{ localStorage.setItem('pi_'+playerName, idx); }
+  const mid = typeof currentManagerId !== 'undefined' ? currentManagerId : 'viewer';
+  try{ localStorage.setItem('pi_'+mid+'_'+playerName, idx); }
   catch(e){}
 }
 function getPortraitCount(playerName){
