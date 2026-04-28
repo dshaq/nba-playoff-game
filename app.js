@@ -1380,18 +1380,31 @@ async function toggleElim(tid){
   const t=S.teams.find(x=>x.id===tid);
   t.eliminated=!t.eliminated;
   if(t.eliminated){
-    // Find managers with players on this team
-    const affected = S.managers.filter(m=>
-      (S.rosters[m.id]||[]).some(pid=>getPlayer(pid)?.team===tid)
-    ).map(m=>m.name);
-    // Post a chat message notifying everyone
-    const msg = `🚨 ${t.name} ELIMINATED — waiver slots now open for: ${affected.length?affected.join(', '):'no drafted players'}`;
+    // Auto-remove eliminated players from all rosters, bank their FP
+    const affectedMgrNames = [];
+    if(!S.droppedFP) S.droppedFP={};
+    for(const m of S.managers){
+      const elimPids = (S.rosters[m.id]||[]).filter(pid=>getPlayer(pid)?.team===tid);
+      if(!elimPids.length) continue;
+      affectedMgrNames.push(m.name);
+      for(const pid of elimPids){
+        // Bank their accumulated FP
+        const fp = playerStatScore(pid, m.id);
+        S.droppedFP[m.id] = (S.droppedFP[m.id]||0) + fp;
+        // Remove from roster
+        S.rosters[m.id] = S.rosters[m.id].filter(p=>p!==pid);
+        // Clear from injured list if there
+        if(S.injured[m.id]) S.injured[m.id] = S.injured[m.id].filter(p=>p!==pid);
+      }
+    }
+    // Post chat notification
+    const msg = `🚨 ${t.name} ELIMINATED — players auto-removed from rosters. Points banked. Waiver slots open for: ${affectedMgrNames.length?affectedMgrNames.join(', '):'no one'}`;
     try{
       const chatState = await loadChatState();
       chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,text:msg,ts:new Date().toISOString()});
       await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
     }catch(e){}
-    showToast(t.name+' eliminated! Waiver slots opened.','warn');
+    showToast(t.name+' eliminated! Players removed, FP banked, slots opened.','warn');
   }
   await saveState();render();
 }
