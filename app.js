@@ -570,15 +570,10 @@ function tokensSpent(mid){ return getWaiverSlots(mid).filter(s=>s.usedByPid).len
 
 
 
-// ── Token system ──────────────────────────────────────────────────
-// Managers earn 1 token per player whose team was eliminated. Tokens spent on waivers.
-function tokensEarned(mid){
-  return S.rosters[mid].filter(pid=>{
-    const p=getPlayer(pid); if(!p) return false;
-    return getTeam(p.team)?.eliminated;
-  }).length + ((S.injured[mid]||[]).length);
-}
-function tokensAvailable(mid){ return Math.max(0, tokensEarned(mid)-tokensSpent(mid)); }
+// ── Token system — delegates to getWaiverSlots for accuracy ──────
+function tokensEarned(mid){ return getWaiverSlots(mid).length; }
+function tokensSpentNew(mid){ return getWaiverSlots(mid).filter(s=>s.usedByPid!==null).length; }
+function tokensAvailable(mid){ return waiverSlotsOpen(mid); }
 function draftedIds(){return Object.values(S.rosters).flat();}
 function availablePlayers(){
   const tk=draftedIds();
