@@ -519,31 +519,38 @@ function getWaiverSlots(mid){
   const slots = [];
   const usage = S.waiverSlotUsage||{};
 
-  // Slots from eliminated players currently on roster
+  // Slots from eliminated players currently on roster (not yet auto-removed)
   (S.rosters[mid]||[]).forEach(pid=>{
     const p=getPlayer(pid); if(!p) return;
     if(getTeam(p.team)?.eliminated){
       const key='elim_'+pid;
-      slots.push({key, type:'elim', pid, playerName:p.name, usedByPid:usage[mid+'_'+key]||null});
+      if(!usage.hasOwnProperty(mid+'_'+key)){
+        slots.push({key, type:'elim', pid, playerName:p.name, usedByPid:null});
+      } else {
+        slots.push({key, type:'elim', pid, playerName:p.name, usedByPid:usage[mid+'_'+key]});
+      }
     }
+  });
+
+  // Slots from pre-stored elimination events (players already removed from roster)
+  // These are stored as mid_elim_PID keys in waiverSlotUsage
+  Object.entries(usage).forEach(([k,v])=>{
+    const prefix = mid+'_elim_';
+    if(!k.startsWith(prefix)) return;
+    const pid = parseInt(k.slice(prefix.length));
+    // Only include if not already in roster (would be caught above)
+    if((S.rosters[mid]||[]).includes(pid)) return;
+    const p = getPlayer(pid);
+    slots.push({key:'elim_'+pid, type:'elim', pid, playerName:p?.name||'Unknown', usedByPid:v});
   });
 
   // Slots from injured players (marked by manager, still on roster)
   (S.injured[mid]||[]).forEach(pid=>{
-    if(!(S.rosters[mid]||[]).includes(pid)) return; // dropped player — slot handled as legacy
+    if(!(S.rosters[mid]||[]).includes(pid)) return;
     const p=getPlayer(pid); if(!p) return;
     const key='inj_'+pid;
     slots.push({key, type:'inj', pid, playerName:p.name, usedByPid:usage[mid+'_'+key]||null});
   });
-
-  // Legacy slots (from dropped players, pre-migration waiverAdds)
-  // Count legacy_* usage entries as pre-used closed slots
-  const legacyUsed = Object.keys(usage).filter(k=>k.startsWith(mid+'_legacy_')).length;
-  // Remaining old waiverAdds (fallback for any not yet migrated)
-  const oldAdds = S.waiverAdds?.[mid]||0;
-  // These are already-spent slots that no longer have a source player to show
-  // They don't add open slots — they just mean slots were already used
-  // (No need to add them since they don't affect open count)
 
   return slots;
 }
@@ -1383,9 +1390,10 @@ async function toggleElim(tid){
   const t=S.teams.find(x=>x.id===tid);
   t.eliminated=!t.eliminated;
   if(t.eliminated){
-    // Auto-remove eliminated players from all rosters, bank their FP
+    // Auto-remove eliminated players from all rosters, bank their FP, create waiver slots
     const affectedMgrNames = [];
     if(!S.droppedFP) S.droppedFP={};
+    if(!S.waiverSlotUsage) S.waiverSlotUsage={};
     for(const m of S.managers){
       const elimPids = (S.rosters[m.id]||[]).filter(pid=>getPlayer(pid)?.team===tid);
       if(!elimPids.length) continue;
@@ -1394,6 +1402,11 @@ async function toggleElim(tid){
         // Bank their accumulated FP
         const fp = playerStatScore(pid, m.id);
         S.droppedFP[m.id] = (S.droppedFP[m.id]||0) + fp;
+        // Create an open waiver slot — stored as null (unclaimed)
+        const slotKey = m.id+'_elim_'+pid;
+        if(!S.waiverSlotUsage.hasOwnProperty(slotKey)){
+          S.waiverSlotUsage[slotKey] = null;
+        }
         // Remove from roster
         S.rosters[m.id] = S.rosters[m.id].filter(p=>p!==pid);
         // Clear from injured list if there
