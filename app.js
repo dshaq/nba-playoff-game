@@ -3454,19 +3454,36 @@ const NEWS_ITEMS = [
 const NEWS_DISMISSED_KEY = 'nba_news_dismissed_2026';
 
 function initNewsBanner(){
-  const dismissed = localStorage.getItem(NEWS_DISMISSED_KEY);
-  if(dismissed === 'true') return;
+  const state = localStorage.getItem(NEWS_DISMISSED_KEY);
   const banner = document.getElementById('news-banner');
   const ticker = document.getElementById('news-ticker-inner');
+  const miniNews = document.getElementById('mini-news-btn');
   if(!banner || !ticker) return;
   ticker.textContent = NEWS_ITEMS.join('   ·   ');
-  banner.style.display = 'block';
+  if(state === 'collapsed'){
+    banner.style.display = 'none';
+    if(miniNews) miniNews.style.display = 'inline-flex';
+  } else {
+    banner.style.display = 'block';
+    if(miniNews) miniNews.style.display = 'none';
+  }
 }
 
 function dismissNews(){
   const banner = document.getElementById('news-banner');
   if(banner) banner.style.display = 'none';
-  localStorage.setItem(NEWS_DISMISSED_KEY, 'true');
+  // Show mini NEWS button next to BRACKET button
+  const miniNews = document.getElementById('mini-news-btn');
+  if(miniNews) miniNews.style.display = 'inline-flex';
+  localStorage.setItem(NEWS_DISMISSED_KEY, 'collapsed');
+}
+
+function showNewsBanner(){
+  const banner = document.getElementById('news-banner');
+  if(banner) banner.style.display = 'block';
+  const miniNews = document.getElementById('mini-news-btn');
+  if(miniNews) miniNews.style.display = 'none';
+  localStorage.setItem(NEWS_DISMISSED_KEY, 'false');
 }
 
 function renderBracket(){

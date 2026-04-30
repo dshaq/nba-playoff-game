@@ -816,7 +816,10 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <div id="top-leaderboard-section" style="border-bottom:2px solid var(--border)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem .375rem;background:var(--bg2);border-bottom:1px solid var(--border2)">
       <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3)">🏆 LIVE LEADERBOARD</div>
-      <button onclick="openBracketModal()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">🗓 BRACKET</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="mini-news-btn" onclick="showNewsBanner()" style="display:none;align-items:center;gap:4px;background:rgba(255,51,68,.15);border:1px solid #ff3344;color:#ff3344;font-family:'Press Start 2P',monospace;font-size:6px;padding:3px 7px;cursor:pointer">📢 NEWS</button>
+        <button onclick="openBracketModal()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">🗓 BRACKET</button>
+      </div>
     </div>
     <div id="top-leaderboard-list"></div>
   </div>
