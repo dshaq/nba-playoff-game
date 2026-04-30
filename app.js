@@ -3028,6 +3028,38 @@ function openManagerProfile(mid){
       +'</div>';
   }).join('');
 
+  // ── Dropped / Eliminated players ──
+  const droppedPlayers = [];
+  // From waiver log — injury drops
+  (S.waiverLog||[]).forEach(e=>{
+    if(e.managerId===mid && e.dropPid){
+      if(!droppedPlayers.find(d=>d.pid===e.dropPid))
+        droppedPlayers.push({pid:e.dropPid, name:e.dropName||getPlayer(e.dropPid)?.name||'Unknown', fp:e.droppedFP||0, source:'dropped'});
+    }
+  });
+  // From waiverSlotUsage — eliminated players
+  Object.entries(S.waiverSlotUsage||{}).forEach(([k,v])=>{
+    const m2 = k.match(/^(\d+)_elim_(\d+)$/);
+    if(m2 && parseInt(m2[1])===mid){
+      const pid=parseInt(m2[2]);
+      if(!droppedPlayers.find(d=>d.pid===pid)){
+        const p2=getPlayer(pid);
+        droppedPlayers.push({pid, name:p2?.name||'Unknown', fp:playerStatScore(pid,mid), source:'elim'});
+      }
+    }
+  });
+
+  const droppedHtml = droppedPlayers.length ? (
+    '<div style="padding:3px 0;border-top:1px dashed var(--border2);margin-top:4px">'    +'<div style="font-size:8px;color:var(--text3);padding:4px 0 2px;letter-spacing:.05em">DROPPED / ELIMINATED</div>'    +droppedPlayers.map(d=>{
+      const p=getPlayer(d.pid);
+      const portrait=p?getActivePortrait(p.name):null;
+      const tc=p?(TEAM_LOGOS[p.team]?.color||'#4a9eff'):'#555';
+      const tag=d.source==='elim'?'ELIM':'DROPPED';
+      const tagColor=d.source==='elim'?'#ff6600':'#888';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2);opacity:.65">'        +'<div style="width:36px;height:36px;overflow:hidden;flex-shrink:0;border:1px solid #333;position:relative;filter:grayscale(80%)">'        +(portrait?'<img src="'+portrait+'" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>'          :'<div style="width:100%;height:100%;background:#11111188;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555">'+(p?.team||'?')+'</div>')        +'<div style="position:absolute;top:0;left:0;right:0;background:rgba(0,0,0,.6);text-align:center;font-family:var(--font-pixel),monospace;font-size:4px;color:'+tagColor+'">'+tag+'</div>'        +'</div>'        +'<div style="flex:1;min-width:0">'          +'<div style="font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(d.name||p?.name||'Unknown')+'</div>'          +'<div style="font-size:9px;color:#555">'+(p?.team||'')+'</div>'        +'</div>'        +'<div style="font-family:var(--font-pixel),monospace;font-size:9px;color:'+(d.fp>0?'#997744':'#555')+';text-align:right">'          +(d.fp>0?'+':'')+d.fp.toFixed(0)        +'</div>'        +'</div>';
+    }).join('')    +'</div>'
+  ) : '';
+
   const modal = document.createElement('div');
   modal.id = 'mgr-profile-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
@@ -3071,7 +3103,7 @@ function openManagerProfile(mid){
     +'</div>'
     // Roster list
     +'<div style="overflow-y:auto;padding:.5rem 1rem;flex:1">'
-      +rosterHtml
+      +rosterHtml+droppedHtml
     +'</div>'
     +'</div>';
 
