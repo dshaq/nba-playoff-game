@@ -1109,6 +1109,13 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 // ── Avatar system ──
 // Custom logos uploaded by commissioner — stored in Supabase
 let CUSTOM_LOGOS = []; // [{name, dataUri, color}]
+let TOKEN_IMG = null; // Custom token image
+
+function getTokenImg(size){
+  size = size||20;
+  if(TOKEN_IMG) return '<img src="'+TOKEN_IMG+'" style="width:'+size+'px;height:'+size+'px;object-fit:contain;image-rendering:pixelated;vertical-align:middle"/>';
+  return '<span style="font-size:'+(size-4)+'px">🏀</span>';
+}
 
 async function loadCustomLogos(){
   try{
@@ -1116,6 +1123,8 @@ async function loadCustomLogos(){
     if(data?.state){
       CUSTOM_LOGOS = JSON.parse(data.state);
       console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos');
+      const _tl = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()==='token');
+      if(_tl) TOKEN_IMG = _tl.dataUri;
     }
   }catch(e){ /* none yet */ }
 }

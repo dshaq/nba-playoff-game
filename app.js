@@ -1844,7 +1844,7 @@ function renderStandings(){
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:18px;color:var(--text);font-weight:600">${m.name}</span>
             ${livePlayers.length ? `<span class="score-live" style="font-size:8px">▶ LIVE: ${livePlayers.join(', ')}</span>` : ''}
-            ${tokens>0 ? `<span style="display:inline-flex;align-items:center;gap:2px">${Array(Math.min(tokens,3)).fill('<span class="token" style="width:18px;height:18px;font-size:9px">🏀</span>').join('')}${tokens>3?`<span style="font-size:10px;color:var(--accent2)">+${tokens-3}</span>`:''}</span>` : ''}
+            ${tokens>0 ? `<span style="display:inline-flex;align-items:center;gap:2px">${Array(Math.min(tokens,3)).fill(getTokenImg(18)).join('')}${tokens>3?`<span style="font-size:10px;color:var(--accent2)">+${tokens-3}</span>`:''}</span>` : ''}
           </div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px">
             ${showScores
@@ -1984,7 +1984,7 @@ function renderWaiver(){
     const tokenDisplay = S.managers.map(m=>{
       const tkns = tokensAvailable(m.id);
       if(tkns<=0) return '';
-      const coins = Array(Math.min(tkns,5)).fill('<span class="token">🏀</span>').join('');
+      const coins = Array(Math.min(tkns,5)).fill(getTokenImg(16)).join('');
       return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px"><strong>${m.name}</strong>: ${coins}${tkns>5?`<span class="token-count">×${tkns}</span>`:''}`;
     }).filter(Boolean).join(' ');
 
@@ -1999,7 +1999,7 @@ function renderWaiver(){
       <div style="margin-bottom:6px">🚨 ELIMINATED: <strong>${elimNames}</strong></div>
       ${openSlotMgrs.length?`<div style="margin-bottom:4px;color:var(--green);font-size:13px">✓ Ready to claim: ${openSlotMgrs.map(m=>m.name).join(', ')}</div>`:''}
       ${needsDropMgrs.length?`<div style="margin-bottom:4px;color:#ff9900;font-size:13px">⚠ Must drop first (go to Rosters): ${needsDropMgrs.map(m=>m.name).join(', ')}</div>`:''}
-      ${tokenDisplay?`<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px">🏀 TOKENS: ${tokenDisplay}</div>`:''}
+      ${tokenDisplay?`<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px">${getTokenImg(16)} TOKENS: ${tokenDisplay}</div>`:''}
       <div>PENDING CLAIMS: ${pendingCount>0?`<strong style="color:var(--accent2)">${pendingCount} claim${pendingCount>1?'s':''} queued</strong>`:'none yet'}</div>
     </div>`;
   }
