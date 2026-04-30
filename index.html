@@ -418,8 +418,12 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 .loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:9999}
 .loading-title{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--accent3);text-shadow:2px 2px 0 var(--accent2)}
 .loading-sub{font-size:18px;color:var(--text2)}
-.pixel-spinner{width:32px;height:32px;border:4px solid var(--border);border-top-color:var(--accent);animation:spin .8s steps(8) infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* Basketball loader */
+.bball-loader{display:flex;flex-direction:column;align-items:center;gap:0}
+.bball-bounce{animation:bball-bounce .7s cubic-bezier(.36,.07,.19,.97) infinite alternate}
+.bball-shadow{width:44px;height:8px;background:rgba(0,0,0,.4);border-radius:50%;animation:bball-shadow .7s ease-in-out infinite alternate;margin-top:4px}
+@keyframes bball-bounce{0%{transform:translateY(0) rotate(0deg)}100%{transform:translateY(-28px) rotate(25deg)}}
+@keyframes bball-shadow{0%{transform:scaleX(1);opacity:.4}100%{transform:scaleX(.5);opacity:.15}}
 
 /* ══════════════════════════════════
    DRAFT BANNER
@@ -668,7 +672,20 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 <!-- ── Loading overlay ── -->
 <div class="loading-overlay" id="loading-overlay">
-  <div class="pixel-spinner"></div>
+  <div class="bball-loader">
+    <svg class="bball-bounce" width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="26" cy="26" r="24" fill="#e8722a" stroke="#c25a10" stroke-width="2"/>
+      <!-- vertical seam -->
+      <path d="M26 2 Q38 14 38 26 Q38 38 26 50" fill="none" stroke="#c25a10" stroke-width="2.5"/>
+      <path d="M26 2 Q14 14 14 26 Q14 38 26 50" fill="none" stroke="#c25a10" stroke-width="2.5"/>
+      <!-- horizontal seam -->
+      <path d="M2 26 Q14 18 26 18 Q38 18 50 26" fill="none" stroke="#c25a10" stroke-width="2.5"/>
+      <path d="M2 26 Q14 34 26 34 Q38 34 50 26" fill="none" stroke="#c25a10" stroke-width="2.5"/>
+      <!-- shine -->
+      <ellipse cx="18" cy="16" rx="5" ry="3" fill="rgba(255,255,255,.18)" transform="rotate(-20 18 16)"/>
+    </svg>
+    <div class="bball-shadow"></div>
+  </div>
   <div class="loading-title">NBA ARCADE</div>
   <div class="loading-sub">LOADING LEAGUE DATA...</div>
 </div>
