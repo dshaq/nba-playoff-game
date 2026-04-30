@@ -915,6 +915,7 @@ function showMainScreen(){
       topbarUser.style.pointerEvents = 'auto';
     }
   }
+  initNewsBanner();
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
@@ -1101,6 +1102,7 @@ function selectManager(id){
       topbarUser.style.pointerEvents = 'auto';
     }
   }
+  initNewsBanner();
   startPolling();
   fetchScores();
   setInterval(fetchScores, 60000);
@@ -2272,7 +2274,7 @@ function renderRosters(){
                 // Check if team has played games but player has 0 stats in any of them
                 // ESPN injury status overrides everything — show button if ESPN says Out/DTD
                 const espnInj = getESPNInjury(p.name);
-                const isESPNOut = espnInj && espnInj.status==='Out'; // only show DROP for confirmed Out
+                const isESPNOut = espnInj && (espnInj.status==='Out' || espnInj.status==='Day-To-Day'); // OUT or DTD both eligible
 
                 // Also check if player missed a game
                 const teamGameIds = new Set(Object.values(S.playerStats||{}).filter(s=>{
@@ -3440,6 +3442,31 @@ async function endBossBattle(){
   await saveState();
   render();
   showToast('Boss Battle ended','info');
+}
+
+
+// ── NEWS BANNER ─────────────────────────────────────────────────
+const NEWS_ITEMS = [
+  "🆕 RULE UPDATE: Players marked DTD (Day-To-Day) can now be dropped — same as OUT! Check your roster for DTD players.",
+  "⚔ BOSS BATTLE coming in Round 2! Check the BOSS tab to pick your Champion.",
+  "🏀 Waiver tokens are earned when your player is eliminated or marked OUT/DTD."
+];
+const NEWS_DISMISSED_KEY = 'nba_news_dismissed_2026';
+
+function initNewsBanner(){
+  const dismissed = localStorage.getItem(NEWS_DISMISSED_KEY);
+  if(dismissed === 'true') return;
+  const banner = document.getElementById('news-banner');
+  const ticker = document.getElementById('news-ticker-inner');
+  if(!banner || !ticker) return;
+  ticker.textContent = NEWS_ITEMS.join('   ·   ');
+  banner.style.display = 'block';
+}
+
+function dismissNews(){
+  const banner = document.getElementById('news-banner');
+  if(banner) banner.style.display = 'none';
+  localStorage.setItem(NEWS_DISMISSED_KEY, 'true');
 }
 
 function renderBracket(){
