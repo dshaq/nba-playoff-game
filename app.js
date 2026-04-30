@@ -3190,8 +3190,9 @@ function renderBossBattle(){
 
   if(!bb||!bb.active){
     el.innerHTML = `<div style="padding:2rem;text-align:center">
-      <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.5rem">⚔ BOSS BATTLE</div>
-      <div style="font-size:14px;color:var(--text3);margin-bottom:1.5rem">No active Boss Battle. Check back soon.</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.75rem">⚔ BOSS BATTLE</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#ff9900;margin-bottom:.5rem;animation:blink .9s step-end infinite">COMING SOON</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:.75rem;max-width:300px;margin-left:auto;margin-right:auto">Each round a legendary player becomes the Boss. Your team fights together to defeat them. Winners earn bonus FP and exclusive badges.</div>
       ${commPanel}
     </div>`;
     return;
@@ -3454,7 +3455,7 @@ async function endBossBattle(){
 // ── NEWS BANNER ─────────────────────────────────────────────────
 const NEWS_ITEMS = [
   "🆕 RULE UPDATE: Players marked DTD (Day-To-Day) can now be dropped — same as OUT! Check your roster for DTD players.",
-  "⚔ BOSS BATTLE coming in Round 2! Check the BOSS tab to pick your Champion.",
+  "⚔ BOSS BATTLE COMING SOON — check the BOSS tab for details.",
   "🏀 Waiver tokens are earned when your player is eliminated or marked OUT/DTD."
 ];
 const NEWS_DISMISSED_KEY = 'nba_news_dismissed_2026';
@@ -4193,11 +4194,11 @@ function openPlayerModal(pid){
       <td style="color:var(--text3);font-size:10px;white-space:nowrap">${oppLabel}</td>
       <td style="color:${isAvg?'var(--accent3)':isTotal?'var(--accent2)':parseFloat(g.fp||0)>=0?'var(--green)':'var(--red)'};font-family:'Press Start 2P',monospace;font-size:9px">${fpStr}</td>
       <td style="color:var(--text3);font-size:12px">${isAvg?div(parseInt(g.min||0),gp):g.min||'—'}</td>
-      <td style="color:${(g.pts||0)>=25?'#00ff88':(g.pts||0)>=15?'var(--green)':'inherit'};font-weight:600">${isAvg?div(g.pts,gp):g.pts||0}</td>
+      <td style="color:${(g.pts||0)>=25?'#00ff88':(g.pts||0)>=15?'var(--green)':(g.pts||0)>0?'var(--green)':'inherit'};font-weight:600">${isAvg?div(g.pts,gp):g.pts||0}</td>
       <td>${isAvg?div(g.fgm,gp):g.fgm||0}</td>
       <td>${isAvg?div(g.fga,gp):g.fga||0}</td>
       <td style="color:var(--text3)">${pct(g.fgm||0,g.fga||0)}</td>
-      <td style="color:${(g.tpm||0)>=3?'#ffcc00':'inherit'}">${isAvg?div(g.tpm,gp):g.tpm||0}</td>
+      <td style="color:${(g.tpm||0)>=3?'#ffcc00':(g.tpm||0)>0?'#ffcc00':'inherit'}">${isAvg?div(g.tpm,gp):g.tpm||0}</td>
       <td>${isAvg?div(g.tpa,gp):g.tpa||0}</td>
       <td style="color:var(--text3)">${pct(g.tpm||0,g.tpa||0)}</td>
       <td>${isAvg?div(fgm2,gp):fgm2}</td>
@@ -4209,10 +4210,10 @@ function openPlayerModal(pid){
       <td style="color:var(--text3)">${pct(g.ftm||0,g.fta||0)}</td>
       <td style="color:var(--text3)">${isAvg?div(g.oreb,gp):g.oreb||0}</td>
       <td style="color:var(--text3)">${isAvg?div(g.dreb,gp):g.dreb||0}</td>
-      <td style="color:${(g.reb||0)>=10?'#4a9eff':'inherit'}">${isAvg?div(g.reb,gp):g.reb||0}</td>
-      <td style="color:${(g.ast||0)>=8?'#ff69b4':'inherit'}">${isAvg?div(g.ast,gp):g.ast||0}</td>
-      <td>${isAvg?div(g.stl,gp):g.stl||0}</td>
-      <td style="color:${(g.blk||0)>=2?'#cc88ff':'inherit'}">${isAvg?div(g.blk,gp):g.blk||0}</td>
+      <td style="color:${(g.reb||0)>=10?'#4a9eff':(g.reb||0)>0?'#4a9eff':'inherit'}">${isAvg?div(g.reb,gp):g.reb||0}</td>
+      <td style="color:${(g.ast||0)>=8?'#ff69b4':(g.ast||0)>0?'#ff69b4':'inherit'}">${isAvg?div(g.ast,gp):g.ast||0}</td>
+      <td style="color:${(g.stl||0)>0?'var(--accent3)':'inherit'}">${isAvg?div(g.stl,gp):g.stl||0}</td>
+      <td style="color:${(g.blk||0)>=2?'#cc88ff':(g.blk||0)>0?'#cc88ff':'inherit'}">${isAvg?div(g.blk,gp):g.blk||0}</td>
       <td style="color:${(g.to||0)>0?'var(--red)':'inherit'}">${isAvg?div(g.to,gp):g.to||0}</td>
       <td style="color:var(--text3)">${isAvg?div(g.pf,gp):g.pf||0}</td>
       <td style="color:${parseFloat(gmSc)>=10?'var(--green)':parseFloat(gmSc)<0?'var(--red)':'inherit'}">${isAvg?div(parseFloat(gmSc)*gp,gp):gmSc}</td>
