@@ -1169,8 +1169,40 @@ function managerAllClaims(mid){
     .sort((a,b)=>new Date(a.submittedAt)-new Date(b.submittedAt));
 }
 
+
+// ── Waiver Lockout: no claims between first tip-off and last game final ──
+function getWaiverLockoutStatus(){
+  // Returns {locked: bool, reason: string}
+  // Uses the scores fetched by fetchScores — stored in window._todayGames
+  const games = window._todayGames || [];
+  if(!games.length) return {locked:false, reason:''};
+
+  const hasLive    = games.some(g => g.gameStatus===2 || (g.espnId && Object.values(livePlayerStats||{}).some(s=>s.gameId===g.espnId)));
+  const hasUpcoming= games.some(g => g.gameStatus===1 && !(g.espnId && Object.values(livePlayerStats||{}).some(s=>s.gameId===g.espnId)));
+  const allFinal   = games.every(g => g.gameStatus===3);
+
+  if(allFinal) return {locked:false, reason:''};
+  if(hasLive || (!hasUpcoming && !allFinal)){
+    // At least one game is live or in progress — locked
+    const liveCount = games.filter(g=>g.gameStatus===2||(g.espnId&&Object.values(livePlayerStats||{}).some(s=>s.gameId===g.espnId))).length;
+    const remaining = games.filter(g=>g.gameStatus!==3).length;
+    return {
+      locked: true,
+      reason: `WAIVERS LOCKED — ${liveCount} game${liveCount!==1?'s':''} in progress. Claims reopen when all ${games.length} games today are final.`
+    };
+  }
+  return {locked:false, reason:''};
+}
+
 async function submitClaim(pid,mid){
   if(!isCommissioner && currentManagerId !== mid){showToast('You can only submit claims for your own team','error');return;}
+  // Check waiver lockout — no claims during game day
+  const lockout = getWaiverLockoutStatus();
+  if(lockout.locked && !isCommissioner){
+    showToast(lockout.reason, 'error');
+    alert('⛔ ' + lockout.reason);
+    return;
+  }
   if(waiverSlotsOpen(mid)<=0){alert('YOU HAVE NO OPEN WAIVER SLOTS');return;}
   // Check how many claims this manager already has vs how many slots they have
   const existingClaims = managerClaimsCount(mid);
@@ -2102,7 +2134,9 @@ function renderWaiver(){
         isMyClaim
           ? `<button class="btn btn-sm btn-danger" onclick="cancelClaim(${p.id},${myId})">CANCEL</button>`
           : canClaim
-            ? `<button class="btn btn-sm btn-primary" onclick="submitClaim(${p.id},${myId})">CLAIM</button>`
+            ? (()=>{ const lk=getWaiverLockoutStatus(); return lk.locked&&!isCommissioner
+                ? `<span style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--red);padding:3px 6px;border:1px solid var(--red)33">⛔ LOCKED</span>`
+                : `<button class="btn btn-sm btn-primary" onclick="submitClaim(${p.id},${myId})">CLAIM</button>`; })()
             : mySlots<=0
               ? `<span style="font-size:11px;color:var(--text3)">NO SLOT</span>`
               : `<span style="font-size:11px;color:var(--text3)">SLOTS FULL</span>`;
