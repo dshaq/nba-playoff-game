@@ -701,7 +701,11 @@ async function fetchScores(){
     }catch(e){}
   }
 
-  const gameOrder = g => g.gameStatus===2 ? 0 : g.gameStatus===1 ? 1 : 2;
+  // Live = any game with live stats or gameStatus===2
+  const gameOrder = g => {
+    const hasLive = g.espnId && Object.values(livePlayerStats||{}).some(s=>s.gameId===g.espnId);
+    return (g.gameStatus===2||hasLive) ? 0 : g.gameStatus===1 ? 1 : 2;
+  };
   const allGames = [...todayGames, ...yGames].sort((a,b) => gameOrder(a)-gameOrder(b));
 
   if(!allGames.length){
@@ -715,7 +719,9 @@ async function fetchScores(){
   const renderGame = g => {
     const home=g.homeTeam, away=g.awayTeam;
     const status=g.gameStatusText||'';
-    const isLive=g.gameStatus===2, isFinal=g.gameStatus===3, isUpcoming=g.gameStatus===1;
+    // Override: if we have live player stats for this game, treat it as live
+    const hasLiveStats = g.espnId && Object.values(livePlayerStats||{}).some(s=>s.gameId===g.espnId);
+    const isLive=(g.gameStatus===2)||hasLiveStats, isFinal=g.gameStatus===3&&!hasLiveStats, isUpcoming=g.gameStatus===1&&!hasLiveStats;
     const isYday=g._day==='yesterday';
 
     const awayWin = isFinal && (away.score||0) > (home.score||0);
@@ -3982,7 +3988,10 @@ async function refreshLiveStats(){
         const gameStats = await fetchGameBoxScore(event.id);
         for(const [pid, stat] of Object.entries(gameStats)){
           // Accumulate (player may play multiple games)
-          if(!newLive[pid]) newLive[pid]={fp:0,pts:0,reb:0,ast:0,stl:0,blk:0,to:0,live:isLive,gameId:event.id};
+          // Get opponent teams for this game
+          const _comps = event.competitions?.[0]?.competitors||[];
+          const _teams = _comps.map(c=>espnTeamToOurs(c.team?.abbreviation||'')).filter(Boolean);
+          if(!newLive[pid]) newLive[pid]={fp:0,pts:0,reb:0,ast:0,stl:0,blk:0,to:0,live:isLive,gameId:event.id,teams:_teams};
           newLive[pid].fp  += stat.fp;
           newLive[pid].pts += stat.pts;
           newLive[pid].reb += stat.reb;
@@ -4009,7 +4018,9 @@ async function refreshLiveStats(){
         for(const [pid, stat] of Object.entries(stats)){
           const key = pid+'_'+dateStr+'_'+event.id;
           if(!S.playerStats[key]){
-            S.playerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:event.id};
+            const _comps2 = event.competitions?.[0]?.competitors||[];
+            const _teams2 = _comps2.map(c=>espnTeamToOurs(c.team?.abbreviation||'')).filter(Boolean);
+            S.playerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:event.id, teams:_teams2};
             changed = true;
           }
         }
@@ -4152,7 +4163,7 @@ function openPlayerModal(pid){
   const pct = (m,a) => a>0 ? (m/a).toFixed(3).replace(/^0/,'') : '—';
   const efg = (fgm,tpm,fga) => fga>0 ? ((fgm+0.5*tpm)/fga).toFixed(3).replace(/^0/,'') : '—';
 
-  const statRow = (g, isTotal=false, isAvg=false) => {
+  const statRow = (g, isTotal=false, isAvg=false, playerName='') => {
     const fgm2 = (g.fgm||0)-(g.tpm||0), fga2 = (g.fga||0)-(g.tpa||0);
     const gmSc = g.gmSc != null ? g.gmSc :
       +((g.pts||0) + 0.4*(g.fgm||0) - 0.7*(g.fga||0) - 0.4*((g.fta||0)-(g.ftm||0)) +
@@ -4164,35 +4175,48 @@ function openPlayerModal(pid){
       : (g.fp!=null?(g.fp>=0?'+':'')+parseFloat(g.fp).toFixed(1):'—');
     const rowColor = isTotal?'var(--accent2)':isAvg?'var(--accent3)':g.live?'var(--red)':'var(--text3)';
     const div = (n,d) => d>0?(n/d).toFixed(1):'—';
+    // Build opponent label — find the non-player team from teams array
+    let oppLabel = '—';
+    if(!isTotal && !isAvg){
+      if(g.teams && g.teams.length >= 2){
+        const playerTeam = playerName ? (PLAYERS.find(p=>p.name===playerName)?.team||'') : '';
+        const opp = g.teams.find(t=>t!==playerTeam) || g.teams[0];
+        oppLabel = opp ? '@'+opp : (g.live ? '🔴' : '—');
+      } else if(g.live){
+        oppLabel = '🔴';
+      }
+    } else {
+      oppLabel = '';
+    }
     return `<tr class="${isTotal||isAvg?'boxscore-total':''}">
       <td style="color:${rowColor};font-family:'Press Start 2P',monospace;font-size:7px;white-space:nowrap">${dateLabel}</td>
+      <td style="color:var(--text3);font-size:10px;white-space:nowrap">${oppLabel}</td>
+      <td style="color:${isAvg?'var(--accent3)':isTotal?'var(--accent2)':parseFloat(g.fp||0)>=0?'var(--green)':'var(--red)'};font-family:'Press Start 2P',monospace;font-size:9px">${fpStr}</td>
       <td style="color:var(--text3);font-size:12px">${isAvg?div(parseInt(g.min||0),gp):g.min||'—'}</td>
-      <td>${isAvg?div(g.pts,gp):g.pts||0}</td>
+      <td style="color:${(g.pts||0)>=25?'#00ff88':(g.pts||0)>=15?'var(--green)':'inherit'};font-weight:600">${isAvg?div(g.pts,gp):g.pts||0}</td>
       <td>${isAvg?div(g.fgm,gp):g.fgm||0}</td>
       <td>${isAvg?div(g.fga,gp):g.fga||0}</td>
       <td style="color:var(--text3)">${pct(g.fgm||0,g.fga||0)}</td>
-      <td>${isAvg?div(g.tpm,gp):g.tpm||0}</td>
+      <td style="color:${(g.tpm||0)>=3?'#ffcc00':'inherit'}">${isAvg?div(g.tpm,gp):g.tpm||0}</td>
       <td>${isAvg?div(g.tpa,gp):g.tpa||0}</td>
       <td style="color:var(--text3)">${pct(g.tpm||0,g.tpa||0)}</td>
       <td>${isAvg?div(fgm2,gp):fgm2}</td>
       <td>${isAvg?div(fga2,gp):fga2}</td>
       <td style="color:var(--text3)">${pct(fgm2,fga2)}</td>
-      <td style="color:var(--accent3)">${efg(g.fgm||0,g.tpm||0,g.fga||0)}</td>
+      <td style="color:var(--text3)">${efg(g.fgm||0,g.tpm||0,g.fga||0)}</td>
       <td>${isAvg?div(g.ftm,gp):g.ftm||0}</td>
       <td>${isAvg?div(g.fta,gp):g.fta||0}</td>
       <td style="color:var(--text3)">${pct(g.ftm||0,g.fta||0)}</td>
       <td style="color:var(--text3)">${isAvg?div(g.oreb,gp):g.oreb||0}</td>
       <td style="color:var(--text3)">${isAvg?div(g.dreb,gp):g.dreb||0}</td>
-      <td>${isAvg?div(g.reb,gp):g.reb||0}</td>
-      <td>${isAvg?div(g.ast,gp):g.ast||0}</td>
+      <td style="color:${(g.reb||0)>=10?'#4a9eff':'inherit'}">${isAvg?div(g.reb,gp):g.reb||0}</td>
+      <td style="color:${(g.ast||0)>=8?'#ff69b4':'inherit'}">${isAvg?div(g.ast,gp):g.ast||0}</td>
       <td>${isAvg?div(g.stl,gp):g.stl||0}</td>
-      <td>${isAvg?div(g.blk,gp):g.blk||0}</td>
+      <td style="color:${(g.blk||0)>=2?'#cc88ff':'inherit'}">${isAvg?div(g.blk,gp):g.blk||0}</td>
       <td style="color:${(g.to||0)>0?'var(--red)':'inherit'}">${isAvg?div(g.to,gp):g.to||0}</td>
       <td style="color:var(--text3)">${isAvg?div(g.pf,gp):g.pf||0}</td>
-      <td style="font-weight:600">${isAvg?div(g.pts,gp):g.pts||0}</td>
       <td style="color:${parseFloat(gmSc)>=10?'var(--green)':parseFloat(gmSc)<0?'var(--red)':'inherit'}">${isAvg?div(parseFloat(gmSc)*gp,gp):gmSc}</td>
       <td style="color:${(g.plusMinus||0)>0?'var(--green)':(g.plusMinus||0)<0?'var(--red)':'inherit'}">${isAvg?'—':(g.plusMinus!=null?(g.plusMinus>0?'+':'')+g.plusMinus:'—')}</td>
-      <td style="color:${isAvg?'var(--accent3)':isTotal?'var(--accent2)':parseFloat(g.fp||0)>=0?'var(--green)':'var(--red)'};font-family:'Press Start 2P',monospace;font-size:9px">${fpStr}</td>
     </tr>`;
   };
 
@@ -4219,23 +4243,23 @@ function openPlayerModal(pid){
     <table class="boxscore-table" style="font-size:11px;min-width:900px">
       <thead>
         <tr style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text3)">
-          <th>DATE</th><th>MP</th><th>PTS</th>
+          <th>DATE</th><th>OPP</th><th style="color:var(--green)">FP</th><th>MP</th><th style="color:var(--green)">PTS</th>
           <th>FG</th><th>FGA</th><th style="color:var(--text3)">FG%</th>
-          <th>3P</th><th>3PA</th><th style="color:var(--text3)">3P%</th>
+          <th style="color:#ffcc00">3P</th><th>3PA</th><th style="color:var(--text3)">3P%</th>
           <th>2P</th><th>2PA</th><th style="color:var(--text3)">2P%</th>
-          <th style="color:var(--accent3)">eFG%</th>
+          <th style="color:var(--text3)">eFG%</th>
           <th>FT</th><th>FTA</th><th style="color:var(--text3)">FT%</th>
-          <th style="color:var(--text3)">ORB</th><th style="color:var(--text3)">DRB</th><th>TRB</th>
-          <th>AST</th><th>STL</th><th>BLK</th>
+          <th style="color:var(--text3)">ORB</th><th style="color:var(--text3)">DRB</th><th style="color:#4a9eff">TRB</th>
+          <th style="color:#ff69b4">AST</th><th>STL</th><th style="color:#cc88ff">BLK</th>
           <th style="color:var(--red)">TOV</th><th style="color:var(--text3)">PF</th>
           <th>PTS</th><th>GmSc</th><th>+/-</th>
           <th style="color:var(--accent2)">FP</th>
         </tr>
       </thead>
       <tbody>
-        ${gameStats.map(g=>statRow(g)).join('')}
-        ${gp>1?statRow(totals,true):''}
-        ${gp>1?statRow(totals,false,true):''}
+        ${gameStats.map(g=>statRow(g,false,false,p?.name||'')).join('')}
+        ${gp>1?statRow(totals,true,false,p?.name||''):''}
+        ${gp>1?statRow(totals,false,true,p?.name||''):''}
       </tbody>
     </table>
     </div>` :
