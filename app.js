@@ -3177,7 +3177,330 @@ async function setBossConfig(bossData){
   showToast('Boss Battle updated!','info');
 }
 
+// ── BOSS BATTLE SCENE — SNES FF3 Style ─────────────────────────
+// Commissioner-only staging until battle is made public
+
+function renderBossBattleScene(){
+  const el = document.getElementById('boss-battle-content');
+  if(!el) return;
+
+  const bb = getBossBattle();
+  const isStaging = !bb?.active && isCommissioner;
+  const isPublic = bb?.active;
+
+  // Only show scene to commissioner (staging) or everyone (active)
+  if(!isStaging && !isPublic){
+    // Show coming soon to non-commissioners
+    const commPanel = isCommissioner ? renderBossCommPanel(bb) : '';
+    el.innerHTML = `<div style="padding:2rem;text-align:center">
+      <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.75rem">⚔ BOSS BATTLE</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#ff9900;margin-bottom:.5rem;animation:blink .9s step-end infinite">COMING SOON</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:.75rem;max-width:300px;margin-left:auto;margin-right:auto">Each round a legendary player becomes the Boss. Your team fights together to defeat them. Winners earn bonus FP and exclusive badges.</div>
+      ${commPanel}
+    </div>`;
+    return;
+  }
+
+  // Get sprites from CUSTOM_LOGOS
+  const getSprite = name => {
+    const logo = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()===name.toLowerCase());
+    return logo?.dataUri || null;
+  };
+
+  const bossSunImg    = getSprite('Boss_Sun');
+  const minion1Img    = getSprite('Boss_Minion1');
+  const minion2Img    = getSprite('Boss_Minion2');
+  const brooksImg     = getSprite('Brooks_Chained');
+
+  // Enemy HP values
+  const bossHP    = bb?.bossHP || 175;
+  const minion1HP = bb?.minion1HP || 45;
+  const minion2HP = bb?.minion2HP || 45;
+  const damage    = bb?.active ? getBossDamage() : 0;
+  const bossCurrent    = Math.max(0, bossHP - damage);
+  const minion1Current = Math.max(0, minion1HP - (bb?.minion1Damage||0));
+  const minion2Current = Math.max(0, minion2HP - (bb?.minion2Damage||0));
+
+  const mid = currentManagerId;
+  const myChampPid = bb?.champions?.[mid];
+  const myChamp = myChampPid ? getPlayer(myChampPid) : null;
+
+  // Champion list — left 3 and right 3
+  const allChamps = S.managers.map(m => {
+    const pid = bb?.champions?.[m.id];
+    const p = pid ? getPlayer(pid) : null;
+    const fp = p ? playerStatScore(pid, m.id) : 0;
+    const portrait = p ? getActivePortrait(p.name) : null;
+    const isLive = p ? isPlayerLive(pid) : false;
+    const aColor = getAvatarColor(m.id);
+    return { m, p, pid, fp, portrait, isLive, aColor };
+  });
+  const leftChamps  = allChamps.slice(0,3);
+  const rightChamps = allChamps.slice(3,6);
+
+  // HP bar helper
+  const hpBar = (current, max, color, label, icon) => {
+    const pct = Math.min(100, Math.round(current/max*100));
+    const barColor = pct>50?color:pct>25?'#ff9900':'#ff3344';
+    return `<div style="margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+        <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${color}">${icon} ${label}</span>
+        <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${barColor}">${current}/${max}</span>
+      </div>
+      <div style="height:12px;background:#0a0a0a;border:1px solid ${color}44;position:relative;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barColor};transition:width .8s;box-shadow:0 0 6px ${barColor}88"></div>
+        ${Array.from({length:Math.floor(max/20)},(_,i)=>`<div style="position:absolute;left:${(i+1)*(100/(Math.floor(max/20)+1))}%;top:0;height:100%;width:1px;background:rgba(0,0,0,.4)"></div>`).join('')}
+      </div>
+    </div>`;
+  };
+
+  // Champion card helper
+  const champCard = (champ, side) => {
+    const { m, p, pid, fp, portrait, isLive, aColor } = champ;
+    const isMe = m.id === mid;
+    const hasChamp = !!p;
+    return `<div style="margin-bottom:8px;${side==='right'?'text-align:right':''}">
+      <div style="display:inline-block;position:relative">
+        <!-- Manager name -->
+        <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${aColor};margin-bottom:2px;${side==='right'?'text-align:right':''}">${m.name.toUpperCase()}</div>
+        <!-- Champion portrait -->
+        <div style="width:52px;height:52px;border:2px solid ${hasChamp?aColor:'#333'};background:#0a0510;overflow:hidden;position:relative;${side==='right'?'margin-left:auto':''}">
+          ${portrait
+            ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated${isLive?';animation:champ-pulse 1.2s ease-in-out infinite':''}"/>`
+            : hasChamp
+              ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:${aColor}">${p.team}</div>`
+              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#333">?</div>`}
+          ${isLive?`<div style="position:absolute;inset:0;border:2px solid var(--red);animation:live-border 1s step-end infinite;pointer-events:none"></div>`:''}
+        </div>
+        <!-- FP damage -->
+        ${hasChamp?`<div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'#ffcc00':'#555'};margin-top:2px;${side==='right'?'text-align:right':''}">⚔ ${fp.toFixed(0)}</div>`:''}
+        <!-- Pick button for own team -->
+        ${isMe&&!bb?.defeated&&isPublic?`<button onclick="openChampionPicker(${m.id})" style="width:52px;margin-top:2px;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:${aColor}22;border:1px solid ${aColor};color:${aColor};cursor:pointer">${hasChamp?'CHANGE':'PICK'}</button>`:''}
+      </div>
+    </div>`;
+  };
+
+  // Staging banner
+  const stagingBanner = isStaging ? `
+    <div style="background:rgba(255,153,0,.12);border:1px dashed #ff9900;padding:5px 10px;text-align:center;font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;margin-bottom:8px">
+      🔓 COMMISSIONER PREVIEW — NOT YET PUBLIC
+    </div>` : '';
+
+  el.innerHTML = `
+  <div style="font-family:'Press Start 2P',monospace">
+    ${stagingBanner}
+
+    <!-- ── BATTLE ARENA ── -->
+    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?280:340}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:8px">
+
+      <!-- Desert sky background -->
+      <canvas id="boss-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+
+      <!-- Left champions -->
+      <div style="position:absolute;left:8px;top:12px;z-index:5">
+        ${leftChamps.map(c=>champCard(c,'left')).join('')}
+      </div>
+
+      <!-- Right champions -->
+      <div style="position:absolute;right:8px;top:12px;z-index:5">
+        ${rightChamps.map(c=>champCard(c,'right')).join('')}
+      </div>
+
+      <!-- Center: Boss + Minions + Brooks -->
+      <div style="position:absolute;left:50%;transform:translateX(-50%);top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;z-index:4;padding-top:8px">
+
+        <!-- Sun Boss -->
+        <div style="position:relative;margin-bottom:4px">
+          ${bossSunImg
+            ? `<img src="${bossSunImg}" style="width:${IS_MOBILE?80:110}px;height:${IS_MOBILE?80:110}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrent/bossHP<.3?',boss-shake .15s infinite':''}"/>`
+            : `<div style="width:${IS_MOBILE?80:110}px;height:${IS_MOBILE?80:110}px;display:flex;align-items:center;justify-content:center;font-size:${IS_MOBILE?48:64}px;animation:boss-float 3s ease-in-out infinite">☀️</div>`}
+          <!-- Boss name -->
+          <div style="text-align:center;font-size:7px;color:#ff6600;margin-top:2px;white-space:nowrap">DESERT SUN</div>
+        </div>
+
+        <!-- Minions row -->
+        <div style="display:flex;gap:16px;margin-bottom:8px">
+          ${[{img:minion1Img,label:'MINION 1'},{img:minion2Img,label:'MINION 2'}].map(mn=>`
+            <div style="text-align:center">
+              ${mn.img
+                ? `<img src="${mn.img}" style="width:${IS_MOBILE?44:56}px;height:${IS_MOBILE?44:56}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.5s ease-in-out infinite .4s"/>`
+                : `<div style="width:${IS_MOBILE?44:56}px;height:${IS_MOBILE?44:56}px;display:flex;align-items:center;justify-content:center;font-size:${IS_MOBILE?28:36}px;animation:boss-float 2.5s ease-in-out infinite .4s">👹</div>`}
+              <div style="font-size:6px;color:#cc4400">${mn.label}</div>
+            </div>`).join('')}
+        </div>
+
+        <!-- Dillon Brooks chained -->
+        <div style="text-align:center;opacity:.85">
+          ${brooksImg
+            ? `<img src="${brooksImg}" style="width:${IS_MOBILE?36:46}px;height:${IS_MOBILE?36:46}px;object-fit:contain;image-rendering:pixelated;animation:prisoner-sway 2s ease-in-out infinite"/>`
+            : `<div style="font-size:${IS_MOBILE?24:32}px;animation:prisoner-sway 2s ease-in-out infinite">⛓️</div>`}
+          <div style="font-size:6px;color:#888">D. BROOKS<br>⛓ CAPTIVE</div>
+        </div>
+      </div>
+
+      <!-- Damage flash overlay -->
+      <div id="damage-flash" style="position:absolute;inset:0;background:rgba(255,200,0,0);pointer-events:none;transition:background .1s;z-index:10"></div>
+
+      <!-- Victory overlay -->
+      ${bb?.defeated?`
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:20;animation:victory-fade 1s ease-in">
+        <div style="text-align:center">
+          <div style="font-size:${IS_MOBILE?14:20}px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;animation:victory-pulse 1s ease-in-out infinite">☀ DEFEATED ☀</div>
+          <div style="font-size:9px;color:#fff;margin-top:8px">+${bb.reward} FP AWARDED</div>
+        </div>
+      </div>`:''
+      }
+    </div>
+
+    <!-- ── HP BARS ── -->
+    <div style="background:#050510;border:2px solid #1a0a2a;padding:.625rem .75rem;margin-bottom:8px">
+      <div style="font-size:7px;color:#cc6600;margin-bottom:6px">ENEMIES</div>
+      ${hpBar(bossCurrent, bossHP, '#ff6600', 'DESERT SUN', '☀')}
+      ${hpBar(minion1Current, minion1HP, '#cc2200', 'MINION I', '👹')}
+      ${hpBar(minion2Current, minion2HP, '#cc2200', 'MINION II', '👹')}
+    </div>
+
+    <!-- ── CHAMPION DAMAGE ── -->
+    <div style="background:#050510;border:2px solid #1a2a1a;padding:.625rem .75rem;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:7px;color:#00cc66">CHAMPIONS — TOTAL DAMAGE: <span style="color:${damage>=bossHP?'#ffcc00':'#00ff88'}">${damage.toFixed(0)} / ${bossHP}</span></span>
+      </div>
+      ${S.managers.map(m=>{
+        const pid = bb?.champions?.[m.id];
+        const p = pid?getPlayer(pid):null;
+        const fp = p?playerStatScore(pid,m.id):0;
+        const aColor = getAvatarColor(m.id);
+        const portrait = p?getActivePortrait(p.name):null;
+        const barPct = Math.min(100,Math.round(fp/bossHP*100*6)); // contribution
+        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #1a1a2a">
+          <div style="width:16px;height:16px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(m.id,'sm')}</div>
+          <span style="font-size:7px;color:${aColor};min-width:56px">${m.name.toUpperCase()}</span>
+          <span style="font-size:9px;color:var(--text2);flex:1">${p?p.name.split(' ').pop():'— no champion'}</span>
+          <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'#ffcc00':'#444'}">⚔ ${fp.toFixed(0)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Badges earned -->
+    ${bb?.defeated?renderBadges(mid):''}
+
+    <!-- Commissioner panel -->
+    ${isCommissioner?renderBossCommPanel(bb):''}
+  </div>`;
+
+  // Start desert background animation
+  requestAnimationFrame(()=>drawDesertBg());
+}
+
+// ── Desert Background Canvas Animation ──────────────────────────
+let _bgFrame = 0;
+let _bgAnimating = false;
+
+function drawDesertBg(){
+  const canvas = document.getElementById('boss-bg-canvas');
+  if(!canvas){ _bgAnimating=false; return; }
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W; canvas.height = H;
+
+  _bgFrame++;
+
+  // Sky gradient — deep purple to burnt orange
+  const sky = ctx.createLinearGradient(0,0,0,H*.6);
+  sky.addColorStop(0,'#1a0520');
+  sky.addColorStop(.4,'#3d1205');
+  sky.addColorStop(1,'#8b3a00');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0,0,W,H);
+
+  // Sun rays emanating from center-top
+  const cx=W*.5, cy=-H*.1;
+  const rayCount=12;
+  for(let i=0;i<rayCount;i++){
+    const angle = (i/rayCount)*Math.PI*2 + _bgFrame*.005;
+    const x1=cx+Math.cos(angle)*20, y1=cy+Math.sin(angle)*20;
+    const x2=cx+Math.cos(angle)*W, y2=cy+Math.sin(angle)*W;
+    const grad=ctx.createLinearGradient(x1,y1,x2,y2);
+    const alpha=0.04+0.02*Math.sin(_bgFrame*.03+i);
+    grad.addColorStop(0,`rgba(255,150,0,${alpha*3})`);
+    grad.addColorStop(1,`rgba(255,100,0,0)`);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+    ctx.strokeStyle=grad;ctx.lineWidth=W/rayCount;ctx.stroke();
+  }
+
+  // Heat shimmer layers
+  const shimmerY = H*.55;
+  for(let layer=0;layer<3;layer++){
+    const shimmer=ctx.createLinearGradient(0,shimmerY+layer*8,0,shimmerY+layer*8+12);
+    const a=0.05+0.03*Math.sin(_bgFrame*.04+layer*1.2);
+    shimmer.addColorStop(0,`rgba(255,180,80,0)`);
+    shimmer.addColorStop(.5,`rgba(255,180,80,${a})`);
+    shimmer.addColorStop(1,`rgba(255,180,80,0)`);
+    ctx.fillStyle=shimmer;
+    const wobble=Math.sin(_bgFrame*.02+layer)*3;
+    ctx.fillRect(0,shimmerY+layer*8+wobble,W,12);
+  }
+
+  // Desert ground — pixel dunes
+  const groundY=H*.62;
+  ctx.fillStyle='#4a2200';
+  ctx.fillRect(0,groundY,W,H-groundY);
+
+  // Dune highlights
+  for(let d=0;d<5;d++){
+    const dx=(d/5)*W + Math.sin(_bgFrame*.008+d)*2;
+    const dy=groundY-6+Math.sin(d*0.7)*4;
+    const dg=ctx.createRadialGradient(dx,dy,0,dx,dy,W*.2);
+    dg.addColorStop(0,'rgba(200,120,30,0.15)');
+    dg.addColorStop(1,'rgba(200,120,30,0)');
+    ctx.fillStyle=dg;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // Pixel sand particles
+  const sandColors=['#8b5a00','#a06820','#7a4800'];
+  for(let p=0;p<8;p++){
+    const px=(p*W/7+_bgFrame*.5*(p%2?1:-1))%W;
+    const py=groundY-2+Math.sin(p*.9+_bgFrame*.01)*3;
+    ctx.fillStyle=sandColors[p%3];
+    ctx.fillRect(Math.round(px),Math.round(py),2,2);
+  }
+
+  // Pixel stars in upper sky
+  for(let s=0;s<15;s++){
+    const sx=(s*97+13)%W, sy=(s*61+7)%(H*.35);
+    const brightness=0.3+0.4*Math.sin(_bgFrame*.05+s*.8);
+    ctx.fillStyle=`rgba(255,220,180,${brightness})`;
+    ctx.fillRect(Math.round(sx),Math.round(sy),1,1);
+  }
+
+  if(document.getElementById('boss-bg-canvas')){
+    requestAnimationFrame(drawDesertBg);
+  }
+}
+
+// ── Boss Battle CSS Animations ──────────────────────────────────
+(function injectBossCSS(){
+  if(document.getElementById('boss-css')) return;
+  const style = document.createElement('style');
+  style.id = 'boss-css';
+  style.textContent = `
+    @keyframes boss-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes boss-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+    @keyframes prisoner-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+    @keyframes champ-pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
+    @keyframes live-border{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes victory-fade{from{opacity:0}to{opacity:1}}
+    @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  `;
+  document.head.appendChild(style);
+})();
+
+
 function renderBossBattle(){
+  renderBossBattleScene();
+}
+function _oldRenderBossBattle_unused(){
   const el = document.getElementById('boss-battle-content');
   if(!el) return;
   const bb = getBossBattle();
