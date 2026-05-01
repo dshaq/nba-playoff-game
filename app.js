@@ -679,7 +679,7 @@ async function autoProcessWaivers(){
   const _claimsAfter = Array.isArray(S.waiverClaims) ? S.waiverClaims : Object.values(S.waiverClaims||{});
   if(!_claimsAfter.length) return; // re-check after refresh
 
-  await processWaiverClaims();
+  await _runWaiverClaims();
 }
 
 function startWaiverPolling(){
@@ -1281,13 +1281,17 @@ async function cancelClaim(pid,mid){
 }
 
 async function processWaiverClaims(){
-  // Normalize waiverClaims to array
-  if(!Array.isArray(S.waiverClaims)) S.waiverClaims = Object.values(S.waiverClaims||{});
+  // Manual trigger — commissioner only with confirm dialog
   if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
-  if(!S.waiverClaims||Object.keys(S.waiverClaims).length===0){
-    alert('NO PENDING CLAIMS TO PROCESS');return;
-  }
+  if(!Array.isArray(S.waiverClaims)) S.waiverClaims = Object.values(S.waiverClaims||{});
+  if(!S.waiverClaims||S.waiverClaims.length===0){alert('NO PENDING CLAIMS TO PROCESS');return;}
   if(!confirm('PROCESS ALL WAIVER CLAIMS NOW?\n\nHigher priority managers win ties. This cannot be undone.')) return;
+  await _runWaiverClaims();
+}
+
+async function _runWaiverClaims(){
+  // Core processing logic — no prompts, safe for auto-processing
+  if(!Array.isArray(S.waiverClaims)) S.waiverClaims = Object.values(S.waiverClaims||{});
 
   const priority = getWaiverPriority();
   const results = [];
