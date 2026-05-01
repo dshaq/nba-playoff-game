@@ -645,6 +645,47 @@ async function loadState(){
   }
 }
 
+
+// ── Auto Waiver Processing ────────────────────────────────────────
+let _waiverPollingInterval = null;
+let _lastWaiverProcess = 0;
+
+async function autoProcessWaivers(){
+  if(!db || !S) return;
+  if(!(S.waiverClaims||[]).length) return; // nothing to do
+
+  // Check lockout — don't process during live games
+  const lockout = getWaiverLockoutStatus();
+  if(lockout.locked){
+    console.log('Waiver auto-process skipped — games in progress');
+    return;
+  }
+
+  // Debounce — don't process more than once per 2 minutes
+  const now = Date.now();
+  if(now - _lastWaiverProcess < 120000) return;
+  _lastWaiverProcess = now;
+
+  console.log('Auto-processing', S.waiverClaims.length, 'waiver claim(s)...');
+
+  // Re-fetch fresh state first to avoid stale data conflicts
+  try{
+    const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
+    if(data?.state) S = JSON.parse(data.state);
+  }catch(e){ return; }
+
+  if(!(S.waiverClaims||[]).length) return; // re-check after refresh
+
+  await processWaiverClaims();
+}
+
+function startWaiverPolling(){
+  if(_waiverPollingInterval) clearInterval(_waiverPollingInterval);
+  // Check every 90 seconds — offset from 60s stats and 20s state polling
+  _waiverPollingInterval = setInterval(autoProcessWaivers, 90000);
+  console.log('Waiver auto-processing started (every 90s)');
+}
+
 function startPolling(){
   setInterval(async()=>{
     if(!db||!S) return;
@@ -927,6 +968,7 @@ function showMainScreen(){
   setInterval(fetchScores, 60000);
   startChatPolling();
   startLiveStatsPolling();
+  startWaiverPolling();
 }
 
 // Manager PINs
@@ -1114,6 +1156,7 @@ function selectManager(id){
   setInterval(fetchScores, 60000);
   startChatPolling();
   startLiveStatsPolling();
+  startWaiverPolling();
 }
 
 // ── Actions ───────────────────────────────────────────────────────
