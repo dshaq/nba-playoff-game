@@ -1388,18 +1388,26 @@ async function processWaiverClaims(){
   S.waiverPriority = currentPriority;
 
   // Clear all processed claims
-  S.waiverClaims = {};
+  S.waiverClaims = [];
 
   await saveState(); render();
 
-  // Show results
-  const msg = results.map(r=>{
-    const p = getPlayer(r.pid);
-    return r.won
-      ? `✓ ${r.name} gets ${p?p.name:'?'}`
-      : `✗ ${r.name} loses claim on ${p?p.name:'?'}${r.reason?' ('+r.reason+')':''}`;
-  }).join('\n');
-  alert('WAIVER RESULTS:\n\n'+msg);
+  // Post results to chat + show toast (no blocking alert)
+  if(results.length){
+    const msg = '🏀 WAIVER CLAIMS PROCESSED:\n' + results.map(r=>{
+      const p = getPlayer(r.pid);
+      return r.won
+        ? `✅ ${r.name} → ${p?p.name:'?'}`
+        : `❌ ${r.name} missed ${p?p.name:'?'}${r.reason?' ('+r.reason+')':''}`;
+    }).join('\n');
+    try{
+      const chatState = await loadChatState();
+      chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,text:msg,ts:new Date().toISOString()});
+      await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
+    }catch(e){}
+    const wonCount = results.filter(r=>r.won).length;
+    if(wonCount) showToast(`✅ ${wonCount} waiver claim${wonCount>1?'s':''} processed!`,'info');
+  }
 }
 
 async function addFromWaiver(pid,mid){
