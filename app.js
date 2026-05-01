@@ -1374,13 +1374,46 @@ async function markInjured(mid,pid){
   if(!isCommissioner && currentManagerId !== mid){alert('ONLY YOUR OWN PLAYERS CAN BE MARKED INJURED');return;}
   const p = getPlayer(pid);
   const m = S.managers.find(x=>x.id===mid);
-  if(!confirm(`Mark ${p?.name||pid} as OUT?
+  if(!confirm(`DROP ${p?.name||pid}?
 
-This opens a waiver slot so you can claim a replacement.`)) return;
-  if(!(S.injured[mid]||[]).includes(pid)){if(!S.injured[mid])S.injured[mid]=[];S.injured[mid].push(pid);}
+This will:
+• Remove them from your roster
+• Bank their earned FP
+• Open a waiver slot to claim a replacement`)) return;
+
+  // Bank their FP (filtered to only what was earned while on this roster)
+  const earnedFP = playerStatScore(pid, mid);
+  if(!S.droppedFP) S.droppedFP = {};
+  S.droppedFP[mid] = (S.droppedFP[mid]||0) + earnedFP;
+
+  // Create waiver slot BEFORE removing from roster
+  if(!S.waiverSlotUsage) S.waiverSlotUsage = {};
+  const slotKey = mid+'_inj_'+pid;
+  if(!S.waiverSlotUsage.hasOwnProperty(slotKey)){
+    S.waiverSlotUsage[slotKey] = null; // open slot
+  }
+
+  // Remove from roster and injured list
+  S.rosters[mid] = (S.rosters[mid]||[]).filter(x=>x!==pid);
+  S.injured[mid] = (S.injured[mid]||[]).filter(x=>x!==pid);
+
+  // Log to waiver log
+  if(!S.waiverLog) S.waiverLog = [];
+  S.waiverLog.unshift({
+    ts: new Date().toISOString(),
+    managerId: mid,
+    managerName: m?.name||'Unknown',
+    addPid: null,
+    addName: null,
+    dropPid: pid,
+    dropName: p?.name||'Unknown',
+    droppedFP: earnedFP,
+    round: S.round||1
+  });
+
   await saveState();
   render();
-  showToast(`${p?.name} marked OUT — waiver slot opened`, 'warn');
+  showToast(`${p?.name} dropped — ${earnedFP.toFixed(0)} FP banked, waiver slot opened`, 'warn');
   await saveInjuryNotification(m?.name||'Unknown', p?.name||'Unknown');
 }
 async function clearInjury(mid,pid){
