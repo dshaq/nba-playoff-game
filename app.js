@@ -652,7 +652,9 @@ let _lastWaiverProcess = 0;
 
 async function autoProcessWaivers(){
   if(!db || !S) return;
-  if(!(S.waiverClaims||[]).length) return; // nothing to do
+  // Handle waiverClaims being either array or object (legacy)
+  const _claims = Array.isArray(S.waiverClaims) ? S.waiverClaims : Object.values(S.waiverClaims||{});
+  if(!_claims.length) return; // nothing to do
 
   // Check lockout — don't process during live games
   const lockout = getWaiverLockoutStatus();
@@ -674,7 +676,8 @@ async function autoProcessWaivers(){
     if(data?.state) S = JSON.parse(data.state);
   }catch(e){ return; }
 
-  if(!(S.waiverClaims||[]).length) return; // re-check after refresh
+  const _claimsAfter = Array.isArray(S.waiverClaims) ? S.waiverClaims : Object.values(S.waiverClaims||{});
+  if(!_claimsAfter.length) return; // re-check after refresh
 
   await processWaiverClaims();
 }
@@ -1278,6 +1281,8 @@ async function cancelClaim(pid,mid){
 }
 
 async function processWaiverClaims(){
+  // Normalize waiverClaims to array
+  if(!Array.isArray(S.waiverClaims)) S.waiverClaims = Object.values(S.waiverClaims||{});
   if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
   if(!S.waiverClaims||Object.keys(S.waiverClaims).length===0){
     alert('NO PENDING CLAIMS TO PROCESS');return;
