@@ -1303,8 +1303,8 @@ async function processWaiverClaims(){
       managersWhoWon.add(mid);
       // Remove the dropped player from roster — preserve their earned FP
       if(claim.dropPid){
-        // Save their FP before removing
-        const droppedFP = playerStatScore(claim.dropPid);
+        // Save their FP before removing — use mid filter so only counts FP earned while on THIS manager's roster
+        const droppedFP = playerStatScore(claim.dropPid, mid);
         if(!S.droppedFP) S.droppedFP = {};
         S.droppedFP[mid] = (S.droppedFP[mid]||0) + droppedFP;
         S.rosters[mid] = S.rosters[mid].filter(p=>p!==claim.dropPid);
@@ -1314,7 +1314,7 @@ async function processWaiverClaims(){
         const injuredOnRoster = (S.injured[mid]||[]).filter(p=>S.rosters[mid].includes(p));
         if(injuredOnRoster.length>0){
           const autoDrop = injuredOnRoster[0];
-          const droppedFP = playerStatScore(autoDrop);
+          const droppedFP = playerStatScore(autoDrop, mid); // filter by mid
           if(!S.droppedFP) S.droppedFP = {};
           S.droppedFP[mid] = (S.droppedFP[mid]||0) + droppedFP;
           S.rosters[mid] = S.rosters[mid].filter(p=>p!==autoDrop);
@@ -1327,7 +1327,7 @@ async function processWaiverClaims(){
       const dropName = claim.dropPid ? getPlayer(claim.dropPid)?.name : null;
       results.push({mid, name:claim.managerName, pid:claim.pid, dropPid:claim.dropPid, dropName, won:true});
       if(!S.waiverLog) S.waiverLog = [];
-      S.waiverLog.unshift({ts:new Date().toISOString(),managerId:mid,managerName:claim.managerName,addPid:claim.pid,addName:getPlayer(claim.pid)?.name||'?',dropPid:claim.dropPid||null,dropName:dropName||null,droppedFP:claim.dropPid?playerStatScore(claim.dropPid):0,round:S.round||1});
+      S.waiverLog.unshift({ts:new Date().toISOString(),managerId:mid,managerName:claim.managerName,addPid:claim.pid,addName:getPlayer(claim.pid)?.name||'?',dropPid:claim.dropPid||null,dropName:dropName||null,droppedFP:claim.dropPid?playerStatScore(claim.dropPid,mid):0,round:S.round||1});
       if(S.waiverLog.length>50) S.waiverLog=S.waiverLog.slice(0,50);
       roundWinners.add(mid);
       anyProcessed=true;
