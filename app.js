@@ -3339,326 +3339,348 @@ async function setBossConfig(bossData){
 // ── BOSS BATTLE SCENE — SNES FF3 Style ─────────────────────────
 // Commissioner-only staging until battle is made public
 
+// ── BOSS BATTLE V2 — Full RPG System ─────────────────────────────
+
+// ── Champion HP from Series Record ──────────────────────────────
+function getChampionHP(pid){
+  const p = getPlayer(pid); if(!p) return 0;
+  const team = getTeam(p.team);
+  if(!team || team.eliminated) return 0;
+  // Find opponent in current round
+  const allTeams = S.teams.filter(t=>!t.eliminated && t.id!==team.id);
+  let teamWins = 0, oppWins = 0;
+  for(const opp of allTeams){
+    const sr = getSeriesRecord(team.id, opp.id);
+    if(!sr) continue;
+    const tw = sr.wins[team.id]||0;
+    const ow = sr.wins[opp.id]||0;
+    if(tw+ow === 0) continue;
+    teamWins = tw; oppWins = ow;
+    break;
+  }
+  // HP = team's wins out of 4 possible wins needed
+  // Leading: high HP. Trailing: low HP.
+  const maxWins = 4;
+  const advantage = teamWins - oppWins; // -3 to +3
+  // Map: +3=100, +2=87, +1=75, 0=50, -1=37, -2=25, -3=12
+  const hpPct = Math.max(5, Math.round((advantage + 3) / 6 * 100));
+  return hpPct;
+}
+
+function getChampionSeriesStatus(pid){
+  const p = getPlayer(pid); if(!p) return {wins:0,losses:0,summary:''};
+  const team = getTeam(p.team);
+  if(!team || team.eliminated) return {wins:0,losses:0,summary:'ELIMINATED'};
+  const allTeams = S.teams.filter(t=>!t.eliminated && t.id!==team.id);
+  for(const opp of allTeams){
+    const sr = getSeriesRecord(team.id, opp.id);
+    if(!sr) continue;
+    const tw = sr.wins[team.id]||0;
+    const ow = sr.wins[opp.id]||0;
+    if(tw+ow === 0) continue;
+    return {wins:tw, losses:ow, summary:sr.summary, opp:opp.id};
+  }
+  return {wins:0,losses:0,summary:'No series'};
+}
+
+// ── Attack System ────────────────────────────────────────────────
+// S.bossBattle.attackPool[mid] = unspent FP available to attack with
+// S.bossBattle.bossCurrentHP, minion1CurrentHP, minion2CurrentHP
+// S.bossBattle.attackLog = [{mid, pid, fp, target, ts}]
+
+async function directAttack(mid, target){
+  // target: 'boss' | 'minion1' | 'minion2'
+  if(currentManagerId !== mid && !isCommissioner){showToast('You can only attack with your own champion','error');return;}
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated){showToast('No active battle','error');return;}
+  const champPid = bb.champions?.[mid];
+  if(!champPid){showToast('Pick a champion first!','error');return;}
+
+  // Calculate available attack FP (earned since last attack)
+  const totalFP = playerStatScore(champPid, mid);
+  const spentFP = (bb.attackLog||[]).filter(a=>a.mid===mid).reduce((s,a)=>s+a.fp,0);
+  const availableFP = Math.max(0, totalFP - spentFP);
+
+  if(availableFP <= 0){
+    showToast('No FP available to attack with yet!','error');
+    return;
+  }
+
+  const p = getPlayer(champPid);
+  const targetLabels = {boss:'BOSS',minion1:'MINION I',minion2:'MINION II'};
+  if(!confirm(`${p?.name} attacks ${targetLabels[target]} for ${availableFP.toFixed(0)} FP damage!\n\nConfirm?`)) return;
+
+  if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
+  S.bossBattle.attackLog.push({mid, pid:champPid, fp:availableFP, target, ts:new Date().toISOString()});
+
+  // Apply damage
+  const dmg = availableFP;
+  if(target==='boss'){
+    S.bossBattle.bossCurrentHP = Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - dmg);
+  } else if(target==='minion1'){
+    S.bossBattle.minion1CurrentHP = Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??45) - dmg);
+  } else if(target==='minion2'){
+    S.bossBattle.minion2CurrentHP = Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??45) - dmg);
+  }
+
+  await saveState();
+  render();
+  showToast(`⚔ ${p?.name} deals ${dmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
+
+  // Trigger damage flash animation
+  const flash = document.getElementById('damage-flash');
+  if(flash){
+    flash.style.background='rgba(255,220,0,.35)';
+    setTimeout(()=>flash.style.background='rgba(255,220,0,0)',300);
+  }
+
+  // Check if boss/minions defeated
+  await checkBossVictoryV2();
+}
+
+async function checkBossVictoryV2(){
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated) return;
+  const bossHP = S.bossBattle.bossCurrentHP ?? bb.bossHP;
+  if(bossHP <= 0){
+    bb.defeated = true;
+    bb.defeatedTs = new Date().toISOString();
+    // Award FP + badges
+    if(!S.droppedFP) S.droppedFP={};
+    if(!S.badges) S.badges={};
+    const badgeName = bb.round===4?'final_boss':'boss_battle_r'+bb.round;
+    for(const m of S.managers){
+      if(bb.champions?.[m.id]){
+        S.droppedFP[m.id]=(S.droppedFP[m.id]||0)+(bb.reward||0);
+        if(!S.badges[m.id]) S.badges[m.id]=[];
+        if(!S.badges[m.id].includes(badgeName)) S.badges[m.id].push(badgeName);
+      }
+    }
+    await saveState();
+    render();
+    try{
+      const chatState = await loadChatState();
+      chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,
+        text:`🏆 BOSS DEFEATED! The Basketball Monster has fallen! +${bb.reward} FP awarded to all Champions! Badges earned! ⚔`,
+        ts:new Date().toISOString()});
+      await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
+    }catch(e){}
+    showToast(`🏆 BOSS DEFEATED! +${bb.reward} FP awarded!`,'warn');
+  }
+}
+
+// ── Main Render ──────────────────────────────────────────────────
 function renderBossBattleScene(){
   const el = document.getElementById('boss-battle-content');
   if(!el) return;
-
   const bb = getBossBattle();
+  const mid = currentManagerId;
   const isStaging = !bb?.active && isCommissioner;
   const isPublic = bb?.active;
 
-  // Only show scene to commissioner (staging) or everyone (active)
   if(!isStaging && !isPublic){
-    // Show coming soon to non-commissioners
-    const commPanel = isCommissioner ? renderBossCommPanel(bb) : '';
     el.innerHTML = `<div style="padding:2rem;text-align:center">
       <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.75rem">⚔ BOSS BATTLE</div>
       <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#ff9900;margin-bottom:.5rem;animation:blink .9s step-end infinite">COMING SOON</div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:.75rem;max-width:300px;margin-left:auto;margin-right:auto">Each round a legendary player becomes the Boss. Your team fights together to defeat them. Winners earn bonus FP and exclusive badges.</div>
-      ${commPanel}
+      <div style="font-size:13px;color:var(--text3);max-width:300px;margin:0 auto .75rem">Each round a legendary basketball monster appears. Your champions must defeat it together.</div>
+      ${isCommissioner?renderBossCommPanel(bb):''}
     </div>`;
     return;
   }
 
-  // Get sprites from CUSTOM_LOGOS
-  const getSprite = name => {
-    const logo = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()===name.toLowerCase());
-    return logo?.dataUri || null;
-  };
+  // Get sprites
+  const getSprite = name => CUSTOM_LOGOS.find(l=>l.name.toLowerCase()===name.toLowerCase())?.dataUri||null;
+  const bossSunImg  = getSprite('Boss_Main') || getSprite('Boss_Sun');
+  const minion1Img  = getSprite('Boss_Minion1');
+  const minion2Img  = getSprite('Boss_Minion2');
 
-  const bossSunImg    = getSprite('Boss_Sun');
-  const minion1Img    = getSprite('Boss_Minion1');
-  const minion2Img    = getSprite('Boss_Minion2');
-  const brooksImg     = getSprite('Brooks_Chained');
+  // HP values
+  const bossMaxHP = bb?.bossHP || 175;
+  const bossCurrentHP = S.bossBattle?.bossCurrentHP ?? bossMaxHP;
+  const minion1MaxHP = bb?.minion1HP || 45;
+  const minion1CurrentHP = S.bossBattle?.minion1CurrentHP ?? minion1MaxHP;
+  const minion2MaxHP = bb?.minion2HP || 45;
+  const minion2CurrentHP = S.bossBattle?.minion2CurrentHP ?? minion2MaxHP;
 
-  // Enemy HP values
-  const bossHP    = bb?.bossHP || 175;
-  const minion1HP = bb?.minion1HP || 45;
-  const minion2HP = bb?.minion2HP || 45;
-  const damage    = bb?.active ? getBossDamage() : 0;
-  const bossCurrent    = Math.max(0, bossHP - damage);
-  const minion1Current = Math.max(0, minion1HP - (bb?.minion1Damage||0));
-  const minion2Current = Math.max(0, minion2HP - (bb?.minion2Damage||0));
-
-  const mid = currentManagerId;
-  const myChampPid = bb?.champions?.[mid];
-  const myChamp = myChampPid ? getPlayer(myChampPid) : null;
-
-  // Champion list — left 3 and right 3
-  const allChamps = S.managers.map(m => {
+  // Champion data
+  const champions = S.managers.map(m=>{
     const pid = bb?.champions?.[m.id];
     const p = pid ? getPlayer(pid) : null;
-    const fp = p ? playerStatScore(pid, m.id) : 0;
     const portrait = p ? getActivePortrait(p.name) : null;
-    const isLive = p ? isPlayerLive(pid) : false;
+    const fp = p ? playerStatScore(pid, m.id) : 0;
+    const spentFP = (bb?.attackLog||[]).filter(a=>a.mid===m.id).reduce((s,a)=>s+a.fp,0);
+    const availFP = Math.max(0, fp - spentFP);
+    const hp = p ? getChampionHP(pid) : 0;
+    const series = p ? getChampionSeriesStatus(pid) : null;
     const aColor = getAvatarColor(m.id);
-    return { m, p, pid, fp, portrait, isLive, aColor };
-  });
-  const leftChamps  = allChamps.slice(0,3);
-  const rightChamps = allChamps.slice(3,6);
-
-  // HP bar helper
-  const hpBar = (current, max, color, label, icon) => {
-    const pct = Math.min(100, Math.round(current/max*100));
-    const barColor = pct>50?color:pct>25?'#ff9900':'#ff3344';
-    return `<div style="margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-        <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${color}">${icon} ${label}</span>
-        <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${barColor}">${current}/${max}</span>
-      </div>
-      <div style="height:12px;background:#0a0a0a;border:1px solid ${color}44;position:relative;overflow:hidden">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barColor};transition:width .8s;box-shadow:0 0 6px ${barColor}88"></div>
-        ${Array.from({length:Math.floor(max/20)},(_,i)=>`<div style="position:absolute;left:${(i+1)*(100/(Math.floor(max/20)+1))}%;top:0;height:100%;width:1px;background:rgba(0,0,0,.4)"></div>`).join('')}
-      </div>
-    </div>`;
-  };
-
-  // Champion card helper
-  const champCard = (champ, side) => {
-    const { m, p, pid, fp, portrait, isLive, aColor } = champ;
+    const isLive = p ? isPlayerLive(pid) : false;
     const isMe = m.id === mid;
-    const hasChamp = !!p;
-    return `<div style="margin-bottom:8px;${side==='right'?'text-align:right':''}">
-      <div style="display:inline-block;position:relative">
-        <!-- Manager name -->
-        <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${aColor};margin-bottom:2px;${side==='right'?'text-align:right':''}">${m.name.toUpperCase()}</div>
-        <!-- Champion portrait -->
-        <div style="width:52px;height:52px;border:2px solid ${hasChamp?aColor:'#333'};background:#0a0510;overflow:hidden;position:relative;${side==='right'?'margin-left:auto':''}">
-          ${portrait
-            ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated${isLive?';animation:champ-pulse 1.2s ease-in-out infinite':''}"/>`
-            : hasChamp
-              ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:${aColor}">${p.team}</div>`
-              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#333">?</div>`}
-          ${isLive?`<div style="position:absolute;inset:0;border:2px solid var(--red);animation:live-border 1s step-end infinite;pointer-events:none"></div>`:''}
-        </div>
-        <!-- FP damage -->
-        ${hasChamp?`<div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'#ffcc00':'#555'};margin-top:2px;${side==='right'?'text-align:right':''}">⚔ ${fp.toFixed(0)}</div>`:''}
-        <!-- Pick button for own team -->
-        ${isMe&&!bb?.defeated&&isPublic?`<button onclick="openChampionPicker(${m.id})" style="width:52px;margin-top:2px;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:${aColor}22;border:1px solid ${aColor};color:${aColor};cursor:pointer">${hasChamp?'CHANGE':'PICK'}</button>`:''}
-      </div>
-    </div>`;
-  };
+    const isElim = p ? (getTeam(p.team)?.eliminated || hp===0) : false;
+    return {m, p, pid, portrait, fp, spentFP, availFP, hp, series, aColor, isLive, isMe, isElim};
+  });
 
-  // Staging banner
-  const stagingBanner = isStaging ? `
-    <div style="background:rgba(255,153,0,.12);border:1px dashed #ff9900;padding:5px 10px;text-align:center;font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;margin-bottom:8px">
-      🔓 COMMISSIONER PREVIEW — NOT YET PUBLIC
-    </div>` : '';
+  injectBossCSS();
 
-  el.innerHTML = `
-  <div style="font-family:'Press Start 2P',monospace">
-    ${stagingBanner}
+  el.innerHTML = `<div style="font-family:'Press Start 2P',monospace">
 
-    <!-- ── BATTLE ARENA ── -->
-    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?280:340}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:8px">
+    ${isStaging?`<div style="background:rgba(255,153,0,.12);border:1px dashed #ff9900;padding:5px 10px;text-align:center;font-size:7px;color:#ff9900;margin-bottom:8px">🔓 COMMISSIONER PREVIEW — NOT YET PUBLIC</div>`:''}
 
-      <!-- Desert sky background -->
+    <!-- ══ BATTLE ARENA ══ -->
+    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?260:320}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:8px">
       <canvas id="boss-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
 
-      <!-- Left champions -->
-      <div style="position:absolute;left:8px;top:12px;z-index:5">
-        ${leftChamps.map(c=>champCard(c,'left')).join('')}
-      </div>
-
-      <!-- Right champions -->
-      <div style="position:absolute;right:8px;top:12px;z-index:5">
-        ${rightChamps.map(c=>champCard(c,'right')).join('')}
-      </div>
-
-      <!-- Center: Boss + Minions + Brooks -->
-      <div style="position:absolute;left:50%;transform:translateX(-50%);top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;z-index:4;padding-top:8px">
-
-        <!-- Sun Boss -->
-        <div style="position:relative;margin-bottom:4px">
-          ${bossSunImg
-            ? `<img src="${bossSunImg}" style="width:${IS_MOBILE?80:110}px;height:${IS_MOBILE?80:110}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrent/bossHP<.3?',boss-shake .15s infinite':''}"/>`
-            : `<div style="width:${IS_MOBILE?80:110}px;height:${IS_MOBILE?80:110}px;display:flex;align-items:center;justify-content:center;font-size:${IS_MOBILE?48:64}px;animation:boss-float 3s ease-in-out infinite">☀️</div>`}
-          <!-- Boss name -->
-          <div style="text-align:center;font-size:7px;color:#ff6600;margin-top:2px;white-space:nowrap">DESERT SUN</div>
+      <!-- BOSS MONSTERS — center top -->
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
+        <!-- Minions row above boss -->
+        <div style="display:flex;gap:24px;margin-bottom:6px">
+          ${[{img:minion1Img,label:'MINION I',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:'MINION II',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
+          <div style="text-align:center;opacity:${mn.hp<=0?.3:1}">
+            ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
+              mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
+              `<div style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
+            <div style="font-size:5px;color:#cc4400;margin-top:1px">${mn.label}</div>
+            <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#1a0808;border:1px solid #cc440044;margin-top:2px">
+              <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.hp/mn.max>.5?'#cc4400':'#ff3344'};transition:width .5s"></div>
+            </div>
+          </div>`).join('')}
         </div>
-
-        <!-- Minions row -->
-        <div style="display:flex;gap:16px;margin-bottom:8px">
-          ${[{img:minion1Img,label:'MINION 1'},{img:minion2Img,label:'MINION 2'}].map(mn=>`
-            <div style="text-align:center">
-              ${mn.img
-                ? `<img src="${mn.img}" style="width:${IS_MOBILE?44:56}px;height:${IS_MOBILE?44:56}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.5s ease-in-out infinite .4s"/>`
-                : `<div style="width:${IS_MOBILE?44:56}px;height:${IS_MOBILE?44:56}px;display:flex;align-items:center;justify-content:center;font-size:${IS_MOBILE?28:36}px;animation:boss-float 2.5s ease-in-out infinite .4s">👹</div>`}
-              <div style="font-size:6px;color:#cc4400">${mn.label}</div>
-            </div>`).join('')}
-        </div>
-
-        <!-- Dillon Brooks chained -->
-        <div style="text-align:center;opacity:.85">
-          ${brooksImg
-            ? `<img src="${brooksImg}" style="width:${IS_MOBILE?36:46}px;height:${IS_MOBILE?36:46}px;object-fit:contain;image-rendering:pixelated;animation:prisoner-sway 2s ease-in-out infinite"/>`
-            : `<div style="font-size:${IS_MOBILE?24:32}px;animation:prisoner-sway 2s ease-in-out infinite">⛓️</div>`}
-          <div style="font-size:6px;color:#888">D. BROOKS<br>⛓ CAPTIVE</div>
+        <!-- Main Boss -->
+        <div style="position:relative;text-align:center">
+          ${bossCurrentHP<=0?`<div style="font-size:${IS_MOBILE?56:72}px">💀</div>`
+            :bossSunImg?`<img src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
+            :`<div style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
+          <div style="font-size:6px;color:#ff6600;margin-top:2px">${(bb?.bossLabel||'BOSS').toUpperCase()}</div>
         </div>
       </div>
 
-      <!-- Damage flash overlay -->
-      <div id="damage-flash" style="position:absolute;inset:0;background:rgba(255,200,0,0);pointer-events:none;transition:background .1s;z-index:10"></div>
+      <!-- CHAMPIONS — bottom row -->
+      <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-around;align-items:flex-end;z-index:5;padding:0 4px 4px">
+        ${champions.map(c=>`
+        <div style="text-align:center;width:${IS_MOBILE?'15':'16'}%;opacity:${c.isElim?.4:1}">
+          <!-- Portrait -->
+          <div onclick="${c.isMe&&!bb?.defeated?'openChampionPicker('+c.m.id+')':''}"
+            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${c.p?c.aColor:'#333'};background:#0a0510;position:relative;cursor:${c.isMe&&!bb?.defeated?'pointer':'default'}">
+            ${c.portrait?`<img src="${c.portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
+              :c.p?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:${c.aColor}">${c.p.team}</div>`
+              :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#444">?</div>`}
+            ${c.isLive?`<div style="position:absolute;top:0;left:0;right:0;background:rgba(255,51,68,.8);font-size:4px;text-align:center;padding:1px;color:#fff">LIVE</div>`:''}
+            ${c.isElim?`<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:10px">💀</div>`:''}
+          </div>
+          <!-- Manager name -->
+          <div style="font-size:5px;color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
+          <!-- HP bar -->
+          <div style="height:3px;background:#1a1a2a;margin-top:1px">
+            <div style="height:100%;width:${c.hp}%;background:${c.hp>60?'var(--green)':c.hp>30?'#ff9900':'var(--red)'};transition:width .5s"></div>
+          </div>
+          <!-- FP/Attack bar -->
+          <div style="height:3px;background:#1a1a2a;margin-top:1px">
+            <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:#ffcc00;transition:width .5s"></div>
+          </div>
+          <!-- Available FP -->
+          ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:5px;color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
+        </div>`).join('')}
+      </div>
+
+      <!-- Damage flash -->
+      <div id="damage-flash" style="position:absolute;inset:0;background:rgba(255,220,0,0);pointer-events:none;transition:background .15s;z-index:10"></div>
 
       <!-- Victory overlay -->
-      ${bb?.defeated?`
-      <div style="position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:20;animation:victory-fade 1s ease-in">
+      ${bb?.defeated?`<div style="position:absolute;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:20">
         <div style="text-align:center">
-          <div style="font-size:${IS_MOBILE?14:20}px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;animation:victory-pulse 1s ease-in-out infinite">☀ DEFEATED ☀</div>
-          <div style="font-size:9px;color:#fff;margin-top:8px">+${bb.reward} FP AWARDED</div>
+          <div style="font-size:${IS_MOBILE?14:22}px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;animation:victory-pulse 1s ease-in-out infinite">🏆 DEFEATED 🏆</div>
+          <div style="font-size:8px;color:#fff;margin-top:8px">+${bb.reward} FP AWARDED TO ALL CHAMPIONS</div>
         </div>
-      </div>`:''
-      }
+      </div>`:''}
     </div>
 
-    <!-- ── HP BARS ── -->
-    <div style="background:#050510;border:2px solid #1a0a2a;padding:.625rem .75rem;margin-bottom:8px">
-      <div style="font-size:7px;color:#cc6600;margin-bottom:6px">ENEMIES</div>
-      ${hpBar(bossCurrent, bossHP, '#ff6600', 'DESERT SUN', '☀')}
-      ${hpBar(minion1Current, minion1HP, '#cc2200', 'MINION I', '👹')}
-      ${hpBar(minion2Current, minion2HP, '#cc2200', 'MINION II', '👹')}
-    </div>
-
-    <!-- ── CHAMPION DAMAGE ── -->
-    <div style="background:#050510;border:2px solid #1a2a1a;padding:.625rem .75rem;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:7px;color:#00cc66">CHAMPIONS — TOTAL DAMAGE: <span style="color:${damage>=bossHP?'#ffcc00':'#00ff88'}">${damage.toFixed(0)} / ${bossHP}</span></span>
-      </div>
-      ${S.managers.map(m=>{
-        const pid = bb?.champions?.[m.id];
-        const p = pid?getPlayer(pid):null;
-        const fp = p?playerStatScore(pid,m.id):0;
-        const aColor = getAvatarColor(m.id);
-        const portrait = p?getActivePortrait(p.name):null;
-        const barPct = Math.min(100,Math.round(fp/bossHP*100*6)); // contribution
-        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #1a1a2a">
-          <div style="width:16px;height:16px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(m.id,'sm')}</div>
-          <span style="font-size:7px;color:${aColor};min-width:56px">${m.name.toUpperCase()}</span>
-          <span style="font-size:9px;color:var(--text2);flex:1">${p?p.name.split(' ').pop():'— no champion'}</span>
-          <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:${fp>0?'#ffcc00':'#444'}">⚔ ${fp.toFixed(0)}</span>
+    <!-- ══ HP BARS ══ -->
+    <div style="background:#050510;border:2px solid #2a1a3a;padding:.5rem .75rem;margin-bottom:6px">
+      <div style="font-size:6px;color:#cc6600;margin-bottom:5px;letter-spacing:.1em">ENEMY HP</div>
+      ${[
+        {label:bb?.bossLabel||'BOSS',icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
+        {label:'MINION I',icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
+        {label:'MINION II',icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
+      ].map(e=>{
+        const pct=Math.max(0,Math.round(e.cur/e.max*100));
+        const bc=pct>50?e.color:pct>25?'#ff9900':'#ff3344';
+        return `<div style="margin-bottom:4px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:1px">
+            <span style="font-size:6px;color:${e.color}">${e.icon} ${e.label}</span>
+            <span style="font-size:6px;color:${bc}">${e.cur<=0?'DEFEATED':e.cur+'/'+e.max}</span>
+          </div>
+          <div style="height:10px;background:#0a0a0a;border:1px solid ${e.color}33;position:relative;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${bc};transition:width .6s;box-shadow:0 0 4px ${bc}66"></div>
+          </div>
         </div>`;
       }).join('')}
     </div>
 
-    <!-- Badges earned -->
-    ${bb?.defeated?renderBadges(mid):''}
+    <!-- ══ CHAMPION STATUS ══ -->
+    <div style="background:#050510;border:2px solid #1a2a1a;padding:.5rem .75rem;margin-bottom:6px">
+      <div style="font-size:6px;color:#00cc66;margin-bottom:5px;letter-spacing:.1em">CHAMPIONS</div>
+      ${champions.map(c=>{
+        const isMe = c.isMe && !bb?.defeated;
+        const aColor = c.aColor;
+        return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1a1a2a">
+          <!-- Avatar -->
+          <div style="width:16px;height:16px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(c.m.id,'sm')}</div>
+          <!-- Name + champion -->
+          <div style="flex:1;min-width:0">
+            <div style="font-size:6px;color:${aColor}">${c.m.name.toUpperCase()}</div>
+            <div style="font-size:9px;color:${c.isElim?'#555':'var(--text2)'}">${c.p?c.p.name.split(' ').pop():(isMe?'⚔ PICK CHAMPION':'—')}</div>
+          </div>
+          <!-- Series record -->
+          <div style="font-size:8px;color:var(--text3);text-align:center;min-width:40px">
+            ${c.series?`${c.series.wins}-${c.series.losses}`:'—'}
+            <div style="font-size:5px;color:${c.hp>60?'var(--green)':c.hp>30?'#ff9900':'var(--red)'}">HP ${c.hp}%</div>
+          </div>
+          <!-- Available FP + Attack button -->
+          <div style="text-align:right;min-width:60px">
+            <div style="font-size:8px;color:${c.availFP>0?'#ffcc00':'#444'}">⚔ ${c.availFP.toFixed(0)} FP</div>
+            ${isMe&&c.availFP>0&&!c.isElim?`
+            <div style="display:flex;gap:2px;margin-top:2px">
+              ${bossCurrentHP>0?`<button onclick="directAttack(${c.m.id},'boss')" style="font-size:5px;padding:2px 3px;background:rgba(255,102,0,.2);border:1px solid #ff6600;color:#ff6600;cursor:pointer">🏀</button>`:''}
+              ${minion1CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion1')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">👹1</button>`:''}
+              ${minion2CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion2')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">👹2</button>`:''}
+            </div>`:''}
+            ${isMe&&!c.p?`<button onclick="openChampionPicker(${c.m.id})" style="font-size:5px;padding:2px 4px;background:rgba(255,51,68,.15);border:1px solid var(--red);color:var(--red);cursor:pointer;margin-top:2px">PICK</button>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Attack Log -->
+    ${(bb?.attackLog||[]).length?`
+    <div style="background:#050510;border:1px solid #1a1a2a;padding:.5rem .75rem;margin-bottom:6px">
+      <div style="font-size:6px;color:var(--text3);margin-bottom:4px;letter-spacing:.1em">ATTACK LOG</div>
+      ${[...(bb.attackLog||[])].reverse().slice(0,6).map(a=>{
+        const m=S.managers.find(x=>x.id===a.mid);
+        const p=getPlayer(a.pid);
+        const target={boss:'🏀 BOSS',minion1:'👹 MINION I',minion2:'👹 MINION II'}[a.target]||a.target;
+        const ts=new Date(a.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
+          <span style="color:${getAvatarColor(a.mid)}">${m?.name||'?'}</span>
+          <span>${p?.name?.split(' ').pop()||'?'}</span>
+          <span style="color:#ffcc00">⚔ ${a.fp.toFixed(0)}</span>
+          <span>→ ${target}</span>
+          <span style="margin-left:auto;font-size:8px">${ts}</span>
+        </div>`;
+      }).join('')}
+    </div>`:''
+    }
+
+    <!-- Badges -->
+    ${mid!==null&&mid!=='viewer'?renderBadges(mid):''}
 
     <!-- Commissioner panel -->
     ${isCommissioner?renderBossCommPanel(bb):''}
   </div>`;
 
-  // Start desert background animation
   requestAnimationFrame(()=>drawDesertBg());
 }
 
-// ── Desert Background Canvas Animation ──────────────────────────
-let _bgFrame = 0;
-let _bgAnimating = false;
+function renderBossBattle(){ renderBossBattleScene(); }
 
-function drawDesertBg(){
-  const canvas = document.getElementById('boss-bg-canvas');
-  if(!canvas){ _bgAnimating=false; return; }
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  canvas.width = W; canvas.height = H;
-
-  _bgFrame++;
-
-  // Sky gradient — deep purple to burnt orange
-  const sky = ctx.createLinearGradient(0,0,0,H*.6);
-  sky.addColorStop(0,'#1a0520');
-  sky.addColorStop(.4,'#3d1205');
-  sky.addColorStop(1,'#8b3a00');
-  ctx.fillStyle = sky;
-  ctx.fillRect(0,0,W,H);
-
-  // Sun rays emanating from center-top
-  const cx=W*.5, cy=-H*.1;
-  const rayCount=12;
-  for(let i=0;i<rayCount;i++){
-    const angle = (i/rayCount)*Math.PI*2 + _bgFrame*.005;
-    const x1=cx+Math.cos(angle)*20, y1=cy+Math.sin(angle)*20;
-    const x2=cx+Math.cos(angle)*W, y2=cy+Math.sin(angle)*W;
-    const grad=ctx.createLinearGradient(x1,y1,x2,y2);
-    const alpha=0.04+0.02*Math.sin(_bgFrame*.03+i);
-    grad.addColorStop(0,`rgba(255,150,0,${alpha*3})`);
-    grad.addColorStop(1,`rgba(255,100,0,0)`);
-    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
-    ctx.strokeStyle=grad;ctx.lineWidth=W/rayCount;ctx.stroke();
-  }
-
-  // Heat shimmer layers
-  const shimmerY = H*.55;
-  for(let layer=0;layer<3;layer++){
-    const shimmer=ctx.createLinearGradient(0,shimmerY+layer*8,0,shimmerY+layer*8+12);
-    const a=0.05+0.03*Math.sin(_bgFrame*.04+layer*1.2);
-    shimmer.addColorStop(0,`rgba(255,180,80,0)`);
-    shimmer.addColorStop(.5,`rgba(255,180,80,${a})`);
-    shimmer.addColorStop(1,`rgba(255,180,80,0)`);
-    ctx.fillStyle=shimmer;
-    const wobble=Math.sin(_bgFrame*.02+layer)*3;
-    ctx.fillRect(0,shimmerY+layer*8+wobble,W,12);
-  }
-
-  // Desert ground — pixel dunes
-  const groundY=H*.62;
-  ctx.fillStyle='#4a2200';
-  ctx.fillRect(0,groundY,W,H-groundY);
-
-  // Dune highlights
-  for(let d=0;d<5;d++){
-    const dx=(d/5)*W + Math.sin(_bgFrame*.008+d)*2;
-    const dy=groundY-6+Math.sin(d*0.7)*4;
-    const dg=ctx.createRadialGradient(dx,dy,0,dx,dy,W*.2);
-    dg.addColorStop(0,'rgba(200,120,30,0.15)');
-    dg.addColorStop(1,'rgba(200,120,30,0)');
-    ctx.fillStyle=dg;
-    ctx.fillRect(0,0,W,H);
-  }
-
-  // Pixel sand particles
-  const sandColors=['#8b5a00','#a06820','#7a4800'];
-  for(let p=0;p<8;p++){
-    const px=(p*W/7+_bgFrame*.5*(p%2?1:-1))%W;
-    const py=groundY-2+Math.sin(p*.9+_bgFrame*.01)*3;
-    ctx.fillStyle=sandColors[p%3];
-    ctx.fillRect(Math.round(px),Math.round(py),2,2);
-  }
-
-  // Pixel stars in upper sky
-  for(let s=0;s<15;s++){
-    const sx=(s*97+13)%W, sy=(s*61+7)%(H*.35);
-    const brightness=0.3+0.4*Math.sin(_bgFrame*.05+s*.8);
-    ctx.fillStyle=`rgba(255,220,180,${brightness})`;
-    ctx.fillRect(Math.round(sx),Math.round(sy),1,1);
-  }
-
-  if(document.getElementById('boss-bg-canvas')){
-    requestAnimationFrame(drawDesertBg);
-  }
-}
-
-// ── Boss Battle CSS Animations ──────────────────────────────────
-(function injectBossCSS(){
-  if(document.getElementById('boss-css')) return;
-  const style = document.createElement('style');
-  style.id = 'boss-css';
-  style.textContent = `
-    @keyframes boss-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-    @keyframes boss-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
-    @keyframes prisoner-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
-    @keyframes champ-pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
-    @keyframes live-border{0%,100%{opacity:1}50%{opacity:0}}
-    @keyframes victory-fade{from{opacity:0}to{opacity:1}}
-    @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  `;
-  document.head.appendChild(style);
-})();
-
-
-function renderBossBattle(){
-  renderBossBattleScene();
-}
 function _oldRenderBossBattle_unused(){
   const el = document.getElementById('boss-battle-content');
   if(!el) return;
