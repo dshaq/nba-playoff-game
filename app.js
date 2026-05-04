@@ -1035,7 +1035,7 @@ function showBossModeHelp(){
 
     <!-- Sections -->
     <div style="padding:12px 14px">
-      ${BOSS_SECTIONS.map(s=>`
+      ${sections.map(s=>`
       <div style="margin-bottom:12px;border-left:3px solid ${s.color};padding-left:10px">
         <div style="font-size:clamp(7px,1.8vw,9px);color:${s.color};margin-bottom:5px;letter-spacing:.08em">${s.icon} ${s.title}</div>
         ${s.text ? `<div style="font-size:clamp(8px,2vw,10px);color:#ccbbee;line-height:1.8;font-family:sans-serif;letter-spacing:.01em">${s.text}</div>` : ''}
