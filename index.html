@@ -1241,7 +1241,7 @@ function openAvatarModal(mid){
     </div>`).join('');
 
   // Exclude logos reserved for system use (Token)
-  const RESERVED_LOGOS = ['token'];
+  const RESERVED_LOGOS = ['token','boss_main','boss_minion1','boss_minion2','boss_background','boss_main_hurt','boss_minion1_hurt','boss_minion2_hurt'];
   const customChoices = CUSTOM_LOGOS.length ? `
     <div style="grid-column:1/-1;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent3);padding:8px 0 4px">CUSTOM LOGOS</div>
     ${CUSTOM_LOGOS.map((logo,i)=>{
