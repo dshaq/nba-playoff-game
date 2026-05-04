@@ -959,6 +959,108 @@ function renderPersonalAlert(){
   </div>`;
 }
 
+
+// ── Boss Battle Mode Summary Popup ──────────────────────────────
+function showBossModeHelp(){
+  if(document.getElementById('boss-mode-help-modal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'boss-mode-help-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+
+  const sections = [
+    {
+      icon: '⚔',
+      title: 'CONCEPT',
+      color: '#ffcc00',
+      text: 'Each round a new boss will challenge the very existence of the NBA Arcade. Owners will each select a Champion from their team to join forces with their competitors and defend the league.'
+    },
+    {
+      icon: '🗡',
+      title: 'CHAMPIONS',
+      color: '#00ff88',
+      text: "Prior to the beginning of the round's first game, select a member of your team to battle the Boss. If you don't select before the round starts, the player with the highest FP average will be auto-selected."
+    },
+    {
+      icon: '💥',
+      title: 'ATTACK',
+      color: '#ff6600',
+      text: 'Each day, select Attack and choose which Boss to damage with all available FP earned. If you do not Attack before the next day games begin, the Boss with the highest HP will be auto-targeted.'
+    },
+    {
+      icon: '🏀',
+      title: 'BOSS DAMAGE',
+      color: '#ff3344',
+      text: 'Each Boss has a set amount of Health Points (HP) and is defeated when its HP reaches 0. Work together — a Boss will not fall without the whole team contributing.'
+    },
+    {
+      icon: '❤',
+      title: 'CHAMPION HEALTH',
+      color: '#cc44ff',
+      text: "Each Champion starts at 100% HP. Each time their actual team loses a series game, this will be reduced by 25%. Even if your Champion is defeated, they will still receive rewards for participating."
+    },
+    {
+      icon: '🏆',
+      title: 'REWARDS',
+      color: '#ffcc00',
+      text: null,
+      rewards: [
+        {label:'DEFEAT THE BOSS', desc:'Your Champion earns +25 bonus FP and a special token allowing you to drop a single player who is not injured.'},
+        {label:'FINAL BLOW', desc:'Deliver the killing hit on a Boss to receive a commemorative badge (displayed on My Team) and a new portrait for your Champion.'},
+      ]
+    }
+  ];
+
+  modal.innerHTML = `
+  <div style="
+    background:#0a0510;
+    border:4px solid #8b6914;
+    box-shadow:0 0 0 2px #000,0 0 0 4px #8b6914,0 0 40px rgba(139,105,20,.3);
+    max-width:520px;width:100%;
+    font-family:'Press Start 2P',monospace;
+    position:relative;
+    margin:auto;
+  ">
+    <!-- Corner decorations -->
+    <div style="position:absolute;top:5px;left:5px;width:14px;height:14px;border-top:3px solid #c8a020;border-left:3px solid #c8a020"></div>
+    <div style="position:absolute;top:5px;right:5px;width:14px;height:14px;border-top:3px solid #c8a020;border-right:3px solid #c8a020"></div>
+    <div style="position:absolute;bottom:5px;left:5px;width:14px;height:14px;border-bottom:3px solid #c8a020;border-left:3px solid #c8a020"></div>
+    <div style="position:absolute;bottom:5px;right:5px;width:14px;height:14px;border-bottom:3px solid #c8a020;border-right:3px solid #c8a020"></div>
+
+    <!-- Header -->
+    <div style="background:linear-gradient(180deg,#3a1f00,#1a0a00);border-bottom:3px solid #8b6914;padding:14px;text-align:center">
+      <div style="font-size:clamp(9px,2.5vw,13px);color:#ffcc00;text-shadow:2px 2px 0 #000,0 0 20px #ffcc0088;letter-spacing:.08em">⚔ BOSS BATTLE ⚔</div>
+      <div style="font-size:clamp(6px,1.5vw,8px);color:#c8a020;margin-top:4px;letter-spacing:.05em">MODE GUIDE</div>
+    </div>
+
+    <!-- Sections -->
+    <div style="padding:12px 14px">
+      ${BOSS_SECTIONS.map(s=>`
+      <div style="margin-bottom:12px;border-left:3px solid ${s.color};padding-left:10px">
+        <div style="font-size:clamp(7px,1.8vw,9px);color:${s.color};margin-bottom:5px;letter-spacing:.08em">${s.icon} ${s.title}</div>
+        ${s.text ? `<div style="font-size:clamp(8px,2vw,10px);color:#ccbbee;line-height:1.8;font-family:sans-serif;letter-spacing:.01em">${s.text}</div>` : ''}
+        ${s.rewards ? s.rewards.map(r=>`
+          <div style="margin-bottom:6px">
+            <div style="font-size:clamp(6px,1.5vw,8px);color:${s.color};margin-bottom:2px">${r.label}</div>
+            <div style="font-size:clamp(8px,2vw,10px);color:#ccbbee;line-height:1.8;font-family:sans-serif">${r.desc}</div>
+          </div>`).join('') : ''}
+      </div>`).join('')}
+    </div>
+
+    <!-- Close button -->
+    <div style="padding:0 14px 14px">
+      <button onclick="document.getElementById('boss-mode-help-modal').remove()" style="
+        width:100%;font-family:'Press Start 2P',monospace;font-size:8px;
+        padding:10px;background:linear-gradient(180deg,#1a0f00,#0a0500);
+        border:2px solid #8b6914;color:#ffcc00;cursor:pointer;
+        letter-spacing:.05em
+      ">✕ CLOSE</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(modal);
+}
+
 function startPolling(){
   setInterval(async()=>{
     if(!db||!S) return;
@@ -3844,6 +3946,19 @@ function renderBossBattleScene(){
   el.innerHTML = `<div style="font-family:'Press Start 2P',monospace">
 
     ${isStaging?`<div style="background:rgba(255,153,0,.12);border:1px dashed #ff9900;padding:5px 10px;text-align:center;font-size:7px;color:#ff9900;margin-bottom:8px">🔓 COMMISSIONER PREVIEW — NOT YET PUBLIC</div>`:''}
+
+    <!-- Mode Summary button -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+      <button onclick="showBossModeHelp()" style="
+        font-family:'Press Start 2P',monospace;font-size:7px;
+        padding:4px 10px;
+        background:rgba(255,204,0,.1);
+        border:1px solid #8b6914;
+        color:#c8a020;
+        cursor:pointer;
+        letter-spacing:.05em
+      ">? MODE GUIDE</button>
+    </div>
 
     <!-- ══ BATTLE ARENA ══ -->
     <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?220:280}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:0">
