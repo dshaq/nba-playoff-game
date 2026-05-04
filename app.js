@@ -3665,7 +3665,7 @@ async function directAttack(mid, target){
   }
 
   const p = getPlayer(champPid);
-  const targetLabels = {boss:'BOSS',minion1:'MINION I',minion2:'MINION II'};
+  const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
   if(!confirm(`${p?.name} attacks ${targetLabels[target]} for ${availableFP.toFixed(0)} FP damage!\n\nConfirm?`)) return;
 
   if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
@@ -3874,9 +3874,9 @@ function renderBossBattleScene(){
     <div style="background:#050510;border:2px solid #2a1a3a;padding:.5rem .75rem;margin-bottom:6px">
       <div style="font-size:6px;color:#cc6600;margin-bottom:5px;letter-spacing:.1em">ENEMY HP</div>
       ${[
-        {label:bb?.bossLabel||'BOSS',icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
-        {label:bb?.minion1Name||'MINION I',icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
-        {label:bb?.minion2Name||'MINION II',icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
+        {label:(bb?.bossLabel||'DUNKMAW').toUpperCase(),icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
+        {label:(bb?.minion1Name||'GUS').toUpperCase(),icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
+        {label:(bb?.minion2Name||'RIMREAPER').toUpperCase(),icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
       ].map(e=>{
         const pct=Math.max(0,Math.round(e.cur/e.max*100));
         const bc=pct>50?e.color:pct>25?'#ff9900':'#ff3344';
@@ -3915,10 +3915,10 @@ function renderBossBattleScene(){
           <div style="text-align:right;min-width:60px">
             <div style="font-size:8px;color:${c.availFP>0?'#ffcc00':'#444'}">⚔ ${c.availFP.toFixed(0)} FP</div>
             ${isMe&&c.availFP>0&&!c.isElim?`
-            <div style="display:flex;gap:2px;margin-top:2px">
-              ${bossCurrentHP>0?`<button onclick="directAttack(${c.m.id},'boss')" style="font-size:5px;padding:2px 3px;background:rgba(255,102,0,.2);border:1px solid #ff6600;color:#ff6600;cursor:pointer">🏀</button>`:''}
-              ${minion1CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion1')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">👹1</button>`:''}
-              ${minion2CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion2')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">👹2</button>`:''}
+            <div style="display:flex;gap:2px;margin-top:2px;flex-wrap:wrap">
+              ${bossCurrentHP>0?`<button onclick="directAttack(${c.m.id},'boss')" style="font-size:5px;padding:2px 3px;background:rgba(255,102,0,.2);border:1px solid #ff6600;color:#ff6600;cursor:pointer">⚔${(bb?.bossLabel||'DUNKMAW').split(' ')[0]}</button>`:''}
+              ${minion1CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion1')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">⚔${bb?.minion1Name||'GUS'}</button>`:''}
+              ${minion2CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion2')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">⚔${bb?.minion2Name||'RIMREAPER'}</button>`:''}
             </div>`:''}
             ${isMe&&!c.p?`<button onclick="openChampionPicker(${c.m.id})" style="font-size:5px;padding:2px 4px;background:rgba(255,51,68,.15);border:1px solid var(--red);color:var(--red);cursor:pointer;margin-top:2px">PICK</button>`:''}
           </div>
@@ -3933,7 +3933,7 @@ function renderBossBattleScene(){
       ${[...(bb.attackLog||[])].reverse().slice(0,6).map(a=>{
         const m=S.managers.find(x=>x.id===a.mid);
         const p=getPlayer(a.pid);
-        const target={boss:'🏀 BOSS',minion1:'👹 MINION I',minion2:'👹 MINION II'}[a.target]||a.target;
+        const target={boss:'🏀 '+(bb?.bossLabel||'DUNKMAW'),minion1:'👹 '+(bb?.minion1Name||'GUS'),minion2:'👹 '+(bb?.minion2Name||'RIMREAPER')}[a.target]||a.target;
         const ts=new Date(a.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
         return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
           <span style="color:${getAvatarColor(a.mid)}">${m?.name||'?'}</span>
