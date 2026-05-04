@@ -1439,7 +1439,7 @@ async function renameMgr(id,val){
 }
 async function setRound(r){S.round=r;if(document.getElementById('m-round'))document.getElementById('m-round').textContent='R'+r;await saveState();render();}
 async function randomizeDraft(){
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!isCommissioner && currentManagerId !== 4){ showToast && showToast('Commissioner access required','error'); return; }
   const n=S.managers.length,idx=[...Array(n).keys()].sort(()=>Math.random()-.5),old=[...S.managers];
   S.managers=idx.map((i,ni)=>({...old[i],id:ni}));
   S.rosters=Object.fromEntries(S.managers.map(m=>[m.id,[]]));
@@ -1551,7 +1551,7 @@ async function cancelClaim(pid,mid){
 
 async function processWaiverClaims(){
   // Manual trigger — commissioner only with confirm dialog
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!isCommissioner && currentManagerId !== 4){ showToast && showToast('Commissioner access required','error'); return; }
   if(!Array.isArray(S.waiverClaims)) S.waiverClaims = Object.values(S.waiverClaims||{});
   if(!S.waiverClaims||S.waiverClaims.length===0){alert('NO PENDING CLAIMS TO PROCESS');return;}
   if(!confirm('PROCESS ALL WAIVER CLAIMS NOW?\n\nHigher priority managers win ties. This cannot be undone.')) return;
@@ -1783,7 +1783,7 @@ function showToast(msg, type='info'){
   setTimeout(()=>toast.remove(), 4000);
 }
 async function toggleElim(tid){
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!isCommissioner && currentManagerId !== 4){ showToast && showToast('Commissioner access required','error'); return; }
   const t=S.teams.find(x=>x.id===tid);
   t.eliminated=!t.eliminated;
   if(t.eliminated){
@@ -1822,7 +1822,7 @@ async function toggleElim(tid){
   await saveState();render();
 }
 async function setSurvivedRounds(tid,r){
-  if(!isCommissioner){alert('COMMISSIONER ACCESS REQUIRED');return;}
+  if(!isCommissioner && currentManagerId !== 4){ showToast && showToast('Commissioner access required','error'); return; }
   S.teams.find(x=>x.id===tid).survivedRounds=parseInt(r);
   await saveState();render();
 }
@@ -4603,7 +4603,7 @@ async function sendChat(){
 }
 
 async function deleteChat(id){
-  if(!isCommissioner){ alert('COMMISSIONER ACCESS REQUIRED'); return; }
+  if(!isCommissioner && currentManagerId !== 4){ showToast && showToast('Commissioner access required','error'); return; }
   const chatState = await loadChatState();
   const filtered = chatState.filter(e=>e.id!==id);
   await saveChatState(filtered);
