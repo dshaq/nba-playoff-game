@@ -1135,10 +1135,30 @@ function triggerAttackFX(target, damage, aColor){
   arena.classList.add('arena-shake');
   setTimeout(()=>arena.classList.remove('arena-shake'), 500);
 
-  // Hit flash on the enemy sprite + knockback
+  // Hit flash on the enemy sprite + knockback + hurt frame swap if available
   const hitClass = target==='boss' ? 'boss-hit' : target==='minion1' ? 'gus-hit' : 'rim-hit';
   const spriteEl = document.getElementById('enemy-sprite-'+target);
-  if(spriteEl){
+  if(spriteEl && spriteEl.tagName==='IMG'){
+    const hurtName = target==='boss' ? 'Boss_Main_hurt' : target==='minion1' ? 'Boss_Minion1_hurt' : 'Boss_Minion2_hurt';
+    const hurtLogo = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()===hurtName.toLowerCase());
+    const idleSrc = spriteEl.src;
+    if(hurtLogo){
+      // Real hurt frame swap
+      spriteEl.src = hurtLogo.dataUri;
+      spriteEl.classList.add(hitClass);
+      setTimeout(()=>{
+        spriteEl.src = idleSrc;
+        spriteEl.classList.remove(hitClass);
+      }, 700);
+    } else {
+      // CSS filter fallback
+      spriteEl.classList.remove('boss-hit','gus-hit','rim-hit');
+      void spriteEl.offsetWidth;
+      spriteEl.classList.add(hitClass);
+      setTimeout(()=>spriteEl.classList.remove(hitClass), 700);
+    }
+  } else if(spriteEl){
+    // Emoji fallback
     spriteEl.classList.remove('boss-hit','gus-hit','rim-hit');
     void spriteEl.offsetWidth;
     spriteEl.classList.add(hitClass);
@@ -4500,7 +4520,17 @@ function renderBossCommPanel(bb){
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ff990033">
         <div style="font-size:7px;color:#ff9900;margin-bottom:6px">🖼 BOSS ASSETS (GIF-safe — no resize)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="font-size:6px;color:#ff990088;margin-bottom:4px">IDLE SPRITES</div>
           ${['Boss_Main','Boss_Minion1','Boss_Minion2','Boss_Background'].map(name=>{
+            const existing = CUSTOM_LOGOS.find(l=>l.name===name);
+            return `<div style="font-size:9px;color:var(--text2)">
+              <div style="color:var(--text3);margin-bottom:2px">${name}</div>
+              ${existing?`<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--green)">✓ Uploaded</span><button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:1px 4px;background:none;border:1px solid #555;color:#888;cursor:pointer">Replace</button></div>`
+                :`<button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:3px 6px;background:rgba(255,153,0,.1);border:1px solid #ff990066;color:#ff9900;cursor:pointer">📁 Upload</button>`}
+            </div>`;
+          }).join('')}
+          <div style="font-size:6px;color:#ff990088;margin:8px 0 4px;padding-top:8px;border-top:1px solid #ff990022">HURT FRAMES (on attack)</div>
+          ${['Boss_Main_hurt','Boss_Minion1_hurt','Boss_Minion2_hurt'].map(name=>{
             const existing = CUSTOM_LOGOS.find(l=>l.name===name);
             return `<div style="font-size:9px;color:var(--text2)">
               <div style="color:var(--text3);margin-bottom:2px">${name}</div>
