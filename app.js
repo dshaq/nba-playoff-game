@@ -2322,7 +2322,7 @@ function renderRosters(){
   if(teamCtrlEl){
     if(_isComm){
       const teamChips = S.teams.map(t=>{
-        const survivalDropdown = `<select onchange="setSurvived('${t.id}',parseInt(this.value))" style="background:var(--bg2);border:1px solid var(--border2);color:var(--text2);font-size:10px;padding:1px 2px;width:46px;margin-left:2px">
+        const survivalDropdown = `<select onchange="setSurvivedRounds('${t.id}',parseInt(this.value))" style="background:var(--bg2);border:1px solid var(--border2);color:var(--text2);font-size:10px;padding:1px 2px;width:46px;margin-left:2px">
           <option value="0" ${(t.survivedRounds||0)===0?'selected':''}>R0</option>
           <option value="1" ${(t.survivedRounds||0)===1?'selected':''}>R1✓</option>
           <option value="2" ${(t.survivedRounds||0)===2?'selected':''}>R2✓</option>
