@@ -700,6 +700,11 @@ function shouldShowBossPopup(){
   if(!bb?.active || bb?.defeated) return false;
   const mid = currentManagerId;
   if(mid === null || mid === 'viewer') return false;
+  // May 4 only — always show on login regardless of dismissal
+  const etNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const isToday = etNow.getMonth()===4 && etNow.getDate()===4; // May 4
+  if(isToday) return true;
+  // After today — respect dismissal
   if(localStorage.getItem(BOSS_POPUP_KEY+'_'+mid)) return false;
   return true;
 }
