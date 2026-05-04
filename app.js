@@ -3959,10 +3959,10 @@ function renderBossBattleScene(){
     </div>
 
     <!-- ══ CHAMPION STATUS + RPG MENU ══ -->
-    <div style="display:${IS_MOBILE?'block':'flex'};gap:8px;margin-bottom:6px">
+    <div style="display:flex;flex-direction:${IS_MOBILE?'column':'row'};gap:8px;margin-bottom:6px">
 
-      <!-- Champion list — left half on desktop -->
-      <div style="background:#050510;border:2px solid #1a2a1a;padding:.5rem .75rem;${IS_MOBILE?'margin-bottom:6px':'flex:1;min-width:0'}">
+      <!-- Champion list — left half on desktop, second on mobile -->
+      <div style="background:#050510;border:2px solid #1a2a1a;padding:.5rem .75rem;${IS_MOBILE?'margin-bottom:6px':'flex:1;min-width:0'};order:${IS_MOBILE?2:1}">
         <div style="font-size:6px;color:#00cc66;margin-bottom:5px;letter-spacing:.1em">⚔ CHAMPIONS</div>
         ${champions.map(c=>{
           const isMe = c.isMe && !bb?.defeated;
@@ -3990,7 +3990,7 @@ function renderBossBattleScene(){
         const hasAttack = isMe && myChamp?.availFP > 0 && !myChamp?.isElim;
         const needsChamp = isMe && !myChamp?.p;
 
-        return `<div style="background:#050210;border:2px solid ${aColor}44;padding:.5rem .75rem;${IS_MOBILE?'':'flex:1;min-width:0'}">
+        return `<div style="background:#050210;border:2px solid ${aColor}44;padding:.5rem .75rem;${IS_MOBILE?'order:1;margin-bottom:6px':'flex:1;min-width:0'}">
           <!-- FF-style dialog box header -->
           <div style="font-size:6px;color:${aColor};margin-bottom:8px;letter-spacing:.1em">${myChamp?.m?.name?.toUpperCase()||'BATTLE MENU'}</div>
 
