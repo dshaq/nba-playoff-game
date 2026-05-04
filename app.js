@@ -723,6 +723,7 @@ function injectBossCSS(){
     @keyframes live-border{0%,100%{opacity:1}50%{opacity:0}}
     @keyframes victory-fade{from{opacity:0}to{opacity:1}}
     @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+    .rpg-hidden{display:none!important}
   `;
   document.head.appendChild(style);
 }
@@ -3894,12 +3895,12 @@ function renderBossBattleScene(){
           <!-- Manager name -->
           <div style="font-size:5px;color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
           <!-- HP bar -->
-          <div style="height:3px;background:#1a1a2a;margin-top:1px">
-            <div style="height:100%;width:${c.hp}%;background:${c.hp>60?'var(--green)':c.hp>30?'#ff9900':'var(--red)'};transition:width .5s"></div>
+          <div style="height:3px;background:#1a1a2a;margin-top:1px" title="HP: ${c.hp}%">
+            <div style="height:100%;width:${c.hp}%;background:${c.aColor};opacity:${c.isElim?.3:1};transition:width .5s;box-shadow:0 0 4px ${c.aColor}88"></div>
           </div>
           <!-- FP/Attack bar -->
-          <div style="height:3px;background:#1a1a2a;margin-top:1px">
-            <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:#ffcc00;transition:width .5s"></div>
+          <div style="height:3px;background:#1a1a2a;margin-top:1px" title="⚔ ${c.availFP.toFixed(0)} FP ready">
+            <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:${c.aColor};opacity:.7;transition:width .5s"></div>
           </div>
           <!-- Available FP -->
           ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:5px;color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
@@ -3922,8 +3923,8 @@ function renderBossBattleScene(){
       <div style="font-size:6px;color:#cc6600;margin-bottom:5px;letter-spacing:.1em">ENEMY HP</div>
       ${[
         {label:(bb?.bossLabel||'DUNKMAW').toUpperCase(),icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
-        {label:(bb?.minion1Name||'GUS').toUpperCase(),icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
-        {label:(bb?.minion2Name||'RIMREAPER').toUpperCase(),icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
+        {label:(bb?.minion1Name||'GUS').toUpperCase(),icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#aa44ff'},
+        {label:(bb?.minion2Name||'RIMREAPER').toUpperCase(),icon:'💀',cur:minion2CurrentHP,max:minion2MaxHP,color:'#ffffff'},
       ].map(e=>{
         const pct=Math.max(0,Math.round(e.cur/e.max*100));
         const bc=pct>50?e.color:pct>25?'#ff9900':'#ff3344';
@@ -3939,38 +3940,103 @@ function renderBossBattleScene(){
       }).join('')}
     </div>
 
-    <!-- ══ CHAMPION STATUS ══ -->
-    <div style="background:#050510;border:2px solid #1a2a1a;padding:.5rem .75rem;margin-bottom:6px">
-      <div style="font-size:6px;color:#00cc66;margin-bottom:5px;letter-spacing:.1em">CHAMPIONS</div>
-      ${champions.map(c=>{
-        const isMe = c.isMe && !bb?.defeated;
-        const aColor = c.aColor;
-        return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1a1a2a">
-          <!-- Avatar -->
-          <div style="width:16px;height:16px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(c.m.id,'sm')}</div>
-          <!-- Name + champion -->
-          <div style="flex:1;min-width:0">
-            <div style="font-size:6px;color:${aColor}">${c.m.name.toUpperCase()}</div>
-            <div style="font-size:9px;color:${c.isElim?'#555':'var(--text2)'}">${c.p?c.p.name.split(' ').pop():(isMe?'⚔ PICK CHAMPION':'—')}</div>
-          </div>
-          <!-- Series record -->
-          <div style="font-size:8px;color:var(--text3);text-align:center;min-width:40px">
-            ${c.series?`${c.series.wins}-${c.series.losses}`:'—'}
-            <div style="font-size:5px;color:${c.hp>60?'var(--green)':c.hp>30?'#ff9900':'var(--red)'}">HP ${c.hp}%</div>
-          </div>
-          <!-- Available FP + Attack button -->
-          <div style="text-align:right;min-width:60px">
-            <div style="font-size:8px;color:${c.availFP>0?'#ffcc00':'#444'}">⚔ ${c.availFP.toFixed(0)} FP</div>
-            ${isMe&&c.availFP>0&&!c.isElim?`
-            <div style="display:flex;gap:2px;margin-top:2px;flex-wrap:wrap">
-              ${bossCurrentHP>0?`<button onclick="directAttack(${c.m.id},'boss')" style="font-size:5px;padding:2px 3px;background:rgba(255,102,0,.2);border:1px solid #ff6600;color:#ff6600;cursor:pointer">⚔${(bb?.bossLabel||'DUNKMAW').split(' ')[0]}</button>`:''}
-              ${minion1CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion1')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">⚔${bb?.minion1Name||'GUS'}</button>`:''}
-              ${minion2CurrentHP>0?`<button onclick="directAttack(${c.m.id},'minion2')" style="font-size:5px;padding:2px 3px;background:rgba(204,34,0,.2);border:1px solid #cc2200;color:#cc2200;cursor:pointer">⚔${bb?.minion2Name||'RIMREAPER'}</button>`:''}
-            </div>`:''}
-            ${isMe&&!c.p?`<button onclick="openChampionPicker(${c.m.id})" style="font-size:5px;padding:2px 4px;background:rgba(255,51,68,.15);border:1px solid var(--red);color:var(--red);cursor:pointer;margin-top:2px">PICK</button>`:''}
-          </div>
+    <!-- ══ CHAMPION STATUS + RPG MENU ══ -->
+    <div style="display:${IS_MOBILE?'block':'flex'};gap:8px;margin-bottom:6px">
+
+      <!-- Champion list — left half on desktop -->
+      <div style="background:#050510;border:2px solid #1a2a1a;padding:.5rem .75rem;${IS_MOBILE?'margin-bottom:6px':'flex:1;min-width:0'}">
+        <div style="font-size:6px;color:#00cc66;margin-bottom:5px;letter-spacing:.1em">⚔ CHAMPIONS</div>
+        ${champions.map(c=>{
+          const isMe = c.isMe && !bb?.defeated;
+          const aColor = c.aColor;
+          return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #0a0a1a">
+            <div style="width:14px;height:14px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(c.m.id,'sm')}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:6px;color:${aColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.m.name.toUpperCase()}</div>
+              <div style="font-size:8px;color:${c.isElim?'#555':'var(--text2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.p?c.p.name.split(' ').pop():(isMe?'— pick champion':'—')}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:7px;color:${aColor}">HP ${c.hp}</div>
+              <div style="height:3px;width:40px;background:#111;margin-top:1px"><div style="height:100%;width:${c.hp}%;background:${aColor};box-shadow:0 0 3px ${aColor}88"></div></div>
+              <div style="font-size:7px;color:${c.availFP>0?'#ffcc00':'#444'};margin-top:2px">⚔ ${c.availFP.toFixed(0)}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- RPG Action Menu — right half on desktop -->
+      ${(()=>{
+        const myChamp = champions.find(c=>c.isMe);
+        const isMe = myChamp && !bb?.defeated;
+        const aColor = myChamp ? myChamp.aColor : '#ffcc00';
+        const hasAttack = isMe && myChamp?.availFP > 0 && !myChamp?.isElim;
+        const needsChamp = isMe && !myChamp?.p;
+
+        return `<div style="background:#050210;border:2px solid ${aColor}44;padding:.5rem .75rem;${IS_MOBILE?'':'flex:1;min-width:0'}">
+          <!-- FF-style dialog box header -->
+          <div style="font-size:6px;color:${aColor};margin-bottom:8px;letter-spacing:.1em">${myChamp?.m?.name?.toUpperCase()||'BATTLE MENU'}</div>
+
+          ${needsChamp ? `
+          <div style="text-align:center;padding:8px">
+            <div style="font-size:9px;color:#888;margin-bottom:8px">No champion selected</div>
+            <button onclick="openChampionPicker(${myChamp?.m?.id})" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 16px;background:rgba(255,51,68,.15);border:2px solid var(--red);color:var(--red);cursor:pointer">⚔ PICK CHAMPION</button>
+          </div>` : `
+
+          <!-- RPG 2x2 button grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+
+            <!-- ATTACK — opens target submenu -->
+            <div style="position:relative">
+              <button onclick="document.getElementById('rpg-attack-submenu')?.classList.toggle('rpg-hidden')" style="
+                width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
+                background:${hasAttack?`linear-gradient(180deg,rgba(255,204,0,.15),rgba(255,102,0,.1))`:'rgba(50,50,50,.3)'};
+                border:2px solid ${hasAttack?aColor:'#333'};
+                color:${hasAttack?aColor:'#444'};cursor:${hasAttack?'pointer':'default'};
+                text-align:left;position:relative;
+              ">
+                ▶ ATTACK
+                ${hasAttack?`<div style="font-size:6px;color:#ffcc00aa;margin-top:2px">${myChamp.availFP.toFixed(0)} FP ready</div>`:'<div style="font-size:6px;color:#444;margin-top:2px">0 FP</div>'}
+              </button>
+              <!-- Attack submenu -->
+              <div id="rpg-attack-submenu" class="rpg-hidden" style="
+                position:absolute;top:100%;left:0;right:0;z-index:20;
+                background:#050210;border:2px solid ${aColor};margin-top:2px;
+              ">
+                ${[
+                  {target:'boss', label:bb?.bossLabel||'DUNKMAW', color:'#ff6600', hp:bossCurrentHP},
+                  {target:'minion1', label:bb?.minion1Name||'GUS', color:'#aa44ff', hp:minion1CurrentHP},
+                  {target:'minion2', label:bb?.minion2Name||'RIMREAPER', color:'#ffffff', hp:minion2CurrentHP},
+                ].filter(t=>t.hp>0).map(t=>`
+                  <button onclick="directAttack(${myChamp?.m?.id},'${t.target}');document.getElementById('rpg-attack-submenu')?.classList.add('rpg-hidden')" style="
+                    width:100%;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 8px;
+                    background:rgba(0,0,0,.5);border:none;border-bottom:1px solid #1a1a2a;
+                    color:${t.color};cursor:pointer;text-align:left;display:block
+                  ">⚔ ${t.label}</button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- ITEM -->
+            <button onclick="showToast('Feature Coming Soon!','info')" style="
+              width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
+              background:rgba(50,50,50,.3);border:2px solid #333;color:#555;cursor:pointer;text-align:left;
+            ">▶ ITEM<div style="font-size:6px;color:#444;margin-top:2px">Coming Soon</div></button>
+
+            <!-- CATCH -->
+            <button onclick="showToast('Feature Coming Soon!','info')" style="
+              width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
+              background:rgba(50,50,50,.3);border:2px solid #333;color:#555;cursor:pointer;text-align:left;
+            ">▶ CATCH<div style="font-size:6px;color:#444;margin-top:2px">Coming Soon</div></button>
+
+            <!-- RUN -->
+            <button onclick="showToast('Feature Coming Soon!','info')" style="
+              width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
+              background:rgba(50,50,50,.3);border:2px solid #333;color:#555;cursor:pointer;text-align:left;
+            ">▶ RUN<div style="font-size:6px;color:#444;margin-top:2px">Coming Soon</div></button>
+
+          </div>`}
         </div>`;
-      }).join('')}
+      })()}
     </div>
 
     <!-- Attack Log -->
