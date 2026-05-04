@@ -651,6 +651,7 @@ let _waiverPollingInterval = null;
 let _lastWaiverProcess = 0;
 
 async function autoProcessWaivers(){
+  autoAssignChampions(); // check deadline
   if(!db || !S) return;
   // Handle waiverClaims being either array or object (legacy)
   const _claims = Array.isArray(S.waiverClaims) ? S.waiverClaims : Object.values(S.waiverClaims||{});
@@ -687,6 +688,215 @@ function startWaiverPolling(){
   // Check every 90 seconds — offset from 60s stats and 20s state polling
   _waiverPollingInterval = setInterval(autoProcessWaivers, 90000);
   console.log('Waiver auto-processing started (every 90s)');
+}
+
+
+// ── Boss Battle Champion Selection Popup ─────────────────────────
+const BOSS_DEADLINE = '2026-05-04T20:00:00'; // 8PM ET May 4
+const BOSS_POPUP_KEY = 'boss_popup_seen_r2';
+
+function shouldShowBossPopup(){
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated) return false;
+  const mid = currentManagerId;
+  if(mid === null || mid === 'viewer') return false;
+  // Already picked a champion
+  if(bb.champions?.[mid]) return false;
+  // Already dismissed this popup
+  if(localStorage.getItem(BOSS_POPUP_KEY+'_'+mid)) return false;
+  // Check if all today's games are final (trigger after last game)
+  const games = window._todayGames || [];
+  if(games.length > 0 && !games.every(g=>g.gameStatus===3)) return false;
+  return true;
+}
+
+
+function buildChampionList(roster, mid, topPlayer){
+  return roster.map(p=>{
+    const fp = playerStatScore(p.id, mid);
+    const portrait = getActivePortrait(p.name);
+    const tc = TEAM_LOGOS[p.team]?.color||'#4a9eff';
+    const isTop = topPlayer?.p?.id===p.id;
+    const border = isTop?'#ffcc00':'#2a1a3a';
+    const bg = isTop?'rgba(255,204,0,.08)':'transparent';
+    const img = portrait
+      ? `<img src="${portrait}" style="width:36px;height:36px;object-fit:cover;object-position:center top;image-rendering:pixelated;border:1px solid ${tc}"/>`
+      : `<div style="width:36px;height:36px;background:${tc}22;border:1px solid ${tc};display:flex;align-items:center;justify-content:center;font-size:8px;color:${tc}">${p.team}</div>`;
+    return `<div onclick="selectBossChampion(${mid},${p.id})" style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;border:2px solid ${border};margin-bottom:3px;background:${bg}">
+      ${img}
+      <div style="flex:1">
+        <div style="font-size:8px;color:${tc}">${p.name.split(' ').pop()}</div>
+        <div style="font-size:7px;color:#888;margin-top:2px">${p.team} · ${playerFPPG(p.id,mid).toFixed(1)} FP/g</div>
+      </div>
+      ${isTop?'<div style="font-size:6px;color:#ffcc00;text-align:right">AUTO<br>SELECT</div>':''}
+      <div style="font-size:9px;color:#ffcc00;text-align:right">+${fp.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function showBossChampionPopup(){
+  if(document.getElementById('boss-champion-popup')) return;
+  const mid = currentManagerId;
+  const bb = getBossBattle();
+  const m = S.managers.find(x=>x.id===mid);
+  const roster = (S.rosters[mid]||[]).map(pid=>getPlayer(pid)).filter(Boolean);
+  const aColor = getAvatarColor(mid);
+
+  // Auto-select candidate = highest FP earner on roster
+  const topPlayer = roster.map(p=>({p, fp:playerStatScore(p.id,mid)}))
+    .sort((a,b)=>b.fp-a.fp)[0];
+
+  // Deadline countdown
+  const deadline = new Date(BOSS_DEADLINE+'-04:00'); // ET
+  const now = new Date();
+  const hoursLeft = Math.max(0, Math.round((deadline-now)/36e5));
+
+  const modal = document.createElement('div');
+  modal.id = 'boss-champion-popup';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem';
+
+  // Medieval pixel font styling
+  modal.innerHTML = `
+  <div style="
+    background:#0a0510;
+    border:4px solid #8b6914;
+    box-shadow:0 0 0 2px #000,0 0 0 4px #8b6914,0 0 30px rgba(139,105,20,.4),inset 0 0 30px rgba(0,0,0,.8);
+    max-width:480px;width:100%;
+    font-family:'Press Start 2P',monospace;
+    image-rendering:pixelated;
+    position:relative;
+    overflow:hidden;
+  ">
+    <!-- Corner decorations -->
+    <div style="position:absolute;top:4px;left:4px;width:12px;height:12px;border-top:3px solid #c8a020;border-left:3px solid #c8a020"></div>
+    <div style="position:absolute;top:4px;right:4px;width:12px;height:12px;border-top:3px solid #c8a020;border-right:3px solid #c8a020"></div>
+    <div style="position:absolute;bottom:4px;left:4px;width:12px;height:12px;border-bottom:3px solid #c8a020;border-left:3px solid #c8a020"></div>
+    <div style="position:absolute;bottom:4px;right:4px;width:12px;height:12px;border-bottom:3px solid #c8a020;border-right:3px solid #c8a020"></div>
+
+    <!-- Header -->
+    <div style="background:linear-gradient(180deg,#3a1f00,#1a0a00);border-bottom:3px solid #8b6914;padding:12px;text-align:center">
+      <div style="font-size:clamp(8px,2vw,11px);color:#ffcc00;text-shadow:2px 2px 0 #000,0 0 20px #ffcc0088;letter-spacing:.1em;margin-bottom:4px">⚔ BOSS BATTLE BEGINS ⚔</div>
+      <div style="font-size:clamp(6px,1.5vw,8px);color:#c8a020;animation:blink .8s step-end infinite">ROUND 2 · THE BASKETBALL MONSTER AWAKENS</div>
+    </div>
+
+    <!-- Story text box (FF style) -->
+    <div style="background:#050210;border:2px solid #3a2a5a;margin:12px;padding:10px;position:relative">
+      <div style="position:absolute;top:-8px;left:10px;background:#050210;padding:0 6px;font-size:7px;color:#8866cc">MESSAGE</div>
+      <div style="font-size:clamp(6px,1.5vw,8px);color:#ccbbee;line-height:2;letter-spacing:.05em" id="boss-story-text"></div>
+    </div>
+
+    <!-- Champion selection -->
+    <div style="margin:0 12px 8px;background:#050210;border:2px solid #8b6914">
+      <div style="background:#1a0f00;border-bottom:2px solid #8b6914;padding:6px 10px;font-size:7px;color:#c8a020">⚔ CHOOSE YOUR CHAMPION</div>
+      <div style="max-height:200px;overflow-y:auto;padding:6px" id="boss-champion-list">
+        ${buildChampionList(roster, mid, topPlayer)}
+      </div>
+      </div>
+    </div>
+
+    <!-- Deadline warning -->
+    <div style="margin:0 12px;background:rgba(255,51,68,.1);border:1px solid #ff334455;padding:6px 10px;font-size:6px;color:#ff6666;text-align:center">
+      ⏰ DEADLINE: MAY 4 AT 8PM ET (${hoursLeft}h remaining)
+      <br><span style="color:#888;margin-top:3px;display:block">If you don't choose, your top scorer (${topPlayer?.p?.name?.split(' ').pop()||'?'}) is auto-selected</span>
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:8px;margin:12px;padding-top:8px;border-top:1px solid #3a2a1a">
+      <button onclick="dismissBossPopup()" style="flex:1;background:#0a0510;border:2px solid #444;color:#666;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;cursor:pointer">LATER</button>
+      <button onclick="goToBossTab()" style="flex:2;background:linear-gradient(180deg,#2a1500,#1a0a00);border:2px solid #ffcc00;color:#ffcc00;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;cursor:pointer;text-shadow:0 0 10px #ffcc0088">⚔ OPEN BOSS TAB</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(modal);
+
+  // Typewriter story text
+  const storyLines = [
+    'A terrible monster has awakened...',
+    '',
+    `${m?.name?.toUpperCase()}, your team is called to battle!`,
+    '',
+    'Choose your champion wisely.',
+    'Their FP becomes your weapon.',
+  ];
+  let charIdx = 0, lineIdx = 0;
+  const textEl = document.getElementById('boss-story-text');
+  let fullText = '';
+  function typeNext(){
+    if(!document.getElementById('boss-champion-popup')) return;
+    if(lineIdx >= storyLines.length) return;
+    const line = storyLines[lineIdx];
+    if(charIdx < line.length){
+      fullText += line[charIdx];
+      charIdx++;
+      if(textEl) textEl.innerHTML = fullText.replace(/\n/g,'<br>') + '<span style="animation:blink .5s step-end infinite">▋</span>';
+      setTimeout(typeNext, line[charIdx-1]==='.'?80:35);
+    } else {
+      fullText += '<br>';
+      lineIdx++;
+      charIdx = 0;
+      if(textEl) textEl.innerHTML = fullText + '<span style="animation:blink .5s step-end infinite">▋</span>';
+      setTimeout(typeNext, lineIdx===1?50:200);
+    }
+  }
+  setTimeout(typeNext, 500);
+}
+
+function selectBossChampion(mid, pid){
+  if(!S.bossBattle) return;
+  if(!S.bossBattle.champions) S.bossBattle.champions = {};
+  S.bossBattle.champions[mid] = pid;
+  localStorage.setItem(BOSS_POPUP_KEY+'_'+mid, '1');
+  saveState();
+  render();
+  const p = getPlayer(pid);
+  const popup = document.getElementById('boss-champion-popup');
+  if(popup){
+    popup.innerHTML = "<div style=\"background:#0a0510;border:4px solid #8b6914;max-width:480px;width:100%;font-family:var(--font-pixel),monospace;padding:2rem;text-align:center\">"
+      +'<div style="font-size:14px;color:#ffcc00;margin-bottom:1rem">⚔</div>'
+      +'<div style="font-size:9px;color:#ffcc00;margin-bottom:.5rem">CHAMPION SELECTED!</div>'
+      +'<div style="font-size:11px;color:#fff;margin-bottom:1rem">'+p?.name+'</div>'
+      +'<div style="font-size:7px;color:#888;margin-bottom:1.5rem">May their FP strike true!</div>'
+      +"<button onclick=\"document.getElementById('boss-champion-popup').remove();showTab('boss')\" style=\"background:#1a0f00;border:2px solid #ffcc00;color:#ffcc00;font-family:var(--font-pixel),monospace;font-size:8px;padding:10px 20px;cursor:pointer\">⚔ TO BATTLE</button>"
+      +'</div>';
+    popup.style.alignItems = 'center';
+    popup.style.justifyContent = 'center';
+    setTimeout(()=>{ if(document.getElementById('boss-champion-popup')) { document.getElementById('boss-champion-popup').remove(); showTab('boss'); }}, 3000);
+  }
+  showToast(`${p?.name} is your champion! ⚔`,'warn');
+}
+
+function dismissBossPopup(){
+  const mid = currentManagerId;
+  localStorage.setItem(BOSS_POPUP_KEY+'_'+mid, 'dismissed');
+  document.getElementById('boss-champion-popup')?.remove();
+}
+
+function goToBossTab(){
+  document.getElementById('boss-champion-popup')?.remove();
+  showTab('boss');
+}
+
+// Auto-assign champions at deadline
+async function autoAssignChampions(){
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated) return;
+  const now = new Date();
+  const deadline = new Date(BOSS_DEADLINE+'-04:00');
+  if(now < deadline) return;
+  let changed = false;
+  for(const m of S.managers){
+    if(bb.champions?.[m.id]) continue;
+    // Auto-select top FP earner
+    const roster = S.rosters[m.id]||[];
+    const top = roster.map(pid=>({pid,fp:playerStatScore(pid,m.id)})).sort((a,b)=>b.fp-a.fp)[0];
+    if(top){ 
+      if(!S.bossBattle.champions) S.bossBattle.champions={};
+      S.bossBattle.champions[m.id]=top.pid;
+      changed=true;
+      console.log('Auto-assigned champion for',m.name,':',getPlayer(top.pid)?.name);
+    }
+  }
+  if(changed){ await saveState(); render(); showToast('Champions auto-assigned!','info'); }
 }
 
 function startPolling(){
