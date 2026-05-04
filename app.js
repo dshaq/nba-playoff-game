@@ -3784,7 +3784,7 @@ function renderBossBattleScene(){
     ${isStaging?`<div style="background:rgba(255,153,0,.12);border:1px dashed #ff9900;padding:5px 10px;text-align:center;font-size:7px;color:#ff9900;margin-bottom:8px">🔓 COMMISSIONER PREVIEW — NOT YET PUBLIC</div>`:''}
 
     <!-- ══ BATTLE ARENA ══ -->
-    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?260:320}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:8px">
+    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?220:280}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:0">
       <!-- Background: custom image if uploaded, else canvas animation -->
       ${(()=>{
         const bg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Background');
@@ -3793,7 +3793,7 @@ function renderBossBattleScene(){
           : `<canvas id="boss-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>`;
       })()}
 
-      <!-- BOSS MONSTERS — center top -->
+      <!-- BOSS MONSTERS — center, full arena -->
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
         <!-- Minions row above boss -->
         <div style="display:flex;gap:24px;margin-bottom:6px">
@@ -3817,8 +3817,22 @@ function renderBossBattleScene(){
         </div>
       </div>
 
-      <!-- CHAMPIONS — bottom row -->
-      <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-around;align-items:flex-end;z-index:5;padding:0 4px 4px">
+      <!-- Damage flash -->
+      <div id="damage-flash" style="position:absolute;inset:0;background:rgba(255,220,0,0);pointer-events:none;transition:background .15s;z-index:10"></div>
+
+      <!-- Victory overlay -->
+      ${bb?.defeated?`<div style="position:absolute;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:20">
+        <div style="text-align:center">
+          <div style="font-size:${IS_MOBILE?14:22}px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;animation:victory-pulse 1s ease-in-out infinite">🏆 DEFEATED 🏆</div>
+          <div style="font-size:8px;color:#fff;margin-top:8px">+${bb.reward} FP AWARDED TO ALL CHAMPIONS</div>
+        </div>
+      </div>`:''}
+    </div>
+
+    <!-- ══ CHAMPIONS ROW — below arena ══ -->
+    <div style="background:#08040f;border:3px solid #2a1a0a;border-top:none;padding:8px 4px 6px;margin-bottom:8px">
+      <div style="font-size:6px;color:#666;text-align:center;letter-spacing:.1em;margin-bottom:5px">⚔ CHAMPIONS</div>
+      <div style="display:flex;justify-content:space-around;align-items:flex-start">
         ${champions.map(c=>`
         <div style="text-align:center;width:${IS_MOBILE?'15':'16'}%;opacity:${c.isElim?.4:1}">
           <!-- Portrait -->
@@ -3845,8 +3859,7 @@ function renderBossBattleScene(){
         </div>`).join('')}
       </div>
 
-      <!-- Damage flash -->
-      <div id="damage-flash" style="position:absolute;inset:0;background:rgba(255,220,0,0);pointer-events:none;transition:background .15s;z-index:10"></div>
+
 
       <!-- Victory overlay -->
       ${bb?.defeated?`<div style="position:absolute;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:20">
