@@ -724,6 +724,19 @@ function injectBossCSS(){
     @keyframes victory-fade{from{opacity:0}to{opacity:1}}
     @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
     .rpg-hidden{display:none!important}
+    @keyframes attack-pulse{
+      0%,100%{box-shadow:0 0 8px var(--ac),0 0 16px var(--ac),inset 0 0 8px rgba(255,255,255,.1);transform:scale(1)}
+      50%{box-shadow:0 0 16px var(--ac),0 0 32px var(--ac),0 0 48px var(--ac),inset 0 0 12px rgba(255,255,255,.2);transform:scale(1.03)}
+    }
+    @keyframes attack-shimmer{
+      0%{background-position:200% center}
+      100%{background-position:-200% center}
+    }
+    .attack-ready{
+      animation:attack-pulse 1.4s ease-in-out infinite!important;
+      background:linear-gradient(135deg,rgba(255,204,0,.25),rgba(255,102,0,.2),rgba(255,204,0,.25))!important;
+      background-size:200% 100%!important;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -4120,15 +4133,20 @@ function renderBossBattleScene(){
 
             <!-- ATTACK — opens target submenu -->
             <div style="position:relative">
-              <button onclick="document.getElementById('rpg-attack-submenu')?.classList.toggle('rpg-hidden')" style="
-                width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
-                background:${hasAttack?`linear-gradient(180deg,rgba(255,204,0,.15),rgba(255,102,0,.1))`:'rgba(50,50,50,.3)'};
-                border:2px solid ${hasAttack?aColor:'#333'};
-                color:${hasAttack?aColor:'#444'};cursor:${hasAttack?'pointer':'default'};
-                text-align:left;position:relative;
-              ">
-                ▶ ATTACK
-                ${hasAttack?`<div style="font-size:6px;color:#ffcc00aa;margin-top:2px">${myChamp.availFP.toFixed(0)} FP ready</div>`:'<div style="font-size:6px;color:#444;margin-top:2px">0 FP</div>'}
+              <button onclick="${hasAttack?`document.getElementById('rpg-attack-submenu')?.classList.toggle('rpg-hidden')`:'void(0)'}"
+                class="${hasAttack?'attack-ready':''}"
+                style="
+                  --ac:${aColor};
+                  width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
+                  background:${hasAttack?`linear-gradient(135deg,rgba(255,204,0,.2),rgba(255,102,0,.15))`:'rgba(50,50,50,.3)'};
+                  border:2px solid ${hasAttack?aColor:'#333'};
+                  color:${hasAttack?'#fff':'#444'};cursor:${hasAttack?'pointer':'default'};
+                  text-align:left;position:relative;transition:transform .1s;
+                ">
+                ${hasAttack?'⚔':'▶'} ATTACK
+                ${hasAttack
+                  ? `<div style="font-size:6px;color:#ffcc00;margin-top:3px;letter-spacing:.05em">▸ ${myChamp.availFP.toFixed(0)} FP READY</div>`
+                  : '<div style="font-size:6px;color:#444;margin-top:2px">0 FP</div>'}
               </button>
               <!-- Attack submenu -->
               <div id="rpg-attack-submenu" class="rpg-hidden" style="
