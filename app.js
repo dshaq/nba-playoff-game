@@ -711,6 +711,23 @@ function shouldShowBossPopup(){
 }
 
 
+
+function injectBossCSS(){
+  if(document.getElementById('boss-css')) return;
+  const style = document.createElement('style');
+  style.id = 'boss-css';
+  style.textContent = `
+    @keyframes boss-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes boss-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+    @keyframes prisoner-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+    @keyframes champ-pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
+    @keyframes live-border{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes victory-fade{from{opacity:0}to{opacity:1}}
+    @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  `;
+  document.head.appendChild(style);
+}
+
 function buildChampionList(roster, mid, topPlayer){
   return roster.map(p=>{
     const fp = playerStatScore(p.id, mid);
@@ -3780,7 +3797,7 @@ function renderBossBattleScene(){
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
         <!-- Minions row above boss -->
         <div style="display:flex;gap:24px;margin-bottom:6px">
-          ${[{img:minion1Img,label:'MINION I',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:'MINION II',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
+          ${[{img:minion1Img,label:bb?.minion1Name||'MINION I',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:bb?.minion2Name||'MINION II',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
           <div style="text-align:center;opacity:${mn.hp<=0?.3:1}">
             ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
               mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
@@ -3845,8 +3862,8 @@ function renderBossBattleScene(){
       <div style="font-size:6px;color:#cc6600;margin-bottom:5px;letter-spacing:.1em">ENEMY HP</div>
       ${[
         {label:bb?.bossLabel||'BOSS',icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
-        {label:'MINION I',icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
-        {label:'MINION II',icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
+        {label:bb?.minion1Name||'MINION I',icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#cc2200'},
+        {label:bb?.minion2Name||'MINION II',icon:'👹',cur:minion2CurrentHP,max:minion2MaxHP,color:'#cc2200'},
       ].map(e=>{
         const pct=Math.max(0,Math.round(e.cur/e.max*100));
         const bc=pct>50?e.color:pct>25?'#ff9900':'#ff3344';
@@ -4098,8 +4115,13 @@ function renderBossCommPanel(bb){
         <input id="boss-reward-input" type="number" value="${bb?.reward||25}" min="0" max="200" style="width:60px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:12px;color:var(--text2);min-width:80px">Flavor text:</label>
-        <input id="boss-label-input" type="text" value="${bb?.bossLabel||''}" placeholder="e.g. THE CELTICS EMPEROR" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Boss Name:</label>
+        <input id="boss-label-input" type="text" value="${bb?.bossLabel||'DUNKMAW'}" placeholder="e.g. DUNKMAW" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2);min-width:80px">Minion Names:</label>
+        <input id="boss-minion1-name" type="text" value="${bb?.minion1Name||'GUS'}" placeholder="Minion 1" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+        <input id="boss-minion2-name" type="text" value="${bb?.minion2Name||'RIMREAPER'}" placeholder="Minion 2" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
         <button onclick="saveBossConfig()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,153,0,.2);border:1px solid #ff9900;color:#ff9900;cursor:pointer">💾 SAVE CONFIG</button>
@@ -4214,7 +4236,9 @@ async function saveBossConfig(){
     minion2HP: minionHP,
     round: parseInt(document.getElementById('boss-round-select')?.value)||2,
     reward: parseInt(document.getElementById('boss-reward-input')?.value)||25,
-    bossLabel: document.getElementById('boss-label-input')?.value||'',
+    bossLabel: document.getElementById('boss-label-input')?.value||'DUNKMAW',
+    minion1Name: document.getElementById('boss-minion1-name')?.value||'GUS',
+    minion2Name: document.getElementById('boss-minion2-name')?.value||'RIMREAPER',
   };
   await setBossConfig(config);
 }
