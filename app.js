@@ -724,6 +724,55 @@ function injectBossCSS(){
     @keyframes victory-fade{from{opacity:0}to{opacity:1}}
     @keyframes victory-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
     .rpg-hidden{display:none!important}
+
+    /* ── Attack FX ── */
+    @keyframes enemy-hit{
+      0%{transform:translateX(0) scale(1);filter:brightness(1)}
+      15%{transform:translateX(12px) scale(.95);filter:brightness(10) saturate(0)}
+      30%{transform:translateX(-8px) scale(1.05);filter:brightness(8) sepia(1) saturate(5) hue-rotate(0deg)}
+      50%{transform:translateX(6px) scale(.97);filter:brightness(6)}
+      70%{transform:translateX(-4px);filter:brightness(3)}
+      100%{transform:translateX(0) scale(1);filter:brightness(1)}
+    }
+    @keyframes gus-hit{
+      0%{transform:translateX(0) scale(1);filter:brightness(1)}
+      15%{transform:translateX(12px) scale(.95);filter:brightness(10) saturate(0) hue-rotate(260deg)}
+      50%{transform:translateX(6px);filter:brightness(4) hue-rotate(260deg)}
+      100%{transform:translateX(0) scale(1);filter:brightness(1)}
+    }
+    @keyframes rim-hit{
+      0%{transform:translateX(0) scale(1);filter:brightness(1)}
+      15%{transform:translateX(12px) scale(.95);filter:brightness(20) saturate(0)}
+      50%{transform:translateX(6px);filter:brightness(8) saturate(0)}
+      100%{transform:translateX(0) scale(1);filter:brightness(1)}
+    }
+    @keyframes arena-shake{
+      0%,100%{transform:translate(0,0)}
+      10%{transform:translate(-6px,-4px)}
+      20%{transform:translate(6px,4px)}
+      30%{transform:translate(-5px,3px)}
+      40%{transform:translate(5px,-3px)}
+      50%{transform:translate(-4px,2px)}
+      60%{transform:translate(4px,-2px)}
+      70%{transform:translate(-2px,1px)}
+      80%{transform:translate(2px,-1px)}
+    }
+    @keyframes dmg-float{
+      0%{opacity:1;transform:translateY(0) scale(1)}
+      20%{transform:translateY(-8px) scale(1.2)}
+      80%{opacity:1;transform:translateY(-40px) scale(1)}
+      100%{opacity:0;transform:translateY(-55px) scale(.8)}
+    }
+    .boss-hit{animation:enemy-hit .7s ease-out!important}
+    .gus-hit{animation:gus-hit .7s ease-out!important}
+    .rim-hit{animation:rim-hit .7s ease-out!important}
+    .arena-shake{animation:arena-shake .5s ease-out!important}
+    .dmg-number{
+      position:absolute;pointer-events:none;z-index:50;
+      font-family:'Press Start 2P',monospace;
+      animation:dmg-float 1.2s ease-out forwards;
+      text-shadow:2px 2px 0 #000,-1px -1px 0 #000;
+    }
     @keyframes attack-pulse{
       0%,100%{box-shadow:0 0 8px var(--ac),0 0 16px var(--ac),inset 0 0 8px rgba(255,255,255,.1);transform:scale(1)}
       50%{box-shadow:0 0 16px var(--ac),0 0 32px var(--ac),0 0 48px var(--ac),inset 0 0 12px rgba(255,255,255,.2);transform:scale(1.03)}
@@ -1072,6 +1121,51 @@ function showBossModeHelp(){
   </div>`;
 
   document.body.appendChild(modal);
+}
+
+
+// ── Attack FX ────────────────────────────────────────────────────
+function triggerAttackFX(target, damage, aColor){
+  const arena = document.getElementById('boss-arena');
+  if(!arena) return;
+
+  // Screen shake
+  arena.classList.remove('arena-shake');
+  void arena.offsetWidth; // reflow
+  arena.classList.add('arena-shake');
+  setTimeout(()=>arena.classList.remove('arena-shake'), 500);
+
+  // Hit flash on the enemy sprite + knockback
+  const hitClass = target==='boss' ? 'boss-hit' : target==='minion1' ? 'gus-hit' : 'rim-hit';
+  const spriteEl = document.getElementById('enemy-sprite-'+target);
+  if(spriteEl){
+    spriteEl.classList.remove('boss-hit','gus-hit','rim-hit');
+    void spriteEl.offsetWidth;
+    spriteEl.classList.add(hitClass);
+    setTimeout(()=>spriteEl.classList.remove(hitClass), 700);
+  }
+
+  // Overall damage flash on arena
+  const flash = document.getElementById('damage-flash');
+  if(flash){
+    flash.style.background = 'rgba(255,220,0,.4)';
+    setTimeout(()=>{ flash.style.background='rgba(255,220,0,0)'; }, 250);
+  }
+
+  // Floating damage number over the enemy
+  if(spriteEl){
+    const rect = spriteEl.getBoundingClientRect();
+    const arenaRect = arena.getBoundingClientRect();
+    const dmgEl = document.createElement('div');
+    dmgEl.className = 'dmg-number';
+    dmgEl.style.color = aColor || '#ffcc00';
+    dmgEl.style.fontSize = damage >= 30 ? '14px' : damage >= 15 ? '11px' : '9px';
+    dmgEl.style.left = (rect.left - arenaRect.left + rect.width/2 - 20) + 'px';
+    dmgEl.style.top = (rect.top - arenaRect.top - 10) + 'px';
+    dmgEl.textContent = '-' + Math.round(damage) + ' HP';
+    arena.appendChild(dmgEl);
+    setTimeout(()=>dmgEl.remove(), 1300);
+  }
 }
 
 function startPolling(){
@@ -3848,12 +3942,9 @@ async function directAttack(mid, target){
   render();
   showToast(`⚔ ${p?.name} deals ${dmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
 
-  // Trigger damage flash animation
-  const flash = document.getElementById('damage-flash');
-  if(flash){
-    flash.style.background='rgba(255,220,0,.35)';
-    setTimeout(()=>flash.style.background='rgba(255,220,0,0)',300);
-  }
+  // Trigger full attack FX
+  const _aColor = getAvatarColor(mid);
+  triggerAttackFX(target, dmg, _aColor);
 
   // Check if boss/minions defeated
   await checkBossVictoryV2();
@@ -3987,11 +4078,11 @@ function renderBossBattleScene(){
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
         <!-- Minions row above boss -->
         <div style="display:flex;gap:24px;margin-bottom:6px">
-          ${[{img:minion1Img,label:bb?.minion1Name||'GUS',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:bb?.minion2Name||'RIMREAPER',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
+          ${[{img:minion1Img,label:bb?.minion1Name||'GUS',hp:minion1CurrentHP,max:minion1MaxHP,key:'minion1'},{img:minion2Img,label:bb?.minion2Name||'RIMREAPER',hp:minion2CurrentHP,max:minion2MaxHP,key:'minion2'}].map(mn=>`
           <div style="text-align:center;opacity:${mn.hp<=0?.3:1}">
             ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
-              mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
-              `<div style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
+              mn.img?`<img id="enemy-sprite-${mn.key}" src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
+              `<div id="enemy-sprite-${mn.key}" style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
             <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};margin-top:2px">${mn.label}</div>
             <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
@@ -4001,8 +4092,8 @@ function renderBossBattleScene(){
         <!-- Main Boss -->
         <div style="position:relative;text-align:center">
           ${bossCurrentHP<=0?`<div style="font-size:${IS_MOBILE?56:72}px">💀</div>`
-            :bossSunImg?`<img src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
-            :`<div style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
+            :bossSunImg?`<img id="enemy-sprite-boss" src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
+            :`<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
           <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
