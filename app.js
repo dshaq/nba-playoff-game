@@ -915,6 +915,49 @@ async function autoAssignChampions(){
   if(changed){ await saveState(); render(); showToast('Champions auto-assigned!','info'); }
 }
 
+
+// ── Personal Roster/Waiver Alert Banner ──────────────────────────
+function renderPersonalAlert(){
+  const el = document.getElementById('personal-alert-bar');
+  if(!el) return;
+  const mid = currentManagerId;
+  if(mid === null || mid === 'viewer'){ el.style.display='none'; return; }
+
+  const openSlots = 8 - (S.rosters[mid]||[]).length;
+  const tokens = waiverSlotsOpen(mid);
+  const lockout = typeof getWaiverLockoutStatus !== 'undefined' ? getWaiverLockoutStatus() : {locked:false};
+
+  if(openSlots <= 0 && tokens <= 0){ el.style.display='none'; return; }
+
+  const parts = [];
+  if(openSlots > 0) parts.push(`🔓 You have <strong>${openSlots} open roster spot${openSlots>1?'s':''}</strong>`);
+  if(tokens > 0) parts.push(`${getTokenImg(14)} <strong>${tokens} waiver token${tokens>1?'s':''}</strong> to use`);
+
+  const lockMsg = lockout.locked
+    ? `<span style="color:#ff6666;margin-left:8px">⛔ Waivers locked during live games</span>`
+    : `<span style="margin-left:8px"><a href="#" onclick="showTab('waiver');return false;" style="color:#ffcc00;text-decoration:none;font-family:'Press Start 2P',monospace;font-size:7px">→ GO TO WAIVERS</a></span>`;
+
+  const aColor = getAvatarColor(mid);
+  el.style.display = 'block';
+  el.innerHTML = `<div style="
+    background:linear-gradient(135deg,rgba(255,204,0,.12),rgba(255,102,0,.08));
+    border-bottom:2px solid ${aColor}44;
+    padding:7px 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    font-size:12px;
+    color:var(--text2);
+  ">
+    <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:${aColor};flex-shrink:0">
+      ${getAvatar(mid,'sm')} ${S.managers.find(m=>m.id===mid)?.name?.toUpperCase()}
+    </span>
+    <span style="color:#ccc">${parts.join(' &amp; ')}</span>
+    ${!lockout.locked ? lockMsg : lockMsg}
+  </div>`;
+}
+
 function startPolling(){
   setInterval(async()=>{
     if(!db||!S) return;
@@ -1796,7 +1839,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderPersonalAlert();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
