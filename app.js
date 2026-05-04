@@ -4082,16 +4082,10 @@ function renderBossCommPanel(bb){
     <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;margin-bottom:.625rem">🔓 COMMISSIONER CONTROLS</div>
     <div style="display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:12px;color:var(--text2);min-width:80px">Boss Player:</label>
-        <select id="boss-pid-select" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px">
-          ${PLAYERS.filter(p=>!getTeam(p.team)?.eliminated&&TEAMS.some(t=>t.id===p.team)).map(p=>`<option value="${p.id}" ${bb?.bossPid===p.id?'selected':''}>${p.name} (${p.team})</option>`).join('')}
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <label style="font-size:12px;color:var(--text2);min-width:80px">Boss HP:</label>
-        <input id="boss-hp-input" type="number" value="${bb?.bossHP||175}" min="50" max="500" style="width:80px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
-        <label style="font-size:12px;color:var(--text2)">Portrait #:</label>
-        <input id="boss-portrait-idx" type="number" value="${bb?.bossPortraitIdx||0}" min="0" max="9" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+        <input id="boss-hp-input" type="number" value="${bb?.bossHP||300}" min="50" max="999" style="width:80px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
+        <label style="font-size:12px;color:var(--text2)">Minion HP:</label>
+        <input id="boss-minion-hp-input" type="number" value="${bb?.minion1HP||80}" min="10" max="300" style="width:60px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:3px;font-size:12px"/>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <label style="font-size:12px;color:var(--text2);min-width:80px">Round:</label>
@@ -4213,14 +4207,11 @@ async function handleBossAssetUpload(input){
 }
 
 async function saveBossConfig(){
-  const pid = parseInt(document.getElementById('boss-pid-select')?.value);
-  const p = getPlayer(pid);
-  if(!p){ showToast('Invalid player','error'); return; }
+  const minionHP = parseInt(document.getElementById('boss-minion-hp-input')?.value)||80;
   const config = {
-    bossPid: pid,
-    bossName: p.name,
-    bossHP: parseInt(document.getElementById('boss-hp-input')?.value)||175,
-    bossPortraitIdx: parseInt(document.getElementById('boss-portrait-idx')?.value)||0,
+    bossHP: parseInt(document.getElementById('boss-hp-input')?.value)||300,
+    minion1HP: minionHP,
+    minion2HP: minionHP,
     round: parseInt(document.getElementById('boss-round-select')?.value)||2,
     reward: parseInt(document.getElementById('boss-reward-input')?.value)||25,
     bossLabel: document.getElementById('boss-label-input')?.value||'',
@@ -4230,7 +4221,7 @@ async function saveBossConfig(){
 
 async function startBossBattle(){
   await saveBossConfig();
-  if(!S.bossBattle?.bossPid){ showToast('Set a boss player first','error'); return; }
+  // No boss player required — pure monster with set HP
   if(!S.bossBattle.champions) S.bossBattle.champions={};
   S.bossBattle.active = true;
   S.bossBattle.defeated = false;
