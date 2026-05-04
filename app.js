@@ -3647,15 +3647,17 @@ function getChampionHP(pid){
   const p = getPlayer(pid); if(!p) return 0;
   const team = getTeam(p.team);
   if(!team || team.eliminated) return 0;
-  const allTeams = S.teams.filter(t=>t.id!==team.id);
-  for(const opp of allTeams){
+  // Only check active (non-eliminated) opponents — current round matchups
+  const activeOpps = S.teams.filter(t=>t.id!==team.id && !t.eliminated);
+  for(const opp of activeOpps){
     const sr = getSeriesRecord(team.id, opp.id);
     if(!sr) continue;
     const tw = sr.wins[team.id]||0;
     const ow = sr.wins[opp.id]||0;
-    if(tw+ow === 0) continue;
+    if(tw+ow === 0) continue; // no games played yet in this matchup
     return Math.max(0, 100 - (ow * 25));
   }
+  // Series not started yet — full HP
   return 100;
 }
 
@@ -3850,9 +3852,9 @@ function renderBossBattleScene(){
             ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
               mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
               `<div style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
-            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#cc4400;margin-top:2px;text-shadow:0 0 6px #cc440066">${mn.label}</div>
-            <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#1a0808;border:1px solid #cc440044;margin-top:2px">
-              <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.hp/mn.max>.5?'#cc4400':'#ff3344'};transition:width .5s"></div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};margin-top:2px">${mn.label}</div>
+            <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
+              <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
             </div>
           </div>`).join('')}
         </div>
@@ -3862,6 +3864,10 @@ function renderBossBattleScene(){
             :bossSunImg?`<img src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
             :`<div style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
+          <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
+            <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
+          </div>
+          <div style="font-size:5px;color:#ff660088;margin-top:1px">${bossCurrentHP<=0?'DEFEATED':bossCurrentHP+'/'+bossMaxHP}</div>
         </div>
       </div>
 
@@ -3953,7 +3959,7 @@ function renderBossBattleScene(){
             <div style="width:14px;height:14px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(c.m.id,'sm')}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:6px;color:${aColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.m.name.toUpperCase()}</div>
-              <div style="font-size:8px;color:${c.isElim?'#555':'var(--text2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.p?c.p.name.split(' ').pop():(isMe?'— pick champion':'—')}</div>
+              <div style="font-size:7px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${c.p?c.p.team:(isMe?'NO CHAMP':'—')}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div style="font-size:7px;color:${aColor}">HP ${c.hp}</div>
