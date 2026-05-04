@@ -700,13 +700,7 @@ function shouldShowBossPopup(){
   if(!bb?.active || bb?.defeated) return false;
   const mid = currentManagerId;
   if(mid === null || mid === 'viewer') return false;
-  // Already picked a champion
-  if(bb.champions?.[mid]) return false;
-  // Already dismissed this popup
   if(localStorage.getItem(BOSS_POPUP_KEY+'_'+mid)) return false;
-  // Check if all today's games are final (trigger after last game)
-  const games = window._todayGames || [];
-  if(games.length > 0 && !games.every(g=>g.gameStatus===3)) return false;
   return true;
 }
 
@@ -2836,7 +2830,7 @@ function renderScoring(){
               return `<tr style="border-bottom:1px solid var(--bg2);${t.eliminated?'opacity:.5':''}">
                 <td style="padding:5px 6px">
                   <div style="display:flex;align-items:center;gap:6px">
-                    <div onclick="openPlayerModal(${p.id})" style="cursor:pointer">${playerLogoHtml(p.team,24,p.name)}</div>
+                    <div onclick="openPlayerModal(${p.id})" style="cursor:default">${playerLogoHtml(p.team,24,p.name)}</div>
                     <div>
                       <span style="color:var(--text);cursor:pointer" onclick="openPlayerModal(${p.id})">${p.name}</span>
                       <span class="pos-badge" style="font-size:9px">${p.pos}</span>
@@ -3179,7 +3173,7 @@ function renderTopPlayersBanner(){
       const portrait = getActivePortrait(p.name);
       const tc = TEAM_LOGOS[p.team]?.color||'#4a9eff';
       const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-      return `<div class="ticker-item" onclick="openPlayerModal(${p.id})" style="cursor:pointer">
+      return `<div class="ticker-item" onclick="openPlayerModal(${p.id})" style="cursor:default">
         ${medal?`<span style="font-size:13px">${medal}</span>`:`<span class="ticker-rank">#${i+1}</span>`}
         ${portrait
           ? `<div class="ticker-item-portrait" style="border:1px solid ${tc}"><img src="${portrait}"/></div>`
@@ -3578,7 +3572,7 @@ async function selectChampion(mid, pid){
   if(!(S.rosters[mid]||[]).includes(pid)){showToast('Player must be on your roster','error');return;}
   const p = getPlayer(pid);
   const m = S.managers.find(x=>x.id===mid);
-  if(!confirm(`Set ${p?.name} as your Champion for the Boss Battle?\n\nYou can change this until the battle ends.`)) return;
+  if(!confirm(`Set ${p?.name} as your Champion for the Boss Battle?\n\nYou cannot change your champion once selected.`)) return;
   if(!S.bossBattle.champions) S.bossBattle.champions={};
   S.bossBattle.champions[mid] = pid;
   await saveState();
@@ -3604,25 +3598,16 @@ function getChampionHP(pid){
   const p = getPlayer(pid); if(!p) return 0;
   const team = getTeam(p.team);
   if(!team || team.eliminated) return 0;
-  // Find opponent in current round
-  const allTeams = S.teams.filter(t=>!t.eliminated && t.id!==team.id);
-  let teamWins = 0, oppWins = 0;
+  const allTeams = S.teams.filter(t=>t.id!==team.id);
   for(const opp of allTeams){
     const sr = getSeriesRecord(team.id, opp.id);
     if(!sr) continue;
     const tw = sr.wins[team.id]||0;
     const ow = sr.wins[opp.id]||0;
     if(tw+ow === 0) continue;
-    teamWins = tw; oppWins = ow;
-    break;
+    return Math.max(0, 100 - (ow * 25));
   }
-  // HP = team's wins out of 4 possible wins needed
-  // Leading: high HP. Trailing: low HP.
-  const maxWins = 4;
-  const advantage = teamWins - oppWins; // -3 to +3
-  // Map: +3=100, +2=87, +1=75, 0=50, -1=37, -2=25, -3=12
-  const hpPct = Math.max(5, Math.round((advantage + 3) / 6 * 100));
-  return hpPct;
+  return 100;
 }
 
 function getChampionSeriesStatus(pid){
@@ -3765,9 +3750,23 @@ function renderBossBattleScene(){
     const pid = bb?.champions?.[m.id];
     const p = pid ? getPlayer(pid) : null;
     const portrait = p ? getActivePortrait(p.name) : null;
-    const fp = p ? playerStatScore(pid, m.id) : 0;
+    // Only count Round 2 FP (May 5 onward)
+    const R2_START = '20260505';
+    const fp = p ? Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=R2_START).reduce((sum,s)=>{
+      const acq=S.waiverAcquisitions?.[m.id+'_'+pid];
+      return sum+((!acq||s.date>=acq)?s.fp||0:0);
+    },0) : 0;
+    // Add live FP if playing now and R2
+    const _liveFP = p && isPlayerLive(pid) ? (() => {
+      const live = livePlayerStats[pid];
+      if(!live) return 0;
+      const saved = Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId);
+      return saved ? 0 : (live.fp||0);
+    })() : 0;
+    const totalFP = fp + _liveFP;
     const spentFP = (bb?.attackLog||[]).filter(a=>a.mid===m.id).reduce((s,a)=>s+a.fp,0);
-    const availFP = Math.max(0, fp - spentFP);
+    const availFP = Math.max(0, totalFP - spentFP);
+    const fp_display = totalFP;
     const hp = p ? getChampionHP(pid) : 0;
     const series = p ? getChampionSeriesStatus(pid) : null;
     const aColor = getAvatarColor(m.id);
@@ -3797,7 +3796,7 @@ function renderBossBattleScene(){
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
         <!-- Minions row above boss -->
         <div style="display:flex;gap:24px;margin-bottom:6px">
-          ${[{img:minion1Img,label:bb?.minion1Name||'MINION I',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:bb?.minion2Name||'MINION II',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
+          ${[{img:minion1Img,label:bb?.minion1Name||'GUS',hp:minion1CurrentHP,max:minion1MaxHP},{img:minion2Img,label:bb?.minion2Name||'RIMREAPER',hp:minion2CurrentHP,max:minion2MaxHP}].map(mn=>`
           <div style="text-align:center;opacity:${mn.hp<=0?.3:1}">
             ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
               mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
