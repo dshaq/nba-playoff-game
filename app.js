@@ -2317,6 +2317,35 @@ function renderRosters(){
     ?`<div class="commissioner-bar">🔓 <span style="font-family:'Press Start 2P',monospace;font-size:9px">COMMISSIONER MODE — MANAGE TEAMS &amp; INJURIES BELOW</span></div>`
     :`<div class="notice">VIEW-ONLY MODE — COMMISSIONER CONTROLS LOCKED</div>`;
 
+  // Global team elimination controls at top (commissioner only)
+  const teamCtrlEl = document.getElementById('rosters-team-controls');
+  if(teamCtrlEl){
+    if(_isComm){
+      const teamChips = S.teams.map(t=>{
+        const survivalDropdown = `<select onchange="setSurvived('${t.id}',parseInt(this.value))" style="background:var(--bg2);border:1px solid var(--border2);color:var(--text2);font-size:10px;padding:1px 2px;width:46px;margin-left:2px">
+          <option value="0" ${(t.survivedRounds||0)===0?'selected':''}>R0</option>
+          <option value="1" ${(t.survivedRounds||0)===1?'selected':''}>R1✓</option>
+          <option value="2" ${(t.survivedRounds||0)===2?'selected':''}>R2✓</option>
+          <option value="3" ${(t.survivedRounds||0)===3?'selected':''}>R3✓</option>
+        </select>`;
+        return t.eliminated
+          ? `<span style="display:inline-flex;align-items:center;gap:2px;opacity:.5"><span style="font-size:11px;color:#555">${t.id}</span><span style="font-size:9px;color:var(--red)">OUT</span></span>`
+          : `<span style="display:inline-flex;align-items:center;gap:2px">
+              <button onclick="toggleElim('${t.id}')" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:3px 6px;background:rgba(255,51,68,.1);border:1px solid #ff334466;color:var(--text2);cursor:pointer" title="Mark ${t.id} eliminated">${t.id}</button>
+              ${survivalDropdown}
+            </span>`;
+      }).join('');
+
+      teamCtrlEl.innerHTML = `<div style="background:rgba(255,51,68,.05);border:2px solid #ff334433;padding:.625rem .75rem;margin-bottom:.75rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--red);margin-bottom:.5rem">⚡ ELIMINATE TEAMS / SET ROUNDS SURVIVED</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${teamChips}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">Tap a team button to eliminate them. This removes their players from rosters, banks FP, and opens waiver slots.</div>
+      </div>`;
+    } else {
+      teamCtrlEl.innerHTML = '';
+    }
+  }
+
   document.getElementById('rosters-list').innerHTML=S.managers.map(m=>{
     const players=getRosterOrder(m.id).map(pid=>getPlayer(pid)).filter(Boolean);
     const slotsOpen=waiverSlotsOpen(m.id);
