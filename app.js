@@ -3690,8 +3690,20 @@ async function directAttack(mid, target){
   const champPid = bb.champions?.[mid];
   if(!champPid){showToast('Pick a champion first!','error');return;}
 
-  // Calculate available attack FP (earned since last attack)
-  const totalFP = playerStatScore(champPid, mid);
+  // Calculate available attack FP — Round 2 only (May 5 onward)
+  const R2_START = '20260505';
+  const totalFP = Object.values(S.playerStats||{})
+    .filter(s => s.pid===champPid && s.date >= R2_START)
+    .reduce((sum,s) => {
+      const acq = S.waiverAcquisitions?.[mid+'_'+champPid];
+      return sum + ((!acq||s.date>=acq) ? (s.fp||0) : 0);
+    }, 0)
+    + (() => {
+      const live = livePlayerStats?.[champPid];
+      if(!live) return 0;
+      const saved = Object.values(S.playerStats||{}).some(s=>s.pid===champPid&&s.gameId===live.gameId);
+      return (!saved) ? (live.fp||0) : 0;
+    })();
   const spentFP = (bb.attackLog||[]).filter(a=>a.mid===mid).reduce((s,a)=>s+a.fp,0);
   const availableFP = Math.max(0, totalFP - spentFP);
 
