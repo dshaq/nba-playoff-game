@@ -2311,7 +2311,9 @@ function renderWaiver(){
 }
 
 function renderRosters(){
-  document.getElementById('rosters-comm-notice').innerHTML=isCommissioner
+  // Re-check commissioner status freshly (handles session restore timing)
+  const _isComm = isCommissioner || currentManagerId === 4;
+  document.getElementById('rosters-comm-notice').innerHTML=_isComm
     ?`<div class="commissioner-bar">🔓 <span style="font-family:'Press Start 2P',monospace;font-size:9px">COMMISSIONER MODE — MANAGE TEAMS &amp; INJURIES BELOW</span></div>`
     :`<div class="notice">VIEW-ONLY MODE — COMMISSIONER CONTROLS LOCKED</div>`;
 
@@ -3527,7 +3529,13 @@ function renderBossBattleScene(){
 
     <!-- ══ BATTLE ARENA ══ -->
     <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?260:320}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:8px">
-      <canvas id="boss-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+      <!-- Background: custom image if uploaded, else canvas animation -->
+      ${(()=>{
+        const bg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Background');
+        return bg
+          ? `<img src="${bg.dataUri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated"/>`
+          : `<canvas id="boss-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>`;
+      })()}
 
       <!-- BOSS MONSTERS — center top -->
       <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:4">
@@ -3676,7 +3684,7 @@ function renderBossBattleScene(){
     ${isCommissioner?renderBossCommPanel(bb):''}
   </div>`;
 
-  requestAnimationFrame(()=>drawDesertBg());
+  if(!CUSTOM_LOGOS.find(l=>l.name==='Boss_Background')) requestAnimationFrame(()=>drawDesertBg());
 }
 
 function renderBossBattle(){ renderBossBattleScene(); }
@@ -3864,6 +3872,22 @@ function renderBossCommPanel(bb){
         <button onclick="startBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,51,68,.2);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ ${activated?'UPDATE':'START'} BATTLE</button>
         ${activated?`<button onclick="endBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(100,100,100,.2);border:1px solid #666;color:#666;cursor:pointer">■ END BATTLE</button>`:''}
       </div>
+      <!-- Boss Asset Uploader -->
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ff990033">
+        <div style="font-size:7px;color:#ff9900;margin-bottom:6px">🖼 BOSS ASSETS (GIF-safe — no resize)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${['Boss_Main','Boss_Minion1','Boss_Minion2','Boss_Background'].map(name=>{
+            const existing = CUSTOM_LOGOS.find(l=>l.name===name);
+            return `<div style="font-size:9px;color:var(--text2)">
+              <div style="color:var(--text3);margin-bottom:2px">${name}</div>
+              ${existing?`<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--green)">✓ Uploaded</span><button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:1px 4px;background:none;border:1px solid #555;color:#888;cursor:pointer">Replace</button></div>`
+                :`<button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:3px 6px;background:rgba(255,153,0,.1);border:1px solid #ff990066;color:#ff9900;cursor:pointer">📁 Upload</button>`}
+            </div>`;
+          }).join('')}
+        </div>
+        <input type="file" id="boss-asset-input" accept="image/*,.gif" style="display:none" onchange="handleBossAssetUpload(this)"/>
+        <div id="boss-asset-status" style="font-size:10px;color:var(--text3);margin-top:4px"></div>
+      </div>
     </div>
   </div>`;
 }
@@ -3906,6 +3930,46 @@ function openChampionPicker(mid){
     +'<div style="overflow-y:auto;flex:1">'+rows+'</div>'
     +'</div>';
   document.body.appendChild(modal);
+}
+
+
+// ── Boss Asset Upload (GIF-preserving) ──────────────────────────
+let _pendingBossAssetName = null;
+
+function uploadBossAsset(name){
+  _pendingBossAssetName = name;
+  const input = document.getElementById('boss-asset-input');
+  if(input) input.click();
+}
+
+async function handleBossAssetUpload(input){
+  const file = input.files?.[0];
+  if(!file || !_pendingBossAssetName) return;
+  const status = document.getElementById('boss-asset-status');
+  if(status) status.textContent = 'Reading '+file.name+'...';
+
+  // Read as raw base64 — preserves GIF animation, no canvas conversion
+  const dataUri = await new Promise(resolve=>{
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.readAsDataURL(file);
+  });
+
+  // Store in CUSTOM_LOGOS (replace existing with same name)
+  CUSTOM_LOGOS = CUSTOM_LOGOS.filter(l=>l.name!==_pendingBossAssetName);
+  // For background, detect dominant color; for sprites use a default
+  const color = _pendingBossAssetName==='Boss_Background'?'#8b3a00':'#ff6600';
+  CUSTOM_LOGOS.push({name:_pendingBossAssetName, dataUri, color});
+
+  try{
+    await saveCustomLogos();
+    if(status) status.textContent = '✓ '+_pendingBossAssetName+' saved! ('+Math.round(dataUri.length/1024)+'KB)';
+    render();
+  }catch(e){
+    if(status) status.textContent = '✗ Error: '+e.message;
+  }
+  input.value='';
+  _pendingBossAssetName = null;
 }
 
 async function saveBossConfig(){
