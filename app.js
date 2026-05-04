@@ -693,7 +693,7 @@ function startWaiverPolling(){
 
 // ── Boss Battle Champion Selection Popup ─────────────────────────
 const BOSS_DEADLINE = '2026-05-04T20:00:00'; // 8PM ET May 4
-const BOSS_POPUP_KEY = 'boss_popup_seen_r2';
+const BOSS_POPUP_KEY = 'boss_popup_seen_r2_v2';
 
 function shouldShowBossPopup(){
   const bb = getBossBattle();
@@ -3802,7 +3802,7 @@ function renderBossBattleScene(){
             ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
               mn.img?`<img src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
               `<div style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
-            <div style="font-size:5px;color:#cc4400;margin-top:1px">${mn.label}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#cc4400;margin-top:2px;text-shadow:0 0 6px #cc440066">${mn.label}</div>
             <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#1a0808;border:1px solid #cc440044;margin-top:2px">
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.hp/mn.max>.5?'#cc4400':'#ff3344'};transition:width .5s"></div>
             </div>
@@ -3813,7 +3813,7 @@ function renderBossBattleScene(){
           ${bossCurrentHP<=0?`<div style="font-size:${IS_MOBILE?56:72}px">💀</div>`
             :bossSunImg?`<img src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
             :`<div style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
-          <div style="font-size:6px;color:#ff6600;margin-top:2px">${(bb?.bossLabel||'BOSS').toUpperCase()}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
         </div>
       </div>
 
@@ -4290,11 +4290,11 @@ async function endBossBattle(){
 
 // ── NEWS BANNER ─────────────────────────────────────────────────
 const NEWS_ITEMS = [
-  "🆕 RULE UPDATE: Players marked DTD (Day-To-Day) can now be dropped — same as OUT! Check your roster for DTD players.",
-  "⚔ BOSS BATTLE COMING SOON — check the BOSS tab for details.",
-  "🏀 Waiver tokens are earned when your player is eliminated or marked OUT/DTD."
+  "🏀 ROUND 2 IS HERE! The second round of the NBA Playoffs has begun — check your roster for eliminated players!",
+  "⚔ BOSS BATTLE IS LIVE! Visit the BOSS tab to pick your Champion and attack DUNKMAW, GUS and RIMREAPER!",
+  "🆕 RULE UPDATE: Players marked DTD (Day-To-Day) can now be dropped — same as OUT! Check your roster for DTD players."
 ];
-const NEWS_DISMISSED_KEY = 'nba_news_dismissed_2026';
+const NEWS_DISMISSED_KEY = 'nba_news_dismissed_r2_2026';
 
 function initNewsBanner(){
   const state = localStorage.getItem(NEWS_DISMISSED_KEY);
