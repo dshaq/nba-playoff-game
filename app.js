@@ -3724,7 +3724,7 @@ function renderBossBattleScene(){
       <div style="font-family:'Press Start 2P',monospace;font-size:16px;color:#ff3344;text-shadow:0 0 20px #ff334488;margin-bottom:.75rem">⚔ BOSS BATTLE</div>
       <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#ff9900;margin-bottom:.5rem;animation:blink .9s step-end infinite">COMING SOON</div>
       <div style="font-size:13px;color:var(--text3);max-width:300px;margin:0 auto .75rem">Each round a legendary basketball monster appears. Your champions must defeat it together.</div>
-      ${isCommissioner?renderBossCommPanel(bb):''}
+      ${(isCommissioner||currentManagerId===4)?renderBossCommPanel(bb):''}
     </div>`;
     return;
   }
@@ -3937,7 +3937,8 @@ function _oldRenderBossBattle_unused(){
   const aColor = !isViewer ? getAvatarColor(mid) : '#4a9eff';
 
   // Commissioner setup panel
-  const commPanel = isCommissioner ? renderBossCommPanel(bb) : '';
+  const _isBossComm = isCommissioner || currentManagerId === 4;
+  const commPanel = _isBossComm ? renderBossCommPanel(bb) : '';
 
   if(!bb||!bb.active){
     el.innerHTML = `<div style="padding:2rem;text-align:center">
