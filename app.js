@@ -2183,7 +2183,7 @@ function renderMyTeam(){
     const t=getTeam(p.team); if(!t) return;
     // approximate round by game date vs round start dates
     const d=parseInt(s.date||0);
-    const r = d>=20260604?4:d>=20260519?3:d>=20260505?2:1;
+    const r = d>=20260604?4:d>=20260519?3:d>=20260504?2:1;
     if(!roundDates[r]) roundDates[r]=[];
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(!acqDate||s.date>=acqDate) roundDates[r].push(s.fp||0);
@@ -3920,7 +3920,7 @@ async function directAttack(mid, target){
   if(!champPid){showToast('Pick a champion first!','error');return;}
 
   // Calculate available attack FP — Round 2 only (May 5 onward)
-  const R2_START = '20260505';
+  const R2_START = '20260504';
   const totalFP = Object.values(S.playerStats||{})
     .filter(s => s.pid===champPid && s.date >= R2_START)
     .reduce((sum,s) => {
@@ -4040,7 +4040,7 @@ function renderBossBattleScene(){
     const p = pid ? getPlayer(pid) : null;
     const portrait = p ? getActivePortrait(p.name) : null;
     // Only count Round 2 FP (May 5 onward)
-    const R2_START = '20260505';
+    const R2_START = '20260504';
     const fp = p ? Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=R2_START).reduce((sum,s)=>{
       const acq=S.waiverAcquisitions?.[m.id+'_'+pid];
       return sum+((!acq||s.date>=acq)?s.fp||0:0);
