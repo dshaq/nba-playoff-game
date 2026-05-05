@@ -4140,9 +4140,9 @@ function renderBossBattleScene(){
       <div style="display:flex;justify-content:space-around;align-items:flex-start">
         ${champions.map(c=>`
         <div style="text-align:center;width:${IS_MOBILE?'15':'16'}%;opacity:${c.isElim?.4:1}">
-          <!-- Portrait -->
-          <div onclick="${c.isMe&&!bb?.defeated?'openChampionPicker('+c.m.id+')':''}"
-            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${c.p?c.aColor:'#333'};background:#0a0510;position:relative;cursor:${c.isMe&&!bb?.defeated?'pointer':'default'}">
+          <!-- Portrait — click opens attack log or box scores -->
+          <div onclick="${c.p?'openChampionDetail('+c.m.id+','+c.p.id+')':''}"
+            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${c.p?c.aColor:'#333'};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
             ${c.portrait?`<img src="${c.portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
               :c.p?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:${c.aColor}">${c.p.team}</div>`
               :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#444">?</div>`}
@@ -4445,7 +4445,7 @@ function _oldRenderBossBattle_unused(){
                   <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:${isLive?'var(--red)':'var(--accent2)'}">+${champFP.toFixed(0)}⚔</div>
                 </div>
               </div>
-              ${isMe&&!bb.defeated?`<button onclick="openChampionPicker(${m.id})" style="width:100%;margin-top:4px;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:${mColor}22;border:1px solid ${mColor};color:${mColor};cursor:pointer">CHANGE</button>`:''}
+
             `:`
               ${isMe&&!bb.defeated?`<button onclick="openChampionPicker(${m.id})" style="width:100%;font-family:'Press Start 2P',monospace;font-size:6px;padding:4px;background:rgba(255,51,68,.1);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ PICK CHAMPION</button>`:'<div style="font-size:10px;color:var(--text3);font-style:italic">No champion yet</div>'}
             `}
@@ -4546,45 +4546,134 @@ function renderBossCommPanel(bb){
   </div>`;
 }
 
-function openChampionPicker(mid){
-  const existing = document.getElementById('champion-picker-modal');
-  if(existing){ existing.remove(); return; }
+
+// ── Champion Detail Popup (from portrait click) ──────────────────
+function openChampionDetail(mid, pid){
+  const p = getPlayer(pid); if(!p) return;
   const bb = getBossBattle();
-  if(!bb||!bb.active){ showToast('No active battle','error'); return; }
-  const roster = S.rosters[mid]||[];
+  const m = S.managers.find(x=>x.id===mid);
+  const aColor = getAvatarColor(mid);
+  const portrait = getActivePortrait(p.name);
+  const attacks = (bb?.attackLog||[]).filter(a=>a.mid===mid).reverse();
+  const totalDmg = attacks.reduce((s,a)=>s+a.fp,0);
+  const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
+  const R2_START = '20260504';
+
+  const existing = document.getElementById('champion-detail-modal');
+  if(existing) existing.remove();
+
   const modal = document.createElement('div');
-  modal.id = 'champion-picker-modal';
+  modal.id = 'champion-detail-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
-  const rows = roster.map(pid=>{
-    const p = getPlayer(pid); if(!p) return '';
-    const tc = TEAM_LOGOS[p.team]?.color||'#4a9eff';
-    const portrait = getActivePortrait(p.name);
-    const fp = playerStatScore(pid, mid);
-    const fppg = playerFPPG(pid, mid);
-    const isLive = isPlayerLive(pid);
-    const isCurrent = bb.champions?.[mid]===pid;
-    return '<div onclick="selectChampion('+mid+','+pid+');document.getElementById(\'champion-picker-modal\')?.remove()" '
-      +'style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border2);cursor:pointer;background:'+(isCurrent?tc+'18':'transparent')+'">'
-      +(portrait?'<img src="'+portrait+'" style="width:36px;height:36px;object-fit:cover;object-position:center top;border:2px solid '+(isLive?'var(--red)':tc)+';image-rendering:pixelated;flex-shrink:0"/>':'')
-      +'<div style="flex:1">'
-        +'<div style="font-size:13px;color:var(--text)">'+p.name+'</div>'
-        +'<div style="font-size:10px;color:var(--text3)">'+p.team+' · '+fppg.toFixed(1)+'/g · +'+fp.toFixed(0)+' total</div>'
-      +'</div>'
-      +(isCurrent?'<span style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:var(--accent2)">CURRENT</span>':'')
-      +'<span style="font-family:\'Press Start 2P\',monospace;font-size:8px;color:var(--red)">⚔</span>'
-      +'</div>';
-  }).join('');
-  modal.innerHTML = '<div style="background:var(--panel);border:2px solid var(--red);width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.625rem .875rem;border-bottom:2px solid var(--border);flex-shrink:0;background:rgba(255,51,68,.08)">'
-    +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--red)">⚔ PICK YOUR CHAMPION</span>'
-    +'<button onclick="document.getElementById(\'champion-picker-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>'
-    +'</div>'
-    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0">Your champion\'s FP counts as damage against the Boss.</div>'
-    +'<div style="overflow-y:auto;flex:1">'+rows+'</div>'
-    +'</div>';
+
+  const r2FP = Object.values(S.playerStats||{})
+    .filter(s=>s.pid===pid&&s.date>=R2_START)
+    .reduce((sum,s)=>{const acq=S.waiverAcquisitions?.[mid+'_'+pid];return sum+((!acq||s.date>=acq)?(s.fp||0):0);},0);
+
+  const div = document.createElement('div');
+  div.style.cssText = `background:var(--panel);border:2px solid ${aColor};width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;font-family:var(--font-pixel),monospace`;
+
+  // Header
+  const header = document.createElement('div');
+  header.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:.625rem .875rem;border-bottom:2px solid ${aColor}33;background:${aColor}11`;
+  header.innerHTML = (portrait?`<img src="${portrait}" style="width:32px;height:32px;object-fit:cover;object-position:center top;border:1px solid ${aColor};image-rendering:pixelated;margin-right:8px"/>`:'')
+    + `<div style="flex:1"><div style="font-size:8px;color:${aColor}">${m.name.toUpperCase()}</div><div style="font-size:10px;color:var(--text);margin-top:1px">${p.name}</div></div>`;
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '×';
+  closeBtn.style.cssText = 'background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1';
+  closeBtn.onclick = ()=>modal.remove();
+  header.appendChild(closeBtn);
+  div.appendChild(header);
+
+  // Stats
+  const stats = document.createElement('div');
+  stats.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border2)';
+  stats.innerHTML = `
+    <div style="padding:8px;text-align:center;border-right:1px solid var(--border2)">
+      <div style="font-size:7px;color:var(--text3)">R2 FP</div>
+      <div style="font-size:14px;color:#ffcc00;margin-top:2px">${r2FP.toFixed(0)}</div>
+    </div>
+    <div style="padding:8px;text-align:center;border-right:1px solid var(--border2)">
+      <div style="font-size:7px;color:var(--text3)">DMG DEALT</div>
+      <div style="font-size:14px;color:var(--red);margin-top:2px">${totalDmg.toFixed(0)}</div>
+    </div>
+    <div style="padding:8px;text-align:center">
+      <div style="font-size:7px;color:var(--text3)">ATTACKS</div>
+      <div style="font-size:14px;color:${aColor};margin-top:2px">${attacks.length}</div>
+    </div>`;
+  div.appendChild(stats);
+
+  // Tab buttons
+  const tabs = document.createElement('div');
+  tabs.style.cssText = 'display:flex;border-bottom:1px solid var(--border2)';
+  const btnAtk = document.createElement('button');
+  btnAtk.id = 'cdt-attacks';
+  btnAtk.style.cssText = `flex:1;padding:6px;font-family:var(--font-pixel),monospace;font-size:7px;border:none;border-bottom:2px solid ${aColor};background:${aColor}11;color:${aColor};cursor:pointer`;
+  btnAtk.textContent = '⚔ ATTACKS';
+  const btnBox = document.createElement('button');
+  btnBox.id = 'cdt-boxscores';
+  btnBox.style.cssText = 'flex:1;padding:6px;font-family:var(--font-pixel),monospace;font-size:7px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--text3);cursor:pointer';
+  btnBox.textContent = '📊 BOX SCORES';
+  tabs.appendChild(btnAtk);
+  tabs.appendChild(btnBox);
+  div.appendChild(tabs);
+
+  // Content area
+  const content_el = document.createElement('div');
+  content_el.id = 'champ-detail-content';
+  content_el.style.cssText = 'overflow-y:auto;flex:1;max-height:300px';
+  div.appendChild(content_el);
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:8px;border-top:1px solid var(--border2)';
+  const viewBoxBtn = document.createElement('button');
+  viewBoxBtn.style.cssText = 'width:100%;font-family:var(--font-pixel),monospace;font-size:7px;padding:7px;background:transparent;border:1px solid var(--border);color:var(--text3);cursor:pointer';
+  viewBoxBtn.textContent = '📊 VIEW FULL BOX SCORES';
+  viewBoxBtn.onclick = ()=>{ modal.remove(); openPlayerBoxScores(pid, mid); };
+  footer.appendChild(viewBoxBtn);
+  div.appendChild(footer);
+
+  modal.appendChild(div);
   document.body.appendChild(modal);
+
+  // Tab switching
+  function renderAttacks(){
+    btnAtk.style.borderBottomColor = aColor; btnAtk.style.background = aColor+'11'; btnAtk.style.color = aColor;
+    btnBox.style.borderBottomColor = 'transparent'; btnBox.style.background = 'transparent'; btnBox.style.color = 'var(--text3)';
+    content_el.innerHTML = attacks.length ? attacks.map(a=>{
+      const ts = new Date(a.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border2);font-size:10px">
+        <span style="color:var(--red);font-size:12px">⚔</span>
+        <span style="flex:1;color:var(--text2)">${targetLabels[a.target]||a.target}</span>
+        <span style="color:#ffcc00;font-family:var(--font-pixel),monospace;font-size:8px">-${a.fp.toFixed(0)} HP</span>
+        <span style="color:var(--text3);font-size:9px">${ts}</span>
+      </div>`;
+    }).join('') : '<div style="padding:1rem;text-align:center;font-size:11px;color:var(--text3)">No attacks yet</div>';
+  }
+
+  function renderBoxScores(){
+    btnBox.style.borderBottomColor = aColor; btnBox.style.background = aColor+'11'; btnBox.style.color = aColor;
+    btnAtk.style.borderBottomColor = 'transparent'; btnAtk.style.background = 'transparent'; btnAtk.style.color = 'var(--text3)';
+    const r2stats = Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=R2_START).sort((a,b)=>b.date.localeCompare(a.date));
+    content_el.innerHTML = r2stats.length ? r2stats.map(s=>{
+      const d=s.date; const dateStr=d.slice(4,6)+'/'+d.slice(6,8);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border2);font-size:10px">
+        <span style="color:var(--text3);min-width:36px">${dateStr}</span>
+        <div style="flex:1;display:flex;gap:6px;color:var(--text3);font-size:9px">
+          <span>${s.pts}pts</span><span>${s.reb}reb</span><span>${s.ast}ast</span><span>${s.stl}stl</span><span>${s.blk}blk</span>
+        </div>
+        <span style="color:#ffcc00;font-family:var(--font-pixel),monospace;font-size:8px">+${(s.fp||0).toFixed(0)} FP</span>
+      </div>`;
+    }).join('') : '<div style="padding:1rem;text-align:center;font-size:11px;color:var(--text3)">No R2 games yet</div>';
+  }
+
+  btnAtk.onclick = renderAttacks;
+  btnBox.onclick = renderBoxScores;
+  renderAttacks(); // default tab
 }
+
 
 
 // ── Boss Asset Upload (GIF-preserving) ──────────────────────────
