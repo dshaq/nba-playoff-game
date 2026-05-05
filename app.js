@@ -4152,12 +4152,12 @@ function renderBossBattleScene(){
           <!-- Manager name -->
           <div style="font-size:5px;color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
           <!-- HP bar -->
-          <div style="height:3px;background:#1a1a2a;margin-top:1px" title="HP: ${c.hp}%">
-            <div style="height:100%;width:${c.hp}%;background:${c.aColor};opacity:${c.isElim?.3:1};transition:width .5s;box-shadow:0 0 4px ${c.aColor}88"></div>
+          <div style="height:6px;background:#0a0a1a;margin-top:2px;border-radius:1px;overflow:hidden" title="HP: ${c.hp}%">
+            <div style="height:100%;width:${c.hp}%;background:${c.aColor};opacity:${c.isElim?.3:1};transition:width .5s;box-shadow:0 0 6px ${c.aColor}99"></div>
           </div>
           <!-- FP/Attack bar -->
-          <div style="height:3px;background:#1a1a2a;margin-top:1px" title="⚔ ${c.availFP.toFixed(0)} FP ready">
-            <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:${c.aColor};opacity:.7;transition:width .5s"></div>
+          <div style="height:4px;background:#0a0a1a;margin-top:1px;border-radius:1px;overflow:hidden" title="⚔ ${c.availFP.toFixed(0)} FP ready">
+            <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:${c.aColor};opacity:.6;transition:width .5s"></div>
           </div>
           <!-- Available FP -->
           ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:5px;color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
@@ -4209,12 +4209,13 @@ function renderBossBattleScene(){
           return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #0a0a1a">
             <div style="width:14px;height:14px;border:1px solid ${aColor};overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">${getAvatar(c.m.id,'sm')}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:6px;color:${aColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.m.name.toUpperCase()}</div>
-              <div style="font-size:7px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${c.p?c.p.team:(isMe?'NO CHAMP':'—')}</div>
+              <div style="font-size:6px;color:${aColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">
+                ${c.m.name.toUpperCase()}${c.p?' <span style="color:#555">//</span> <span style="color:var(--text3)">'+(c.p.name.split(' ').slice(-1)[0]).toUpperCase()+'</span>':''}
+              </div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div style="font-size:7px;color:${aColor}">HP ${c.hp}</div>
-              <div style="height:3px;width:40px;background:#111;margin-top:1px"><div style="height:100%;width:${c.hp}%;background:${aColor};box-shadow:0 0 3px ${aColor}88"></div></div>
+              <div style="height:5px;width:44px;background:#111;margin-top:2px;border-radius:1px;overflow:hidden"><div style="height:100%;width:${c.hp}%;background:${aColor};box-shadow:0 0 4px ${aColor}88"></div></div>
               <div style="font-size:7px;color:${c.availFP>0?'#ffcc00':'#444'};margin-top:2px">⚔ ${c.availFP.toFixed(0)}</div>
             </div>
           </div>`;
