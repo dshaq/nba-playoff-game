@@ -4109,20 +4109,40 @@ function renderBossBattleScene(){
         <div style="display:flex;gap:24px;margin-bottom:6px">
           ${[{img:minion1Img,label:bb?.minion1Name||'GUS',hp:minion1CurrentHP,max:minion1MaxHP,key:'minion1'},{img:minion2Img,label:bb?.minion2Name||'RIMREAPER',hp:minion2CurrentHP,max:minion2MaxHP,key:'minion2'}].map(mn=>`
           <div style="text-align:center;opacity:${mn.hp<=0?.3:1}">
-            ${mn.hp<=0?'<div style="font-size:24px">💀</div>':
-              mn.img?`<img id="enemy-sprite-${mn.key}" src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`:
-              `<div id="enemy-sprite-${mn.key}" style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`}
+            ${mn.hp<=0
+              ? (()=>{
+                  const hurtName = mn.key==='minion1'?'Boss_Minion1_hurt':'Boss_Minion2_hurt';
+                  const hurtImg = CUSTOM_LOGOS.find(l=>l.name===hurtName)?.dataUri;
+                  const showImg = hurtImg || mn.img;
+                  return showImg
+                    ? `<img id="enemy-sprite-${mn.key}" src="${showImg}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;opacity:.5;filter:grayscale(.7)"/>`
+                    : `<div style="font-size:24px;opacity:.4">💀</div>`;
+                })()
+              : mn.img
+                ? `<img id="enemy-sprite-${mn.key}" src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`
+                : `<div id="enemy-sprite-${mn.key}" style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`
+            }
             <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};margin-top:2px">${mn.label}</div>
             <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
             </div>
+            <div style="font-size:5px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff77':'#aa44ff99'};margin-top:1px;text-align:center">${mn.hp<=0?'DEFEATED':mn.hp+'/'+mn.max}</div>
           </div>`).join('')}
         </div>
         <!-- Main Boss -->
         <div style="position:relative;text-align:center">
-          ${bossCurrentHP<=0?`<div style="font-size:${IS_MOBILE?56:72}px">💀</div>`
-            :bossSunImg?`<img id="enemy-sprite-boss" src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
-            :`<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`}
+          ${bossCurrentHP<=0
+            ? (()=>{
+                const hurtImg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Main_hurt')?.dataUri;
+                const showImg = hurtImg || bossSunImg;
+                return showImg
+                  ? `<img id="enemy-sprite-boss" src="${showImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;opacity:.55;filter:grayscale(.6)"/>`
+                  : `<div style="font-size:${IS_MOBILE?56:72}px;opacity:.4">💀</div>`;
+              })()
+            : bossSunImg
+              ? `<img id="enemy-sprite-boss" src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
+              : `<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`
+          }
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
           <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
