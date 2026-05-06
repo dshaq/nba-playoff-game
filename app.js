@@ -2193,9 +2193,18 @@ function renderMyTeam(){
   // Add droppedFP to R1 (dropped players like KD earned those points in R1)
   roundFP[1] = +(roundFP[1] + ((S.droppedFP&&S.droppedFP[mid])||0)).toFixed(1);
 
+  // ── Build all-time roster (current + dropped players who earned FP for this manager) ──
+  const droppedPids = [];
+  (S.waiverLog||[]).forEach(e=>{if(e.managerId===mid&&e.dropPid) droppedPids.push(e.dropPid);});
+  Object.entries(S.waiverSlotUsage||{}).forEach(([k,v])=>{
+    const m2=k.match(/^(\d+)_elim_(\d+)$/);
+    if(m2&&parseInt(m2[1])===mid) droppedPids.push(parseInt(m2[2]));
+  });
+  const allTimeRoster = [...new Set([...roster,...droppedPids])];
+
   // ── Best game day ──
   const dayTotals = {};
-  Object.values(S.playerStats||{}).filter(s=>roster.includes(s.pid)).forEach(s=>{
+  Object.values(S.playerStats||{}).filter(s=>allTimeRoster.includes(s.pid)).forEach(s=>{
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(acqDate&&s.date<acqDate) return;
     dayTotals[s.date] = (dayTotals[s.date]||0)+(s.fp||0);
@@ -2203,8 +2212,8 @@ function renderMyTeam(){
   const bestDay = Object.entries(dayTotals).sort((a,b)=>b[1]-a[1])[0];
   const bestDayFmt = bestDay ? new Date(bestDay[0].replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
 
-  // ── Best individual game ──
-  const allPlayerGames = Object.values(S.playerStats||{}).filter(s=>roster.includes(s.pid)).map(s=>{
+  // ── Best individual game (includes dropped players) ──
+  const allPlayerGames = Object.values(S.playerStats||{}).filter(s=>allTimeRoster.includes(s.pid)).map(s=>{
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(acqDate&&s.date<acqDate) return null;
     return {pid:s.pid,fp:s.fp||0,date:s.date,name:getPlayer(s.pid)?.name||''};
@@ -2212,8 +2221,8 @@ function renderMyTeam(){
   const bestGame = allPlayerGames.sort((a,b)=>b.fp-a.fp)[0];
   const bestGameFmt = bestGame ? new Date(bestGame.date.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
 
-  // ── Round MVP (best FPPG) ──
-  const mvpData = roster.map(pid=>{
+  // ── Round MVP (best FPPG, includes dropped players) ──
+  const mvpData = allTimeRoster.map(pid=>{
     const p=getPlayer(pid); if(!p) return null;
     return {pid, name:p.name, fppg:playerFPPG(pid,mid), gp:playerGamesPlayedForManager(pid,mid)};
   }).filter(x=>x&&x.gp>0).sort((a,b)=>b.fppg-a.fppg)[0];
