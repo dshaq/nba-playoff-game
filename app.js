@@ -1218,6 +1218,69 @@ function triggerAttackFX(target, damage, aColor){
   }
 }
 
+
+// ── Boss Battle Announcement Banner ─────────────────────────────
+function renderBossAnnounceBanner(){
+  const el = document.getElementById('boss-announce-bar');
+  if(!el) return;
+  const bb = getBossBattle();
+  const mid = currentManagerId;
+  if(!bb?.active || mid===null || mid==='viewer'){ el.style.display='none'; return; }
+
+  const hasChamp = !!bb.champions?.[mid];
+  const aColor = getAvatarColor(mid);
+
+  el.style.display = 'block';
+  el.innerHTML = `
+  <div style="
+    background:linear-gradient(135deg,rgba(255,102,0,.18),rgba(255,204,0,.12),rgba(255,51,68,.15));
+    border-bottom:3px solid #ff6600;
+    padding:10px 14px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    position:relative;
+    overflow:hidden;
+  ">
+    <!-- Pulsing glow behind -->
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(255,102,0,.08),transparent 70%);pointer-events:none;animation:attack-pulse 3s ease-in-out infinite"></div>
+
+    <!-- Boss icon -->
+    <div style="font-size:${IS_MOBILE?20:26}px;flex-shrink:0;animation:boss-float 3s ease-in-out infinite;filter:drop-shadow(0 0 6px #ff6600)">
+      ${CUSTOM_LOGOS.find(l=>l.name==='Boss_Main')
+        ? `<img src="${CUSTOM_LOGOS.find(l=>l.name==='Boss_Main').dataUri}" style="width:${IS_MOBILE?28:38}px;height:${IS_MOBILE?28:38}px;object-fit:contain;image-rendering:pixelated"/>`
+        : '🏀'}
+    </div>
+
+    <!-- Text -->
+    <div style="flex:1;min-width:180px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?7:9}px;color:#ffcc00;text-shadow:0 0 10px #ffcc0066;margin-bottom:4px;letter-spacing:.05em">
+        ⚔ BOSS BATTLE IS LIVE!
+      </div>
+      <div style="font-size:${IS_MOBILE?10:12}px;color:#ddd;line-height:1.5">
+        A bonus game — defeat <strong style="color:#ff6600">DUNKMAW</strong> &amp; his minions for rewards! No effect on your main score. Attack daily with your Champion's FP.
+      </div>
+    </div>
+
+    <!-- CTA button -->
+    <button onclick="showTab('boss')" style="
+      font-family:'Press Start 2P',monospace;
+      font-size:${IS_MOBILE?7:8}px;
+      padding:${IS_MOBILE?'8px 12px':'10px 16px'};
+      background:linear-gradient(180deg,rgba(255,204,0,.25),rgba(255,102,0,.2));
+      border:2px solid #ffcc00;
+      color:#ffcc00;
+      cursor:pointer;
+      flex-shrink:0;
+      white-space:nowrap;
+      animation:attack-pulse 1.4s ease-in-out infinite;
+      --ac:#ffcc00;
+      letter-spacing:.03em;
+    ">${hasChamp ? '⚔ ATTACK NOW' : '⚔ PICK CHAMPION'}</button>
+  </div>`;
+}
+
 function startPolling(){
   setInterval(async()=>{
     if(!db||!S) return;
@@ -2099,7 +2162,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderPersonalAlert();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderPersonalAlert();renderBossAnnounceBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
