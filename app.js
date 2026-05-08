@@ -599,11 +599,41 @@ let waiverTeamFilter = null;
 let tempMgrs = [{name:"",color:COLORS[0]},{name:"",color:COLORS[1]},{name:"",color:COLORS[2]},{name:"",color:COLORS[3]}];
 
 // ── Persistence ───────────────────────────────────────────────────
+// ── Debounced saveState — batches rapid saves into one write ────
+let _saveTimer = null;
+let _savePromiseResolve = null;
+let _pendingSave = null;
+
 async function saveState(){
   if(!S) return;
+  // Immediate local backup
+  try{ localStorage.setItem('nba_playoff_2026',JSON.stringify(S)); }catch(e){}
+  if(!db) return;
+  // Return a promise that resolves when the debounced save completes
+  return new Promise(resolve => {
+    _savePromiseResolve = resolve;
+    if(_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(async()=>{
+      try{
+        const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
+        await db.from('leagues').upsert(payload);
+      }catch(e){ console.warn('saveState error:',e.message); }
+      finally{
+        _saveTimer = null;
+        if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
+      }
+    }, 3000); // 3 second debounce — batches rapid saves
+  });
+}
+
+// Immediate save — bypasses debounce for critical writes (waivers, boss battle)
+async function saveStateNow(){
+  if(!S) return;
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; }
+  try{ localStorage.setItem('nba_playoff_2026',JSON.stringify(S)); }catch(e){}
+  if(!db) return;
   const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
-  if(db){ await db.from('leagues').upsert(payload); }
-  else { try{localStorage.setItem('nba_playoff_2026',JSON.stringify(S));}catch(e){} }
+  await db.from('leagues').upsert(payload);
 }
 
 function migrateState(){
@@ -3967,7 +3997,7 @@ async function directAttack(mid, target){
     S.bossBattle.minion2CurrentHP = Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??45) - dmg);
   }
 
-  await saveState();
+  await saveStateNow();
   render();
   showToast(`⚔ ${p?.name} deals ${dmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
 
@@ -3997,7 +4027,7 @@ async function checkBossVictoryV2(){
         if(!S.badges[m.id].includes(badgeName)) S.badges[m.id].push(badgeName);
       }
     }
-    await saveState();
+    await saveStateNow();
     render();
     try{
       const chatState = await loadChatState();
