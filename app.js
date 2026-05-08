@@ -1543,7 +1543,7 @@ function showMainScreen(){
   render();
   // Default to My Team tab if logged in as a real manager
   if(currentManagerId !== null && currentManagerId !== 'viewer'){
-    showTab('my-team');
+    showTab(getBossBattle()?.active ? 'boss' : 'my-team');
     // Update topbar user identity
     const m = S.managers.find(x=>x.id===currentManagerId);
     const topbarUser = document.getElementById('topbar-user');
