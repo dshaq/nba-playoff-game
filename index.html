@@ -822,17 +822,6 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
   <!-- Personal waiver/roster alert banner -->
   <div id="personal-alert-bar" style="display:none"></div>
 
-  <div id="top-leaderboard-section" style="border-bottom:2px solid var(--border)">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem .375rem;background:var(--bg2);border-bottom:1px solid var(--border2)">
-      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3)">🏆 LIVE LEADERBOARD</div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="showTab('rules')" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">📋 RULES</button>
-        <button onclick="openBracketModal()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">🗓 BRACKET</button>
-      </div>
-    </div>
-    <div id="top-leaderboard-list"></div>
-  </div>
-
   <!-- Hidden bracket section (used by renderBracket) -->
   <div id="bracket-section" style="display:none"></div>
 
@@ -1104,6 +1093,18 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
 
 <!-- ── Chat bubble button ── -->
+  <!-- LIVE LEADERBOARD — bottom of page -->
+  <div id="top-leaderboard-section" style="border-top:2px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem .375rem;background:var(--bg2);border-bottom:1px solid var(--border2)">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent3)">🏆 LIVE LEADERBOARD</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="showTab('rules')" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">📋 RULES</button>
+        <button onclick="openBracketModal()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;cursor:pointer">🗓 BRACKET</button>
+      </div>
+    </div>
+    <div id="top-leaderboard-list"></div>
+  </div>
+
   <!-- Copyright footer -->
   <div style="text-align:center;padding:.75rem;font-size:11px;color:var(--text3);border-top:1px solid var(--border2);margin-top:1rem">
     © David Schachter 2026 · NBA ARCADE
