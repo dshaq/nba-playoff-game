@@ -843,9 +843,28 @@ function buildChampionList(roster, mid, topPlayer){
   }).join('');
 }
 
-function showBossChampionPopup(){
+function openChampionPicker(mid){
+  // Called from SWAP button — open the champion selection popup for this manager
+  const bb = getBossBattle();
+  if(!bb?.active){ showToast('No active battle','error'); return; }
+  const currentPid = bb.champions?.[mid];
+  if(currentPid && (currentManagerId !== mid) && !(isCommissioner || currentManagerId===4)){
+    showToast('You can only manage your own champion','error'); return;
+  }
+  if(currentPid){
+    const espnInj = getESPNInjury(getPlayer(currentPid)?.name);
+    const isOutOrDTD = espnInj && (espnInj.status==='Out'||espnInj.status==='Day-To-Day');
+    if(!isOutOrDTD && !(isCommissioner||currentManagerId===4)){
+      showToast(`${getPlayer(currentPid)?.name||'Your champion'} must be OUT or DTD to swap`,'error');
+      return;
+    }
+  }
+  showBossChampionPopup(mid);
+}
+
+function showBossChampionPopup(forceMid){
   if(document.getElementById('boss-champion-popup')) return;
-  const mid = currentManagerId;
+  const mid = forceMid !== undefined ? forceMid : currentManagerId;
   const bb = getBossBattle();
   const m = S.managers.find(x=>x.id===mid);
   const roster = (S.rosters[mid]||[]).map(pid=>getPlayer(pid)).filter(Boolean);
@@ -4264,12 +4283,19 @@ function renderBossBattleScene(){
         <div style="text-align:center;width:${IS_MOBILE?'15':'16'}%;opacity:${c.isElim?.4:1}">
           <!-- Portrait — click opens attack log or box scores -->
           <div onclick="${c.p?'openChampionDetail('+c.m.id+','+c.p.id+')':''}"
-            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${c.p?c.aColor:'#333'};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
+            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${(()=>{const inj=c.p?getESPNInjury(c.p.name):null;const isOut=inj&&(inj.status==='Out'||inj.status==='Day-To-Day');return isOut?'#ff3344':c.p?c.aColor:'#333';})()};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
             ${c.portrait?`<img src="${c.portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
               :c.p?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:${c.aColor}">${c.p.team}</div>`
               :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#444">?</div>`}
             ${c.isLive?`<div style="position:absolute;top:0;left:0;right:0;background:rgba(255,51,68,.8);font-size:4px;text-align:center;padding:1px;color:#fff">LIVE</div>`:''}
             ${c.isElim?`<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:10px">💀</div>`:''}
+            ${(()=>{
+              if(!c.p || c.isElim) return '';
+              const inj = getESPNInjury(c.p.name);
+              const isOut = inj && (inj.status==='Out' || inj.status==='Day-To-Day');
+              if(!isOut) return '';
+              return `<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,51,68,.85);font-family:'Press Start 2P',monospace;font-size:5px;text-align:center;padding:2px;color:#fff">${inj.status==='Out'?'OUT':'DTD'}</div>`;
+            })()}
           </div>
           <!-- Manager name -->
           <div style="font-size:5px;color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
@@ -4283,6 +4309,13 @@ function renderBossBattleScene(){
           </div>
           <!-- Available FP -->
           ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:5px;color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
+          ${(()=>{
+            if(!c.isMe || bb?.defeated || !c.p) return '';
+            const inj = getESPNInjury(c.p.name);
+            const isOut = inj && (inj.status==='Out'||inj.status==='Day-To-Day');
+            if(!isOut) return '';
+            return `<button onclick="openChampionPicker(${c.m.id})" style="width:100%;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:rgba(255,51,68,.2);border:1px solid #ff3344;color:#ff3344;cursor:pointer;margin-top:1px">SWAP</button>`;
+          })()}
         </div>`).join('')}
       </div>
 
