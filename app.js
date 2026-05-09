@@ -972,7 +972,10 @@ function showBossChampionPopup(forceMid){
 function selectBossChampion(mid, pid){
   if(!S.bossBattle) return;
   if(!S.bossBattle.champions) S.bossBattle.champions = {};
+  if(!S.bossBattle.championSelectedAt) S.bossBattle.championSelectedAt = {};
   S.bossBattle.champions[mid] = pid;
+  // Record exact timestamp of selection — FP only counts from this moment onward
+  S.bossBattle.championSelectedAt[mid] = new Date().toISOString();
   localStorage.setItem(BOSS_POPUP_KEY+'_'+mid, '1');
   saveState();
   render();
@@ -1298,6 +1301,43 @@ function renderBossAnnounceBanner(){
       letter-spacing:.03em;
     ">${hasChamp ? '⚔ ATTACK NOW' : '⚔ PICK CHAMPION'}</button>
   </div>`;
+}
+
+
+// ── Champion FP earned AFTER selection time ──────────────────────
+function getChampionAvailFP(mid){
+  const bb = getBossBattle();
+  if(!bb?.active) return 0;
+  const pid = bb.champions?.[mid];
+  if(!pid) return 0;
+  const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
+  const R2_START = '20260504';
+
+  // Sum R2 stats earned after selection timestamp
+  const earned = Object.values(S.playerStats||{})
+    .filter(s => s.pid===pid && s.date >= R2_START)
+    .reduce((sum,s)=>{
+      // If no selectedAt, use start of R2 (for original selections)
+      const cutoff = selectedAt ? selectedAt.slice(0,10).replace(/-/g,'') : R2_START;
+      if(s.date < cutoff) return sum;
+      // Same day as selection — only count games that ended after selection time
+      // (We store by date not exact time, so same-day is excluded to be safe)
+      if(selectedAt && s.date === cutoff) return sum; // exclude same day
+      const acq = S.waiverAcquisitions?.[mid+'_'+pid];
+      return sum + ((!acq||s.date>=acq) ? (s.fp||0) : 0);
+    }, 0);
+
+  // Add live FP if currently playing and game not yet saved
+  const live = livePlayerStats?.[pid];
+  const liveExtra = (live && !Object.values(S.playerStats||{}).some(s=>s.pid===pid&&s.gameId===live.gameId))
+    ? (live.fp||0) : 0;
+
+  // Subtract already spent FP (from attack log for this manager+champion)
+  const spent = (bb.attackLog||[])
+    .filter(a=>a.mid===mid && a.pid===pid)
+    .reduce((s,a)=>s+a.fp,0);
+
+  return Math.max(0, earned + liveExtra - spent);
 }
 
 function startPolling(){
@@ -4040,22 +4080,9 @@ async function directAttack(mid, target){
   const champPid = bb.champions?.[mid];
   if(!champPid){showToast('Pick a champion first!','error');return;}
 
-  // Calculate available attack FP — Round 2 only (May 5 onward)
-  const R2_START = '20260504';
-  const totalFP = Object.values(S.playerStats||{})
-    .filter(s => s.pid===champPid && s.date >= R2_START)
-    .reduce((sum,s) => {
-      const acq = S.waiverAcquisitions?.[mid+'_'+champPid];
-      return sum + ((!acq||s.date>=acq) ? (s.fp||0) : 0);
-    }, 0)
-    + (() => {
-      const live = livePlayerStats?.[champPid];
-      if(!live) return 0;
-      const saved = Object.values(S.playerStats||{}).some(s=>s.pid===champPid&&s.gameId===live.gameId);
-      return (!saved) ? (live.fp||0) : 0;
-    })();
-  const spentFP = (bb.attackLog||[]).filter(a=>a.mid===mid).reduce((s,a)=>s+a.fp,0);
-  const availableFP = Math.max(0, totalFP - spentFP);
+  // Calculate available FP — only earned AFTER champion was selected
+  const totalFP = getChampionAvailFP(mid);
+  const availableFP = totalFP; // already net of spent in getChampionAvailFP
 
   if(availableFP <= 0){
     showToast('No FP available to attack with yet!','error');
