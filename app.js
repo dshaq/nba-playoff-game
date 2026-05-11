@@ -1119,8 +1119,9 @@ function showBossModeHelp(){
       color: '#ffcc00',
       text: null,
       rewards: [
-        {label:'DEFEAT THE BOSS', desc:'Your Champion earns +25 bonus FP and a special token allowing you to drop a single player who is not injured.'},
-        {label:'FINAL BLOW', desc:'Deliver the killing hit on a Boss to receive a commemorative badge (displayed on My Team) and a new portrait for your Champion.'},
+        {label:'DEFEAT THE BOSS', desc:'All Champions earn +25 Champion FP added to their total score.'},
+        {label:'FINAL BLOW', desc:'Deliver the killing hit on a Boss or Minion to receive a commemorative badge displayed on My Team.'},
+        {label:'CATCH', desc:'When an enemy reaches 0 HP you can attempt to catch it with a ball from your inventory. The final-blow dealer gets a 10-minute exclusive window before others can try. Each manager gets ONE attempt per enemy per battle. Success depends on your ball rarity and the enemy rarity. A failed catch consumes the ball. If nobody catches it, the enemy fizzles away forever. Caught enemies live in your Boss Zone.'},
       ]
     }
   ];
@@ -1338,6 +1339,401 @@ function getChampionAvailFP(mid){
     .reduce((s,a)=>s+a.fp,0);
 
   return Math.max(0, earned + liveExtra - spent);
+}
+
+// ── INVENTORY SYSTEM ─────────────────────────────────────────────
+// S.inventory[mid] = { coins:0, balls:[{type,id}], caught:[{enemyId,name,battleRound,caughtAt}] }
+
+const BALL_TYPES = {
+  swish:  { name:'Swish Ball',  catchRates:{ common:.50, uncommon:.25, rare:.12 }, rarity:'common',   icon:'🏀' },
+  clutch: { name:'Clutch Ball', catchRates:{ common:.75, uncommon:.50, rare:.30 }, rarity:'uncommon', icon:'⚡' },
+  buzzer: { name:'Buzzer Ball', catchRates:{ common:.95, uncommon:.80, rare:.60 }, rarity:'rare',     icon:'💥' },
+};
+
+const ENEMY_RARITIES = {
+  boss:    'rare',
+  minion1: 'common',
+  minion2: 'common',
+};
+
+function getInventory(mid){
+  if(!S.inventory) S.inventory = {};
+  if(!S.inventory[mid]) S.inventory[mid] = { coins:0, balls:[], caught:[] };
+  return S.inventory[mid];
+}
+
+function getBalls(mid){
+  return getInventory(mid).balls || [];
+}
+
+function hasBall(mid, type){
+  return getBalls(mid).some(b=>b.type===type);
+}
+
+function ballCount(mid, type){
+  return getBalls(mid).filter(b=>b.type===type).length;
+}
+
+function addBall(mid, type, count=1){
+  if(!S.inventory) S.inventory={};
+  if(!S.inventory[mid]) S.inventory[mid]={coins:0,balls:[],caught:[]};
+  for(let i=0;i<count;i++){
+    S.inventory[mid].balls.push({type, id: Date.now()+Math.random()});
+  }
+}
+
+function removeBall(mid, type){
+  if(!S.inventory?.[mid]?.balls) return false;
+  const idx = S.inventory[mid].balls.findIndex(b=>b.type===type);
+  if(idx===-1) return false;
+  S.inventory[mid].balls.splice(idx,1);
+  return true;
+}
+
+// ── Gift starter balls to all managers ──────────────────────────
+async function giftStarterBalls(){
+  if(!S.inventory) S.inventory = {};
+  let changed = false;
+  for(const m of S.managers){
+    const inv = getInventory(m.id);
+    // Only gift once — check if already received
+    if(inv.starterGifted) continue;
+    addBall(m.id, 'swish', 3);
+    addBall(m.id, 'clutch', 1);
+    inv.starterGifted = true;
+    changed = true;
+  }
+  if(changed){ await saveStateNow(); render(); showToast('🎁 Starter balls gifted to all managers!','info'); }
+  else { showToast('Starter balls already gifted','info'); }
+}
+
+// ── CATCH mechanic ───────────────────────────────────────────────
+function canAttemptCatch(mid, target){
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated) return {ok:false, reason:'No active battle'};
+  // Check target HP = 0
+  const enemyName = target==='boss'?bb.bossLabel||'DUNKMAW':target==='minion1'?bb.minion1Name||'GUS':bb.minion2Name||'RIMREAPER';
+  const hp = target==='boss' ? (S.bossBattle.bossCurrentHP??bb.bossHP)
+    : target==='minion1' ? (S.bossBattle.minion1CurrentHP??bb.minion1HP??80)
+    : (S.bossBattle.minion2CurrentHP??bb.minion2HP??80);
+  if(hp > 0) return {ok:false, reason:`${enemyName} still has ${hp} HP remaining!`};
+  // Check enemy not already caught
+  const caught = Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId===target&&c.battleRound===bb.round));
+  if(caught) return {ok:false, reason:`${enemyName} has already been caught this battle!`};
+  // Check 10-minute final blow exclusivity
+  const finalBlow = bb.finalBlows?.[target]; // {mid, ts}
+  if(finalBlow && finalBlow.mid !== mid){
+    const elapsed = (Date.now() - new Date(finalBlow.ts).getTime()) / 60000;
+    if(elapsed < 10){
+      const remaining = Math.ceil(10 - elapsed);
+      return {ok:false, reason:`${S.managers.find(m=>m.id===finalBlow.mid)?.name} delivered the final blow — they have ${remaining} min exclusive window to catch first!`};
+    }
+  }
+  // Check hasn't already attempted this battle
+  const attempts = bb.catchAttempts || {};
+  if(attempts[mid+'_'+target]) return {ok:false, reason:'You already used your catch attempt on '+enemyName};
+  // Check has at least one ball
+  const inv = getInventory(mid);
+  if(!inv.balls?.length) return {ok:false, reason:'You have no balls in your inventory!'};
+  return {ok:true};
+}
+
+async function attemptCatch(mid, target, ballType){
+  const check = canAttemptCatch(mid, target);
+  if(!check.ok){ showToast(check.reason,'error'); return; }
+  if(!removeBall(mid, ballType)){ showToast(`No ${BALL_TYPES[ballType]?.name} in inventory`,'error'); return; }
+  // Record attempt
+  if(!S.bossBattle.catchAttempts) S.bossBattle.catchAttempts = {};
+  S.bossBattle.catchAttempts[mid+'_'+target] = { ballType, ts:new Date().toISOString() };
+  // Calculate catch rate
+  const bb = getBossBattle();
+  const enemyRarity = ENEMY_RARITIES[target] || 'common';
+  const catchRate = BALL_TYPES[ballType]?.catchRates[enemyRarity] || 0.5;
+  const roll = Math.random();
+  const success = roll <= catchRate;
+  // Animate catch attempt
+  await showCatchAnimation(target, ballType, success);
+  if(success){
+    // Add to inventory
+    if(!S.inventory[mid].caught) S.inventory[mid].caught=[];
+    const enemyName = target==='boss'?bb.bossLabel||'DUNKMAW':target==='minion1'?bb.minion1Name||'GUS':bb.minion2Name||'RIMREAPER';
+    S.inventory[mid].caught.push({
+      enemyId: target,
+      name: enemyName,
+      battleRound: bb.round||2,
+      caughtAt: new Date().toISOString(),
+      rarity: enemyRarity,
+      spriteKey: target==='boss'?'Boss_Main':target==='minion1'?'Boss_Minion1':'Boss_Minion2',
+    });
+    await saveStateNow();
+    render();
+    // Chat announcement
+    try{
+      const chatState = await loadChatState();
+      const m = S.managers.find(x=>x.id===mid);
+      chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,
+        text:`🎉 ${m?.name} caught ${enemyName}! ${BALL_TYPES[ballType].icon} ${BALL_TYPES[ballType].name} succeeded! (${Math.round(catchRate*100)}% chance)`,
+        ts:new Date().toISOString()});
+      await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
+    }catch(e){}
+    showToast(`🎉 Caught ${enemyName}!`,'warn');
+  } else {
+    await saveStateNow();
+    render();
+    showToast(`${BALL_TYPES[ballType].icon} ${BALL_TYPES[ballType].name} failed! (${Math.round(catchRate*100)}% chance)`,'error');
+  }
+}
+
+async function showCatchAnimation(target, ballType, success){
+  const arena = document.getElementById('boss-arena');
+  if(!arena) return;
+  const spriteEl = document.getElementById('enemy-sprite-'+target);
+  const ball = BALL_TYPES[ballType];
+  // Create ball element
+  const ballEl = document.createElement('div');
+  ballEl.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:32px;z-index:50;animation:catch-throw .6s ease-out forwards`;
+  ballEl.textContent = ball.icon;
+  arena.appendChild(ballEl);
+  // Flash the sprite
+  await new Promise(r=>setTimeout(r,600));
+  if(spriteEl){
+    spriteEl.style.animation = success ? 'victory-pulse .3s ease-in-out 3' : 'boss-shake .15s 3';
+    await new Promise(r=>setTimeout(r,900));
+    spriteEl.style.animation = '';
+  }
+  if(success && spriteEl){
+    spriteEl.style.opacity = '0';
+    spriteEl.style.transition = 'opacity .5s';
+  }
+  ballEl.remove();
+}
+
+// ── ITEM usage (from Boss Zone inventory) ────────────────────────
+async function useInventoryItem(mid, enemyId){
+  const bb = getBossBattle();
+  if(!bb?.active || bb?.defeated){ showToast('No active battle','error'); return; }
+  const inv = getInventory(mid);
+  const caught = inv.caught?.find(c=>c.enemyId===enemyId);
+  if(!caught){ showToast('You do not have this enemy in your inventory','error'); return; }
+  // Check cooldown — once per battle
+  if(!S.bossBattle.itemsUsed) S.bossBattle.itemsUsed = {};
+  const key = mid+'_'+enemyId;
+  if(S.bossBattle.itemsUsed[key]){ showToast('Already used this battle','error'); return; }
+  const abilities = {
+    boss:    { name:'SLAM SURGE',   desc:'+50% bonus on next attack', icon:'🏀' },
+    minion1: { name:'AREA STRIKE',  desc:'Next attack hits ALL enemies', icon:'👹' },
+    minion2: { name:'SOUL STEAL',   desc:'Next attack deals 2× damage', icon:'💀' },
+  };
+  const ability = abilities[enemyId];
+  if(!ability){ showToast('Unknown ability','error'); return; }
+  if(!confirm(`Use ${ability.name}?\n\n${ability.desc}`)) return;
+  S.bossBattle.itemsUsed[key] = { ability:enemyId, ts:new Date().toISOString() };
+  S.bossBattle.activeAbility = { mid, enemyId, name:ability.name };
+  await saveStateNow();
+  render();
+  showToast(`✨ ${ability.name} activated!`,'warn');
+}
+
+// Apply active ability in directAttack
+function applyActiveAbility(mid, target, dmg){
+  const bb = getBossBattle();
+  if(!bb?.activeAbility || bb.activeAbility.mid !== mid) return {dmg, targets:[target]};
+  const ability = bb.activeAbility.enemyId;
+  S.bossBattle.activeAbility = null; // consume it
+  if(ability==='minion1'){ // AREA STRIKE — hit all
+    return {dmg, targets:['boss','minion1','minion2']};
+  } else if(ability==='minion2'){ // SOUL STEAL — 2x
+    return {dmg:dmg*2, targets:[target]};
+  } else if(ability==='boss'){ // SLAM SURGE — +50%
+    return {dmg:Math.round(dmg*1.5), targets:[target]};
+  }
+  return {dmg, targets:[target]};
+}
+
+
+
+// ── Catch Menu ───────────────────────────────────────────────────
+function showCatchMenu(target){
+  const mid = currentManagerId;
+  const check = canAttemptCatch(mid, target);
+  if(!check.ok){ showToast(check.reason,'error'); return; }
+  const inv = getInventory(mid);
+  const balls = inv.balls||[];
+  if(!balls.length){ showToast('You have no balls! Visit the Store to get some.','error'); return; }
+  // Build ball selection popup
+  const existing = document.getElementById('catch-menu-modal');
+  if(existing) existing.remove();
+  const bb = getBossBattle();
+  const enemyName = target==='boss'?bb.bossLabel||'DUNKMAW':target==='minion1'?bb.minion1Name||'GUS':bb.minion2Name||'RIMREAPER';
+  const enemyRarity = ENEMY_RARITIES[target]||'common';
+  const modal = document.createElement('div');
+  modal.id = 'catch-menu-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  const counts = { swish:ballCount(mid,'swish'), clutch:ballCount(mid,'clutch'), buzzer:ballCount(mid,'buzzer') };
+  const div = document.createElement('div');
+  div.style.cssText = 'background:var(--panel);border:2px solid #ffcc00;width:100%;max-width:360px;font-family:var(--font-pixel),monospace;padding:16px';
+  div.innerHTML = `
+    <div style="font-size:9px;color:#ffcc00;margin-bottom:4px">⚾ CATCH ${enemyName.toUpperCase()}</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:12px">Choose a ball — one attempt only!</div>
+    ${Object.entries(BALL_TYPES).map(([type,ball])=>{
+      const count = counts[type]||0;
+      const rate = Math.round((ball.catchRates[enemyRarity]||0)*100);
+      const disabled = count===0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;border:1px solid ${disabled?'#333':'#555'};opacity:${disabled?.4:1}">
+        <span style="font-size:20px">${ball.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:8px;color:${disabled?'#555':'var(--text)'}">${ball.name}</div>
+          <div style="font-size:9px;color:#888">${rate}% catch rate · You have: ${count}</div>
+        </div>
+        ${!disabled?`<button onclick="attemptCatch(${mid},'${target}','${type}');document.getElementById('catch-menu-modal').remove()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 10px;background:rgba(255,204,0,.15);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer">USE</button>`:''}
+      </div>`;
+    }).join('')}
+    <button onclick="document.getElementById('catch-menu-modal').remove()" style="width:100%;margin-top:8px;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;background:transparent;border:1px solid #444;color:#666;cursor:pointer">CANCEL</button>
+  `;
+  modal.appendChild(div);
+  document.body.appendChild(modal);
+}
+
+// ── Add catch-throw CSS ──────────────────────────────────────────
+(function(){
+  if(document.getElementById('catch-css')) return;
+  const s = document.createElement('style');
+  s.id = 'catch-css';
+  s.textContent = `@keyframes catch-throw{0%{transform:translate(-50%,-50%) scale(0);opacity:0}40%{transform:translate(-50%,-150%) scale(1.3);opacity:1}100%{transform:translate(-50%,-300%) scale(.8);opacity:0}}`;
+  document.head.appendChild(s);
+})();
+
+
+function showInventoryItems(mid){
+  if(mid===null||mid===undefined) mid = currentManagerId;
+  const inv = getInventory(mid);
+  const caught = inv.caught||[];
+  const bb = getBossBattle();
+  if(!caught.length){ showToast('No enemies in your Boss Zone yet!','info'); return; }
+  const existing = document.getElementById('items-menu-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'items-menu-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  const abilities = {
+    boss:    {name:'SLAM SURGE',  desc:'Next attack +50% damage',        icon:'🏀', color:'#ff6600'},
+    minion1: {name:'AREA STRIKE', desc:'Next attack hits ALL enemies',    icon:'👹', color:'#aa44ff'},
+    minion2: {name:'SOUL STEAL',  desc:'Next attack deals 2× damage',    icon:'💀', color:'#ffffff'},
+  };
+  const div = document.createElement('div');
+  div.style.cssText = 'background:var(--panel);border:2px solid #aa44ff;width:100%;max-width:380px;font-family:var(--font-pixel),monospace;padding:16px';
+  div.innerHTML = `
+    <div style="font-size:9px;color:#aa44ff;margin-bottom:4px">✨ BOSS ZONE ABILITIES</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:12px">Activate a power for this battle</div>
+    ${caught.map(c=>{
+      const ab = abilities[c.enemyId];
+      if(!ab) return '';
+      const used = !!(bb?.itemsUsed?.[mid+'_'+c.enemyId]);
+      const isActive = bb?.activeAbility?.mid===mid && bb?.activeAbility?.enemyId===c.enemyId;
+      const sprite = CUSTOM_LOGOS.find(l=>l.name===c.spriteKey)?.dataUri;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;border:1px solid ${used?'#333':ab.color};opacity:${used?.5:1}">
+        ${sprite?`<img src="${sprite}" style="width:32px;height:32px;object-fit:contain;image-rendering:pixelated"/>`:
+          `<span style="font-size:20px">${ab.icon}</span>`}
+        <div style="flex:1">
+          <div style="font-size:8px;color:${used?'#555':ab.color}">${c.name} — ${ab.name}</div>
+          <div style="font-size:9px;color:#888">${ab.desc}</div>
+          ${isActive?'<div style="font-size:8px;color:#ffcc00;margin-top:2px">✓ ACTIVE</div>':''}
+        </div>
+        ${!used&&!isActive?`<button onclick="useInventoryItem(${mid},'${c.enemyId}');document.getElementById('items-menu-modal').remove()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 8px;background:${ab.color}22;border:1px solid ${ab.color};color:${ab.color};cursor:pointer">USE</button>`
+          :`<span style="font-size:7px;color:#555">${isActive?'ACTIVE':'USED'}</span>`}
+      </div>`;
+    }).join('')}
+    <button onclick="document.getElementById('items-menu-modal').remove()" style="width:100%;margin-top:8px;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;background:transparent;border:1px solid #444;color:#666;cursor:pointer">CLOSE</button>
+  `;
+  modal.appendChild(div);
+  document.body.appendChild(modal);
+}
+
+
+// ── Boss Zone ─────────────────────────────────────────────────────
+function renderBossZone(mid, el){
+  if(!el) return;
+  const inv = getInventory(mid);
+  const caught = inv.caught||[];
+  if(!caught.length){ el.style.display='none'; return; }
+  el.style.display = 'block';
+  const zoneBg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Zone_bg');
+  el.innerHTML = `<div style="margin-top:.75rem">
+    <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ffcc00;margin-bottom:.5rem">🏟 BOSS ZONE</div>
+    <div style="position:relative;width:100%;height:${IS_MOBILE?160:200}px;overflow:hidden;border:2px solid #ffcc0044;background:#050210;cursor:pointer" onclick="openBossZoneModal(${mid})">
+      ${zoneBg?`<img src="${zoneBg.dataUri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated"/>`:''}
+      <!-- Floating enemy sprites -->
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;padding:8px">
+        ${caught.map((c,i)=>{
+          const sprite = CUSTOM_LOGOS.find(l=>l.name===c.spriteKey)?.dataUri;
+          const colors = {boss:'#ff6600',minion1:'#aa44ff',minion2:'#ffffff'};
+          const color = colors[c.enemyId]||'#ffcc00';
+          const delay = i*0.7;
+          return `<div style="text-align:center;animation:boss-float ${2.5+i*.3}s ease-in-out infinite ${delay}s">
+            ${sprite?`<img src="${sprite}" style="width:${IS_MOBILE?44:60}px;height:${IS_MOBILE?44:60}px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 6px ${color})"/>`
+              :`<div style="font-size:${IS_MOBILE?32:44}px">👾</div>`}
+            <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${color};margin-top:2px">${c.name}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <!-- Tap hint -->
+      <div style="position:absolute;bottom:4px;right:6px;font-family:'Press Start 2P',monospace;font-size:5px;color:#ffffff44">TAP TO VIEW</div>
+    </div>
+  </div>`;
+}
+
+function openBossZoneModal(mid){
+  const inv = getInventory(mid);
+  const caught = inv.caught||[];
+  const m = S.managers.find(x=>x.id===mid);
+  const existing = document.getElementById('boss-zone-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'boss-zone-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  const zoneBg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Zone_bg');
+  const div = document.createElement('div');
+  div.style.cssText = 'background:#050210;border:2px solid #ffcc00;width:100%;max-width:480px;font-family:var(--font-pixel),monospace;overflow:hidden';
+  const colors = {boss:'#ff6600',minion1:'#aa44ff',minion2:'#ffffff'};
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #ffcc0033;background:#0a0a0a">
+      <div style="font-size:9px;color:#ffcc00">🏟 ${m?.name?.toUpperCase()} — BOSS ZONE</div>
+      <button onclick="document.getElementById('boss-zone-modal').remove()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="position:relative;height:180px;overflow:hidden">
+      ${zoneBg?`<img src="${zoneBg.dataUri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated"/>`:'<div style="position:absolute;inset:0;background:radial-gradient(ellipse,#1a0530,#050210)"></div>'}
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;padding:12px">
+        ${caught.map((c,i)=>{
+          const sprite=CUSTOM_LOGOS.find(l=>l.name===c.spriteKey)?.dataUri;
+          const color=colors[c.enemyId]||'#ffcc00';
+          return `<div style="text-align:center;animation:boss-float ${2.5+i*.3}s ease-in-out infinite ${i*.7}s">
+            ${sprite?`<img src="${sprite}" style="width:64px;height:64px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 8px ${color})"/>`:`<div style="font-size:48px">👾</div>`}
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${color};margin-top:3px">${c.name}</div>
+            <div style="font-size:8px;color:#888">R${c.battleRound}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    ${caught.map(c=>{
+      const color=colors[c.enemyId]||'#ffcc00';
+      const abilities={boss:'SLAM SURGE — next attack +50%',minion1:'AREA STRIKE — hit all enemies',minion2:'SOUL STEAL — 2× damage'};
+      const caughtDate=new Date(c.caughtAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #0a0a1a">
+        <div style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 4px ${color}"></div>
+        <div style="flex:1">
+          <div style="font-size:8px;color:${color}">${c.name}</div>
+          <div style="font-size:9px;color:#888">✨ ${abilities[c.enemyId]||'?'}</div>
+        </div>
+        <div style="font-size:8px;color:#555">Caught ${caughtDate}</div>
+      </div>`;
+    }).join('')}
+  `;
+  modal.appendChild(div);
+  document.body.appendChild(modal);
 }
 
 function startPolling(){
@@ -4095,20 +4491,39 @@ async function directAttack(mid, target){
 
   if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
   S.bossBattle.attackLog.push({mid, pid:champPid, fp:availableFP, target, ts:new Date().toISOString()});
+  // Record final blow if this kills the enemy
+  if(!S.bossBattle.finalBlows) S.bossBattle.finalBlows = {};
+  const _hpAfter = {
+    boss: Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - availableFP),
+    minion1: Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??80) - availableFP),
+    minion2: Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??80) - availableFP),
+  };
+  for(const t of (typeof targets!=='undefined'?targets:[target])){
+    if(_hpAfter[t]<=0 && !S.bossBattle.finalBlows[t]){
+      S.bossBattle.finalBlows[t] = {mid, ts:new Date().toISOString()};
+    }
+  }
 
   // Apply damage
   const dmg = availableFP;
-  if(target==='boss'){
-    S.bossBattle.bossCurrentHP = Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - dmg);
-  } else if(target==='minion1'){
-    S.bossBattle.minion1CurrentHP = Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??45) - dmg);
-  } else if(target==='minion2'){
-    S.bossBattle.minion2CurrentHP = Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??45) - dmg);
+  // Apply active ability (AREA STRIKE, SOUL STEAL, SLAM SURGE)
+  const abilityResult = applyActiveAbility(mid, target, dmg);
+  const finalDmg = abilityResult.dmg;
+  const targets = abilityResult.targets;
+  for(const t of targets){
+    if(t==='boss'){
+      S.bossBattle.bossCurrentHP = Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - finalDmg);
+    } else if(t==='minion1'){
+      S.bossBattle.minion1CurrentHP = Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??80) - finalDmg);
+    } else if(t==='minion2'){
+      S.bossBattle.minion2CurrentHP = Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??80) - finalDmg);
+    }
   }
+  // finalDmg used below for toast
 
   await saveStateNow();
   render();
-  showToast(`⚔ ${p?.name} deals ${dmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
+  showToast(`⚔ ${p?.name} deals ${finalDmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
 
   // Trigger full attack FX
   const _aColor = getAvatarColor(mid);
@@ -4123,6 +4538,8 @@ async function checkBossVictoryV2(){
   if(!bb?.active || bb?.defeated) return;
   const bossHP = S.bossBattle.bossCurrentHP ?? bb.bossHP;
   if(bossHP <= 0){
+    // Record final blow dealer for boss if not already set
+    if(!S.bossBattle.finalBlows) S.bossBattle.finalBlows = {};
     bb.defeated = true;
     bb.defeatedTs = new Date().toISOString();
     // Award FP + badges
@@ -4141,11 +4558,11 @@ async function checkBossVictoryV2(){
     try{
       const chatState = await loadChatState();
       chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,
-        text:`🏆 BOSS DEFEATED! The Basketball Monster has fallen! +${bb.reward} FP awarded to all Champions! Badges earned! ⚔`,
+        text:`🏆 BOSS DEFEATED! The Basketball Monster has fallen! +${bb.reward} Champion FP awarded to all Champions! Badges earned! ⚔`,
         ts:new Date().toISOString()});
       await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
     }catch(e){}
-    showToast(`🏆 BOSS DEFEATED! +${bb.reward} FP awarded!`,'warn');
+    showToast(`🏆 BOSS DEFEATED! +${bb.reward} Champion FP awarded!`,'warn');
   }
 }
 
@@ -4283,6 +4700,7 @@ function renderBossBattleScene(){
               : `<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`
           }
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
+          ${bossCurrentHP<=0&&mid!==null&&mid!=='viewer'?`<button onclick="showCatchMenu('boss')" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 6px;background:rgba(255,204,0,.2);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;margin-top:2px">⚾ CATCH</button>`:''}
           <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
           </div>
@@ -4462,10 +4880,11 @@ function renderBossBattleScene(){
             </div>
 
             <!-- ITEM -->
-            <button onclick="showToast('Feature Coming Soon!','info')" style="
+            <button onclick="showInventoryItems(${myChamp?.m?.id})" style="
               width:100%;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 6px;
-              background:rgba(50,50,50,.3);border:2px solid #333;color:#555;cursor:pointer;text-align:left;
-            ">▶ ITEM<div style="font-size:6px;color:#444;margin-top:2px">Coming Soon</div></button>
+              background:rgba(50,50,50,.3);border:2px solid ${(getInventory(mid)?.caught?.length>0)?'#aa44ff':'#333'};
+              color:${(getInventory(mid)?.caught?.length>0)?'#aa44ff':'#555'};cursor:pointer;text-align:left;
+            ">▶ ITEM<div style="font-size:6px;color:${(getInventory(mid)?.caught?.length>0)?'#aa44ff88':'#444'};margin-top:2px">${(getInventory(mid)?.caught?.length>0)?getInventory(mid).caught.length+' READY':'No items'}</div></button>
 
             <!-- CATCH -->
             <button onclick="showToast('Feature Coming Soon!','info')" style="
@@ -4696,6 +5115,7 @@ function renderBossCommPanel(bb){
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
         <button onclick="saveBossConfig()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,153,0,.2);border:1px solid #ff9900;color:#ff9900;cursor:pointer">💾 SAVE CONFIG</button>
+        <button onclick="giftStarterBalls()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);cursor:pointer">🎁 GIFT STARTER BALLS</button>
         <button onclick="startBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,51,68,.2);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ ${activated?'UPDATE':'START'} BATTLE</button>
         ${activated?`<button onclick="endBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(100,100,100,.2);border:1px solid #666;color:#666;cursor:pointer">■ END BATTLE</button>`:''}
       </div>
@@ -4704,6 +5124,14 @@ function renderBossCommPanel(bb){
         <div style="font-size:7px;color:#ff9900;margin-bottom:6px">🖼 BOSS ASSETS (GIF-safe — no resize)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <div style="font-size:6px;color:#ff990088;margin-bottom:4px">IDLE SPRITES</div>
+          ${['Boss_Zone_bg'].map(name=>{
+            const existing = CUSTOM_LOGOS.find(l=>l.name===name);
+            return `<div style="font-size:9px;color:var(--text2);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #ff990022">
+              <div style="color:#ffcc00;margin-bottom:2px">🏟 BOSS ZONE HABITAT (GIF ok)</div>
+              ${existing?`<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--green)">✓ Uploaded</span><button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:1px 4px;background:none;border:1px solid #555;color:#888;cursor:pointer">Replace</button></div>`
+                :`<button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:3px 6px;background:rgba(255,204,0,.1);border:1px solid #ffcc0066;color:#ffcc00;cursor:pointer">📁 Upload GIF</button>`}
+            </div>`;
+          }).join('')}
           ${['Boss_Main','Boss_Minion1','Boss_Minion2','Boss_Background'].map(name=>{
             const existing = CUSTOM_LOGOS.find(l=>l.name===name);
             return `<div style="font-size:9px;color:var(--text2)">
