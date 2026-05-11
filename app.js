@@ -1314,16 +1314,14 @@ function getChampionAvailFP(mid){
   const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
   const R2_START = '20260504';
 
-  // Sum R2 stats earned after selection timestamp
+  // Sum R2 stats earned on or after selection date
   const earned = Object.values(S.playerStats||{})
     .filter(s => s.pid===pid && s.date >= R2_START)
     .reduce((sum,s)=>{
-      // If no selectedAt, use start of R2 (for original selections)
+      // Only exclude dates STRICTLY BEFORE selection date
+      // Same-day games count since the game was likely played after selection
       const cutoff = selectedAt ? selectedAt.slice(0,10).replace(/-/g,'') : R2_START;
       if(s.date < cutoff) return sum;
-      // Same day as selection — only count games that ended after selection time
-      // (We store by date not exact time, so same-day is excluded to be safe)
-      if(selectedAt && s.date === cutoff) return sum; // exclude same day
       const acq = S.waiverAcquisitions?.[mid+'_'+pid];
       return sum + ((!acq||s.date>=acq) ? (s.fp||0) : 0);
     }, 0);
