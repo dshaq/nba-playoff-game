@@ -394,18 +394,52 @@ const TEAM_LOGOS = {
 // Portraits loaded from Supabase on boot — do not edit manually
 let PLAYER_PORTRAITS = {};
 
+const PORTRAITS_CACHE_KEY = 'nba_portraits_cache';
+const PORTRAITS_CACHE_TS_KEY = 'nba_portraits_cache_ts';
+const PORTRAITS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function loadPortraitsFromLocalStorage(){
+  try{
+    const ts = parseInt(localStorage.getItem(PORTRAITS_CACHE_TS_KEY)||'0');
+    if(Date.now() - ts > PORTRAITS_CACHE_TTL) return false;
+    const raw = localStorage.getItem(PORTRAITS_CACHE_KEY);
+    if(!raw) return false;
+    PLAYER_PORTRAITS = JSON.parse(raw);
+    console.log('Loaded', Object.keys(PLAYER_PORTRAITS).length, 'portraits from localStorage cache');
+    return true;
+  }catch(e){ return false; }
+}
+
+function savePortraitsToLocalStorage(){
+  try{
+    localStorage.setItem(PORTRAITS_CACHE_KEY, JSON.stringify(PLAYER_PORTRAITS));
+    localStorage.setItem(PORTRAITS_CACHE_TS_KEY, Date.now().toString());
+  }catch(e){ console.warn('Could not cache portraits to localStorage (storage full?):', e); }
+}
+
 async function loadPortraits(){
+  // Try localStorage first — avoids Supabase egress on every load
+  if(loadPortraitsFromLocalStorage()) return;
   try{
     if(!db) return;
     const {data} = await db.from('leagues').select('state').eq('id','nba-portraits-2026').single();
     if(data?.state){
       PLAYER_PORTRAITS = JSON.parse(data.state);
       console.log('Loaded', Object.keys(PLAYER_PORTRAITS).length, 'portraits from Supabase');
+      savePortraitsToLocalStorage();
     }
   }catch(e){ console.warn('Could not load portraits:', e); }
 }
 
-// Per-user portrait selection (localStorage so it's personal per device)
+async function forceRefreshPortraits(){
+  try{
+    localStorage.removeItem(PORTRAITS_CACHE_KEY);
+    localStorage.removeItem(PORTRAITS_CACHE_TS_KEY);
+  }catch(e){}
+  await loadPortraits();
+  render();
+  showToast('Portraits refreshed from Supabase', 'info');
+}
 function getPortraitIndex(playerName){
   // Per-manager storage — key includes manager ID so each user has their own preference
   const mid = typeof currentManagerId !== 'undefined' ? currentManagerId : 'viewer';
@@ -448,6 +482,7 @@ async function savePortraits(){
   if(!db) return;
   await db.from('leagues').upsert({id:'nba-portraits-2026', state:JSON.stringify(PLAYER_PORTRAITS)});
   console.log('Saved', Object.keys(PLAYER_PORTRAITS).length, 'portraits to Supabase');
+  savePortraitsToLocalStorage();
 }
 
 const TEAM_COLORS = {
@@ -6754,7 +6789,7 @@ function openPortraitManager(){
     +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent3)">🖼 PORTRAIT MANAGER</span>'
     +"<button onclick=\"document.getElementById('portrait-mgr-modal').remove()\" style=\"background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1\">×</button>"
     +'</div>'
-    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0">Click ✕ on a portrait to delete it. Portraits numbered left to right.</div>'
+    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center">Click ✕ to delete. Portraits left to right.<button onclick="forceRefreshPortraits().then(()=>{document.getElementById(\'portrait-mgr-modal\')?.remove();openPortraitManager();})" style="font-family:var(--font-pixel),monospace;font-size:7px;padding:3px 7px;background:rgba(74,158,255,.15);border:1px solid #4a9eff;color:#4a9eff;cursor:pointer">↺ REFRESH</button></div>'
     +'<div id="portrait-mgr-grid" style="overflow-y:auto;flex:1;padding:.5rem .875rem">'+buildGrid()+'</div>'
     +'</div>';
 
@@ -6774,6 +6809,7 @@ async function deletePortrait(playerName, idx){
   }
   // Save
   await db.from('leagues').upsert({id:'nba-portraits-2026', state:JSON.stringify(PLAYER_PORTRAITS)});
+  savePortraitsToLocalStorage();
   render();
   // Refresh the manager modal grid
   const grid = document.getElementById('portrait-mgr-grid');
@@ -6842,6 +6878,7 @@ async function handlePortraitUpload(input){
       state: JSON.stringify(PLAYER_PORTRAITS)
     });
     if(result.error) throw new Error(result.error.message);
+    savePortraitsToLocalStorage();
     status.textContent = '✓ Saved ' + processed + ' portrait(s)! Total: ' + Object.keys(PLAYER_PORTRAITS).length;
     status.style.color = 'var(--green)';
     render();
