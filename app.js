@@ -1465,6 +1465,10 @@ async function attemptCatch(mid, target, ballType){
       rarity: enemyRarity,
       spriteKey: target==='boss'?'Boss_Main':target==='minion1'?'Boss_Minion1':'Boss_Minion2',
     });
+    // Add catch event to attack log
+    if(!S.bossBattle.attackLog) S.bossBattle.attackLog=[];
+    const champPidForCatch = S.bossBattle.champions?.[mid];
+    S.bossBattle.attackLog.push({mid, pid:champPidForCatch, fp:0, target, ts:new Date().toISOString(), catchEvent:true, ballType});
     await saveStateNow();
     render();
     // Chat announcement
@@ -4716,7 +4720,7 @@ function renderBossBattleScene(){
             <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
             </div>
-            <div style="font-size:5px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff77':'#aa44ff99'};margin-top:1px;text-align:center">${mn.hp<=0?'DEFEATED':mn.hp+'/'+mn.max}</div>
+            <div style="font-size:5px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff77':'#aa44ff99'};margin-top:1px;text-align:center">${mn.hp<=0?(Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId===mn.key&&c.battleRound===bb.round))?'DEFEATED & CAUGHT':'DEFEATED'):mn.hp+'/'+mn.max}</div>
             ${mn.hp<=0&&mid!==null&&mid!=='viewer'?`<button onclick="showCatchMenu('${mn.key}')" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 5px;background:rgba(255,204,0,.2);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;margin-top:2px">⚾ CATCH</button>`:''}
           </div>`).join('')}
         </div>
@@ -4814,16 +4818,18 @@ function renderBossBattleScene(){
     <div style="background:#050510;border:2px solid #2a1a3a;padding:.5rem .75rem;margin-bottom:6px">
       <div style="font-size:6px;color:#cc6600;margin-bottom:5px;letter-spacing:.1em">ENEMY HP</div>
       ${[
-        {label:(bb?.bossLabel||'DUNKMAW').toUpperCase(),icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600'},
-        {label:(bb?.minion1Name||'GUS').toUpperCase(),icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#aa44ff'},
-        {label:(bb?.minion2Name||'RIMREAPER').toUpperCase(),icon:'💀',cur:minion2CurrentHP,max:minion2MaxHP,color:'#ffffff'},
+        {label:(bb?.bossLabel||'DUNKMAW').toUpperCase(),icon:'🏀',cur:bossCurrentHP,max:bossMaxHP,color:'#ff6600',key:'boss'},
+        {label:(bb?.minion1Name||'GUS').toUpperCase(),icon:'👹',cur:minion1CurrentHP,max:minion1MaxHP,color:'#aa44ff',key:'minion1'},
+        {label:(bb?.minion2Name||'RIMREAPER').toUpperCase(),icon:'💀',cur:minion2CurrentHP,max:minion2MaxHP,color:'#ffffff',key:'minion2'},
       ].map(e=>{
         const pct=Math.max(0,Math.round(e.cur/e.max*100));
         const bc=pct>50?e.color:pct>25?'#ff9900':'#ff3344';
+        const isCaught=e.cur<=0&&Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId===e.key&&c.battleRound===bb.round));
+        const defeatLabel=isCaught?'CAUGHT':'DEFEATED';
         return `<div style="margin-bottom:4px">
           <div style="display:flex;justify-content:space-between;margin-bottom:1px">
             <span style="font-size:6px;color:${e.color}">${e.icon} ${e.label}</span>
-            <span style="font-size:6px;color:${bc}">${e.cur<=0?'DEFEATED':e.cur+'/'+e.max}</span>
+            <span style="font-size:6px;color:${bc}">${e.cur<=0?defeatLabel:e.cur+'/'+e.max}</span>
           </div>
           <div style="height:10px;background:#0a0a0a;border:1px solid ${e.color}33;position:relative;overflow:hidden">
             <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${bc};transition:width .6s;box-shadow:0 0 4px ${bc}66"></div>
@@ -4947,6 +4953,15 @@ function renderBossBattleScene(){
         const p=getPlayer(a.pid);
         const target={boss:'🏀 '+(bb?.bossLabel||'DUNKMAW'),minion1:'👹 '+(bb?.minion1Name||'GUS'),minion2:'👹 '+(bb?.minion2Name||'RIMREAPER')}[a.target]||a.target;
         const ts=new Date(a.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        if(a.catchEvent){
+          const ballIcon=a.ballType?BALL_TYPES[a.ballType]?.icon||'⚾':'⚾';
+          return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
+            <span style="color:${getAvatarColor(a.mid)}">${m?.name||'?'}</span>
+            <span style="color:#ffcc00">${ballIcon} CAUGHT</span>
+            <span>→ ${target}</span>
+            <span style="margin-left:auto;font-size:8px">${ts}</span>
+          </div>`;
+        }
         return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
           <span style="color:${getAvatarColor(a.mid)}">${m?.name||'?'}</span>
           <span>${p?.name?.split(' ').pop()||'?'}</span>
