@@ -1415,8 +1415,10 @@ function canAttemptCatch(mid, target){
     : target==='minion1' ? (S.bossBattle.minion1CurrentHP??bb.minion1HP??80)
     : (S.bossBattle.minion2CurrentHP??bb.minion2HP??80);
   if(hp > 0) return {ok:false, reason:`${enemyName} still has ${hp} HP remaining!`};
-  // Check enemy not already caught
-  const caught = Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId===target&&c.battleRound===bb.round));
+  // Check enemy not already caught this battle
+  const caught = Object.values(S.inventory||{}).some(inv=>
+    (inv.caught||[]).some(c=>c.enemyId===target && c.battleRound===bb.round)
+  );
   if(caught) return {ok:false, reason:`${enemyName} has already been caught this battle!`};
   // Check 10-minute final blow exclusivity
   const finalBlow = bb.finalBlows?.[target]; // {mid, ts}
@@ -4711,6 +4713,7 @@ function renderBossBattleScene(){
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
             </div>
             <div style="font-size:5px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff77':'#aa44ff99'};margin-top:1px;text-align:center">${mn.hp<=0?'DEFEATED':mn.hp+'/'+mn.max}</div>
+            ${mn.hp<=0&&mid!==null&&mid!=='viewer'?`<button onclick="showCatchMenu('${mn.key}')" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 5px;background:rgba(255,204,0,.2);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;margin-top:2px">⚾ CATCH</button>`:''}
           </div>`).join('')}
         </div>
         <!-- Main Boss -->
