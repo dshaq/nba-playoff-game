@@ -1736,6 +1736,34 @@ function openBossZoneModal(mid){
   document.body.appendChild(modal);
 }
 
+
+// ── Attack confirmation (mobile-safe, no native confirm()) ────────
+function showAttackConfirm(playerName, targetName, fp){
+  return new Promise(resolve=>{
+    const existing = document.getElementById('attack-confirm-modal');
+    if(existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'attack-confirm-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10002;display:flex;align-items:flex-end;justify-content:center;padding:1rem';
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#0a0510;border:2px solid #ffcc00;width:100%;max-width:420px;padding:16px;font-family:var(--font-pixel),monospace;margin-bottom:env(safe-area-inset-bottom)';
+    div.innerHTML = `
+      <div style="font-size:8px;color:#ffcc00;margin-bottom:8px">⚔ CONFIRM ATTACK</div>
+      <div style="font-size:11px;color:#fff;margin-bottom:4px">${playerName}</div>
+      <div style="font-size:10px;color:#ccc;margin-bottom:12px">Attacks <span style="color:#ff6600">${targetName}</span> for <span style="color:#ffcc00">${fp.toFixed(0)} FP</span> damage</div>
+      <div style="display:flex;gap:8px">
+        <button id="attack-cancel-btn" style="flex:1;font-family:var(--font-pixel),monospace;font-size:8px;padding:10px;background:transparent;border:1px solid #444;color:#666;cursor:pointer">CANCEL</button>
+        <button id="attack-go-btn" style="flex:2;font-family:var(--font-pixel),monospace;font-size:8px;padding:10px;background:linear-gradient(180deg,rgba(255,204,0,.25),rgba(255,102,0,.2));border:2px solid #ffcc00;color:#ffcc00;cursor:pointer">⚔ ATTACK!</button>
+      </div>
+    `;
+    modal.appendChild(div);
+    document.body.appendChild(modal);
+    document.getElementById('attack-go-btn').onclick = ()=>{ modal.remove(); resolve(true); };
+    document.getElementById('attack-cancel-btn').onclick = ()=>{ modal.remove(); resolve(false); };
+    modal.onclick = e=>{ if(e.target===modal){ modal.remove(); resolve(false); } };
+  });
+}
+
 function startPolling(){
   setInterval(async()=>{
     if(!db||!S) return;
@@ -4487,7 +4515,9 @@ async function directAttack(mid, target){
 
   const p = getPlayer(champPid);
   const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
-  if(!confirm(`${p?.name} attacks ${targetLabels[target]} for ${availableFP.toFixed(0)} FP damage!\n\nConfirm?`)) return;
+  // Use inline confirm modal instead of native confirm() which is blocked on some mobile browsers
+  const confirmed = await showAttackConfirm(p?.name, targetLabels[target], availableFP);
+  if(!confirmed) return;
 
   if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
   S.bossBattle.attackLog.push({mid, pid:champPid, fp:availableFP, target, ts:new Date().toISOString()});
