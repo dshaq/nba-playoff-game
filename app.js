@@ -4519,25 +4519,25 @@ async function directAttack(mid, target){
 
   if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
   S.bossBattle.attackLog.push({mid, pid:champPid, fp:availableFP, target, ts:new Date().toISOString()});
-  // Record final blow if this kills the enemy
+
+  // Apply active ability FIRST (AREA STRIKE, SOUL STEAL, SLAM SURGE)
+  const dmg = availableFP;
+  const abilityResult = applyActiveAbility(mid, target, dmg);
+  const finalDmg = abilityResult.dmg;
+  const targets = abilityResult.targets;
+
+  // Record final blow if this kills any target
   if(!S.bossBattle.finalBlows) S.bossBattle.finalBlows = {};
   const _hpAfter = {
-    boss: Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - availableFP),
-    minion1: Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??80) - availableFP),
-    minion2: Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??80) - availableFP),
+    boss: Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - finalDmg),
+    minion1: Math.max(0,(S.bossBattle.minion1CurrentHP??bb.minion1HP??80) - finalDmg),
+    minion2: Math.max(0,(S.bossBattle.minion2CurrentHP??bb.minion2HP??80) - finalDmg),
   };
-  for(const t of (typeof targets!=='undefined'?targets:[target])){
+  for(const t of targets){
     if(_hpAfter[t]<=0 && !S.bossBattle.finalBlows[t]){
       S.bossBattle.finalBlows[t] = {mid, ts:new Date().toISOString()};
     }
   }
-
-  // Apply damage
-  const dmg = availableFP;
-  // Apply active ability (AREA STRIKE, SOUL STEAL, SLAM SURGE)
-  const abilityResult = applyActiveAbility(mid, target, dmg);
-  const finalDmg = abilityResult.dmg;
-  const targets = abilityResult.targets;
   for(const t of targets){
     if(t==='boss'){
       S.bossBattle.bossCurrentHP = Math.max(0,(S.bossBattle.bossCurrentHP??bb.bossHP) - finalDmg);
