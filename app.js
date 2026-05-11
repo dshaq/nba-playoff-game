@@ -2958,6 +2958,10 @@ function renderMyTeam(){
       </div>
     </div>
   </div>`;
+
+  // Render Boss Zone if player has caught enemies
+  const bossZoneEl = document.getElementById('boss-zone-section');
+  if(bossZoneEl) renderBossZone(mid, bossZoneEl);
 }
 
 
