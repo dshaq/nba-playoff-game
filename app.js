@@ -887,10 +887,12 @@ function openChampionPicker(mid){
     showToast('You can only manage your own champion','error'); return;
   }
   if(currentPid){
-    const espnInj = getESPNInjury(getPlayer(currentPid)?.name);
+    const champPlayer = getPlayer(currentPid);
+    const espnInj = getESPNInjury(champPlayer?.name);
     const isOutOrDTD = espnInj && (espnInj.status==='Out'||espnInj.status==='Day-To-Day');
-    if(!isOutOrDTD && !(isCommissioner||currentManagerId===4)){
-      showToast(`${getPlayer(currentPid)?.name||'Your champion'} must be OUT or DTD to swap`,'error');
+    const teamEliminated = champPlayer && getTeam(champPlayer.team)?.eliminated;
+    if(!isOutOrDTD && !teamEliminated && !(isCommissioner||currentManagerId===4)){
+      showToast(`${champPlayer?.name||'Your champion'} must be OUT, DTD, or on an eliminated team to swap`,'error');
       return;
     }
   }
@@ -4832,7 +4834,8 @@ function renderBossBattleScene(){
             if(!c.isMe || bb?.defeated || !c.p) return '';
             const inj = getESPNInjury(c.p.name);
             const isOut = inj && (inj.status==='Out'||inj.status==='Day-To-Day');
-            if(!isOut) return '';
+            const teamElim = getTeam(c.p.team)?.eliminated;
+            if(!isOut && !teamElim) return '';
             return `<button onclick="openChampionPicker(${c.m.id})" style="width:100%;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px;background:rgba(255,51,68,.2);border:1px solid #ff3344;color:#ff3344;cursor:pointer;margin-top:1px">SWAP</button>`;
           })()}
         </div>`).join('')}
