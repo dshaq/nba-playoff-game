@@ -4696,7 +4696,7 @@ function renderBossBattleScene(){
       return saved ? 0 : (live.fp||0);
     })() : 0;
     const totalFP = fp + _liveFP;
-    const spentFP = (bb?.attackLog||[]).filter(a=>a.mid===m.id).reduce((s,a)=>s+a.fp,0);
+    const spentFP = (bb?.attackLog||[]).filter(a=>a.mid===m.id&&a.pid===pid).reduce((s,a)=>s+a.fp,0);
     const availFP = Math.max(0, totalFP - spentFP);
     const fp_display = totalFP;
     const hp = p ? getChampionHP(pid) : 0;
