@@ -12,7 +12,7 @@ const ROUND_BG = ["","rgba(24,95,165,.2)","rgba(59,109,17,.2)","rgba(133,79,11,.
 const ROUND_FG = ["","#4a9eff","#5fd46a","#f5a623","#ff6b9d"];
 const ROUND_BORDER = ["","#185FA5","#3B6D11","#854F0B","#993556"];
 const ROSTER_SIZE = 8;
-const ALL_TABS = ['my-team','live-score','boss','standings','manage-names','draft','waiver','rosters','rules','teams'];
+const ALL_TABS = ['my-team','live-score','boss','standings','manage-names','draft','waiver','rosters','rules','teams','raid'];
 const LEAGUE_ID = 'nba-2026';
 
 // 2026 NBA Playoff Teams — BRACKET SET
@@ -2255,6 +2255,9 @@ function selectManager(id){
     document.getElementById('comm-login-bar').classList.remove('hidden');
     document.getElementById('comm-active-bar').classList.add('hidden');
   }
+  // Show raid tab only for commissioner
+  const raidTabBtn = document.getElementById('raid-tab-btn');
+  if(raidTabBtn) raidTabBtn.style.display = (isCommissioner || id===4) ? '' : 'none';
   render();
   // Default to My Team tab if logged in as a real manager
   if(currentManagerId !== null && currentManagerId !== 'viewer'){
@@ -2689,7 +2692,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderPersonalAlert();renderBossAnnounceBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -5027,6 +5030,357 @@ function renderBossBattleScene(){
 }
 
 function renderBossBattle(){ renderBossBattleScene(); }
+
+// ── RAID BETS ─────────────────────────────────────────────────────
+
+function getRaidBets(){ return S.raidBets || []; }
+
+function saveRaidBets(bets){
+  S.raidBets = bets;
+  saveStateNow();
+}
+
+function getRaidBossSprite(teamAbbr){
+  // Use existing boss sprites mapped to teams, or generic boss
+  const cl = CUSTOM_LOGOS || {};
+  // Try to find a matching boss sprite, fall back to Boss_Main
+  return cl['Boss_Main'] || cl['boss_main'] || null;
+}
+
+function getRaidBossName(betType, team){
+  const names = {
+    moneyline: `THE ${team} LOCK`,
+    spread: `${team} SPREAD BEAST`,
+    total: `THE OVER/UNDER DEMON`,
+    parlay: `PARLAY COLOSSUS`,
+  };
+  return names[betType] || `${team} BOSS`;
+}
+
+function calcRaidHP(odds, wager){
+  // Odds-based HP: favorite = lower HP (easier), underdog = higher HP (harder)
+  // American odds: -150 favorite → 100 HP, +200 underdog → 300 HP
+  const o = parseInt(odds) || -110;
+  if(o < 0){
+    // Favorite — HP scales down: -500 = 60 HP, -100 = 150 HP
+    return Math.max(50, Math.round(150 * (100 / Math.abs(o))));
+  } else {
+    // Underdog — HP scales up: +100 = 150 HP, +400 = 400 HP
+    return Math.min(500, Math.round(150 + o));
+  }
+}
+
+function calcRaidReward(wager, odds){
+  // Simulated coin reward based on wager size
+  const w = parseFloat(wager) || 0;
+  if(w <= 0) return 10;
+  if(w <= 25) return 25;
+  if(w <= 50) return 50;
+  if(w <= 100) return 100;
+  return Math.round(w * 1.5);
+}
+
+function openCreateRaidModal(){
+  const existing = document.getElementById('raid-create-modal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'raid-create-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+
+  modal.innerHTML = `
+    <div style="background:#0d0d1a;border:3px solid #ff6600;padding:1.5rem;max-width:380px;width:100%;font-family:'Press Start 2P',monospace;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem">
+        <div style="font-size:9px;color:#ff6600">🎰 NEW RAID BET</div>
+        <button onclick="document.getElementById('raid-create-modal').remove()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer">×</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+
+        <div>
+          <div style="font-size:6px;color:#888;margin-bottom:4px">SPORTSBOOK</div>
+          <select id="raid-book" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px">
+            <option value="FanDuel">FanDuel</option>
+            <option value="DraftKings">DraftKings</option>
+            <option value="BetMGM">BetMGM</option>
+            <option value="Caesars">Caesars</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:6px;color:#888;margin-bottom:4px">BET TYPE</div>
+          <select id="raid-type" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px">
+            <option value="moneyline">Moneyline</option>
+            <option value="spread">Spread</option>
+            <option value="total">Total (Over/Under)</option>
+            <option value="parlay">Parlay</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:6px;color:#888;margin-bottom:4px">TEAM / BET DESCRIPTION</div>
+          <input id="raid-team" type="text" placeholder="e.g. MIN, OKC Over 220.5" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:6px;color:#888;margin-bottom:4px">ODDS (AMERICAN)</div>
+            <input id="raid-odds" type="text" placeholder="-110" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+          </div>
+          <div>
+            <div style="font-size:6px;color:#888;margin-bottom:4px">WAGER ($)</div>
+            <input id="raid-wager" type="number" placeholder="25" min="1" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:6px;color:#888;margin-bottom:4px">GAME DATE</div>
+          <input id="raid-date" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+        </div>
+
+        <div id="raid-preview" style="display:none;background:#0a0a1a;border:1px solid #ff660044;padding:10px;margin-top:4px">
+          <div style="font-size:6px;color:#ff6600;margin-bottom:6px">RAID PREVIEW</div>
+          <div id="raid-preview-content" style="font-size:10px;color:#aaa;line-height:1.8"></div>
+        </div>
+
+        <button onclick="previewRaidBet()" style="background:rgba(255,102,0,.15);border:2px solid #ff6600;color:#ff6600;font-family:'Press Start 2P',monospace;font-size:7px;padding:10px;cursor:pointer;width:100%">
+          PREVIEW RAID
+        </button>
+
+        <button id="raid-confirm-btn" onclick="confirmCreateRaid()" style="display:none;background:rgba(255,102,0,.3);border:2px solid #ff6600;color:#ff6600;font-family:'Press Start 2P',monospace;font-size:7px;padding:10px;cursor:pointer;width:100%">
+          ⚔ LAUNCH RAID
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function previewRaidBet(){
+  const book = document.getElementById('raid-book')?.value;
+  const type = document.getElementById('raid-type')?.value;
+  const team = document.getElementById('raid-team')?.value?.trim();
+  const odds = document.getElementById('raid-odds')?.value?.trim();
+  const wager = document.getElementById('raid-wager')?.value;
+  const date = document.getElementById('raid-date')?.value;
+
+  if(!team || !odds || !wager){
+    showToast('Fill in team, odds, and wager first', 'error');
+    return;
+  }
+
+  const hp = calcRaidHP(odds, wager);
+  const reward = calcRaidReward(wager, odds);
+  const bossName = getRaidBossName(type, team.toUpperCase());
+
+  const preview = document.getElementById('raid-preview');
+  const content = document.getElementById('raid-preview-content');
+  if(preview && content){
+    preview.style.display = 'block';
+    content.innerHTML = `
+      <div style="color:white;margin-bottom:4px">👹 ${bossName}</div>
+      <div>❤ HP: <span style="color:#ff4444">${hp}</span></div>
+      <div>📅 Date: <span style="color:#aaa">${date}</span></div>
+      <div>📖 ${book} · ${type.toUpperCase()}</div>
+      <div>💰 Wager: $${wager} · Odds: ${odds}</div>
+      <div style="color:#ffcc00;margin-top:4px">🪙 Win reward: ${reward} COINS</div>
+    `;
+  }
+  const confirmBtn = document.getElementById('raid-confirm-btn');
+  if(confirmBtn) confirmBtn.style.display = 'block';
+}
+
+function confirmCreateRaid(){
+  const book = document.getElementById('raid-book')?.value;
+  const type = document.getElementById('raid-type')?.value;
+  const team = document.getElementById('raid-team')?.value?.trim();
+  const odds = document.getElementById('raid-odds')?.value?.trim();
+  const wager = parseFloat(document.getElementById('raid-wager')?.value);
+  const date = document.getElementById('raid-date')?.value;
+
+  if(!team || !odds || !wager) return;
+
+  const hp = calcRaidHP(odds, wager);
+  const reward = calcRaidReward(wager, odds);
+  const bossName = getRaidBossName(type, team.toUpperCase());
+
+  const bet = {
+    id: 'raid_' + Date.now(),
+    book, type,
+    team: team.toUpperCase(),
+    odds,
+    wager,
+    date,
+    bossName,
+    maxHP: hp,
+    currentHP: hp,
+    reward,
+    status: 'active', // active | won | lost
+    createdAt: new Date().toISOString(),
+    attackLog: [],
+    damage: 0,
+  };
+
+  const bets = getRaidBets();
+  bets.unshift(bet);
+  saveRaidBets(bets);
+
+  document.getElementById('raid-create-modal')?.remove();
+  renderRaidBets();
+  showToast(`⚔ Raid launched! ${bossName} has appeared!`, 'success');
+}
+
+function raidAttack(betId){
+  const bets = getRaidBets();
+  const bet = bets.find(b => b.id === betId);
+  if(!bet || bet.status !== 'active') return;
+
+  // Damage = random 5-20 per "attack" for testing
+  const dmg = Math.floor(Math.random() * 16) + 5;
+  bet.currentHP = Math.max(0, bet.currentHP - dmg);
+  bet.attackLog = bet.attackLog || [];
+  bet.attackLog.push({ dmg, ts: new Date().toISOString() });
+
+  if(bet.currentHP <= 0){
+    // Don't auto-resolve — commissioner manually marks win/loss
+    bet.currentHP = 0;
+  }
+
+  saveRaidBets(bets);
+  renderRaidBets();
+  triggerAttackFX('boss', dmg, '#ff6600');
+}
+
+function resolveRaid(betId, outcome){
+  const bets = getRaidBets();
+  const bet = bets.find(b => b.id === betId);
+  if(!bet) return;
+  bet.status = outcome; // 'won' or 'lost'
+  bet.resolvedAt = new Date().toISOString();
+  if(outcome === 'won') bet.currentHP = 0;
+  saveRaidBets(bets);
+  renderRaidBets();
+  showToast(outcome === 'won' ? `🏆 ${bet.bossName} DEFEATED! +${bet.reward} COINS` : `💀 Raid failed — ${bet.bossName} wins`, outcome === 'won' ? 'success' : 'error');
+}
+
+function deleteRaid(betId){
+  const bets = getRaidBets().filter(b => b.id !== betId);
+  saveRaidBets(bets);
+  renderRaidBets();
+}
+
+function renderRaidBets(){
+  const el = document.getElementById('raid-bets-content');
+  if(!el) return;
+
+  const bets = getRaidBets();
+  const activeBets = bets.filter(b => b.status === 'active');
+  const resolvedBets = bets.filter(b => b.status !== 'active');
+
+  const bossSprite = getRaidBossSprite();
+
+  function renderBetCard(bet){
+    const pct = Math.max(0, Math.round(bet.currentHP / bet.maxHP * 100));
+    const hpColor = pct > 50 ? '#00ff88' : pct > 25 ? '#ff9900' : '#ff3344';
+    const isWon = bet.status === 'won';
+    const isLost = bet.status === 'lost';
+    const isDone = isWon || isLost;
+
+    return `
+      <div style="background:#0d0d1a;border:2px solid ${isDone ? (isWon ? '#00ff88' : '#ff3344') : '#ff660066'};padding:1rem;margin-bottom:12px;position:relative">
+
+        <!-- Boss arena -->
+        <div style="background:#0a0a14;border:1px solid #ff660033;padding:12px;margin-bottom:10px;text-align:center;position:relative;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+          ${bossSprite
+            ? `<img src="${bossSprite}" style="height:80px;image-rendering:pixelated;${isDone ? (isWon ? 'filter:grayscale(1) opacity(.4)' : 'filter:hue-rotate(0deg) saturate(2)') : ''}" />`
+            : `<div style="font-size:48px">${isWon ? '💀' : isLost ? '😤' : '👹'}</div>`
+          }
+          <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff6600;text-shadow:0 0 10px #ff660088">${bet.bossName}</div>
+          ${isDone ? `<div style="font-family:'Press Start 2P',monospace;font-size:9px;color:${isWon ? '#00ff88' : '#ff3344'}">${isWon ? '★ DEFEATED ★' : '✗ ESCAPED'}</div>` : ''}
+        </div>
+
+        <!-- HP Bar -->
+        ${!isDone ? `
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#888">❤ HP</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${hpColor}">${bet.currentHP} / ${bet.maxHP}</div>
+          </div>
+          <div style="height:12px;background:#111;border:1px solid #333;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${hpColor};transition:width .5s;box-shadow:0 0 6px ${hpColor}88"></div>
+          </div>
+        </div>` : ''}
+
+        <!-- Bet details -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#888">📖 ${bet.book}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#888">${bet.type.toUpperCase()}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#aaa">💰 $${bet.wager} @ ${bet.odds}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#ffcc00">🪙 ${bet.reward} COINS</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#666">📅 ${bet.date}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${isDone ? (isWon ? '#00ff88' : '#ff3344') : '#ff6600'}">${isDone ? (isWon ? '✓ WON' : '✗ LOST') : '⚔ ACTIVE'}</div>
+        </div>
+
+        <!-- Attack log snippet -->
+        ${bet.attackLog?.length > 0 ? `
+        <div style="background:#050510;border:1px solid #1a1a2e;padding:6px;margin-bottom:8px;max-height:60px;overflow-y:auto">
+          ${[...bet.attackLog].reverse().slice(0,3).map(a =>
+            `<div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#555;margin-bottom:2px">⚔ -${a.dmg} HP · ${new Date(a.ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>`
+          ).join('')}
+        </div>` : ''}
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${!isDone ? `
+            <button onclick="raidAttack('${bet.id}')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer">⚔ ATTACK</button>
+            <button onclick="resolveRaid('${bet.id}','won')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(0,255,136,.1);border:2px solid #00ff88;color:#00ff88;cursor:pointer">✓ WON</button>
+            <button onclick="resolveRaid('${bet.id}','lost')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,51,68,.1);border:2px solid #ff3344;color:#ff3344;cursor:pointer">✗ LOST</button>
+          ` : `
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isWon ? '#00ff88' : '#ff3344'};padding:7px">${isWon ? `🏆 +${bet.reward} COINS EARNED` : '💀 Better luck next time'}</div>
+          `}
+          <button onclick="deleteRaid('${bet.id}')" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,255,255,.05);border:1px solid #333;color:#555;cursor:pointer">🗑</button>
+        </div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div style="font-family:'Press Start 2P',monospace;padding:12px">
+
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:10px;border-bottom:2px solid #ff660044">
+        <div>
+          <div style="font-size:11px;color:#ff6600;text-shadow:0 0 12px #ff660066;margin-bottom:4px">🎰 RAID BETS</div>
+          <div style="font-size:5px;color:#555">COMMISSIONER LAB · PRIVATE</div>
+        </div>
+        <button onclick="openCreateRaidModal()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:8px 12px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer">+ NEW BET</button>
+      </div>
+
+      <!-- Active raids -->
+      ${activeBets.length === 0 && resolvedBets.length === 0 ? `
+        <div style="text-align:center;padding:3rem 1rem;color:#333">
+          <div style="font-size:36px;margin-bottom:1rem">🎰</div>
+          <div style="font-size:7px;color:#444;line-height:2">NO RAIDS ACTIVE</div>
+          <div style="font-size:6px;color:#333;margin-top:8px">Tap + NEW BET to launch your first raid</div>
+        </div>
+      ` : `
+        ${activeBets.length > 0 ? `
+          <div style="font-size:6px;color:#ff6600;margin-bottom:8px;letter-spacing:1px">⚔ ACTIVE (${activeBets.length})</div>
+          ${activeBets.map(renderBetCard).join('')}
+        ` : ''}
+
+        ${resolvedBets.length > 0 ? `
+          <div style="font-size:6px;color:#555;margin:12px 0 8px;letter-spacing:1px">HISTORY (${resolvedBets.length})</div>
+          ${resolvedBets.map(renderBetCard).join('')}
+        ` : ''}
+      `}
+
+    </div>
+  `;
+}
+
+
 
 function _oldRenderBossBattle_unused(){
   const el = document.getElementById('boss-battle-content');
