@@ -5026,7 +5026,7 @@ function renderBossBattleScene(){
     ${isCommissioner?renderBossCommPanel(bb):''}
   </div>`;
 
-  if(!CUSTOM_LOGOS.find(l=>l.name==='Boss_Background')) requestAnimationFrame(()=>drawDesertBg());
+  if(!CUSTOM_LOGOS.find(l=>l.name==='Boss_Background')) requestAnimationFrame(()=>{ if(typeof drawDesertBg==='function') drawDesertBg(); });
 }
 
 function renderBossBattle(){ renderBossBattleScene(); }
@@ -5273,6 +5273,9 @@ function deleteRaid(betId){
 function renderRaidBets(){
   const el = document.getElementById('raid-bets-content');
   if(!el) return;
+  // Ensure tab button is visible for commissioner
+  const raidTabBtn = document.getElementById('raid-tab-btn');
+  if(raidTabBtn && (isCommissioner || currentManagerId === 4)) raidTabBtn.style.display = '';
 
   const bets = getRaidBets();
   const activeBets = bets.filter(b => b.status === 'active');
