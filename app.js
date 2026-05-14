@@ -6857,24 +6857,25 @@ function managerStatScoreAuto(mid){
 
 // ── Player Lightbox ──────────────────────────────────────────────
 function openPlayerModal(pid){
-  const p = getPlayer(pid);
+  // Detect league
+  const isWNBA = WNBA_PLAYERS.some(p=>p.id===pid);
+  const p = isWNBA ? WNBA_PLAYERS.find(p=>p.id===pid) : getPlayer(pid);
   if(!p) return;
-  const t = getTeam(p.team);
-  const teamColor = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+  const t = isWNBA ? WNBA_TEAMS.find(t=>t.id===p.team) : getTeam(p.team);
+  const teamColor = isWNBA ? (WNBA_TEAM_LOGOS[p.team]?.color||'#e91e8c') : ((TEAM_LOGOS[p.team]?.color)||'#4a9eff');
   const hasPortrait = getActivePortrait(p.name);
-  const logo = TEAM_LOGOS[p.team];
+  const logo = isWNBA ? WNBA_TEAM_LOGOS[p.team] : TEAM_LOGOS[p.team];
 
   // Get all saved game stats for this player
+  const statsSource = isWNBA ? (S.wnbaPlayerStats||{}) : (S.playerStats||{});
   const gameStats = [];
-  if(S.playerStats){
-    for(const [key, stat] of Object.entries(S.playerStats)){
-      if(parseInt(stat.pid)===pid){
-        gameStats.push({...stat, key});
-      }
+  for(const [key, stat] of Object.entries(statsSource)){
+    if(parseInt(stat.pid)===pid){
+      gameStats.push({...stat, key});
     }
   }
-  // Also add live stats — but only if not already saved as a completed game
-  const live = livePlayerStats[pid];
+  // Live stats only for NBA for now
+  const live = isWNBA ? null : livePlayerStats[pid];
   if(live){
     const alreadySaved = gameStats.some(g => g.gameId && live.gameId && g.gameId === live.gameId);
     if(!alreadySaved) gameStats.push({...live, date:'TODAY', live:true});
@@ -6912,7 +6913,10 @@ function openPlayerModal(pid){
     let oppLabel = '—';
     if(!isTotal && !isAvg){
       if(g.teams && g.teams.length >= 2){
-        const playerTeam = playerName ? (PLAYERS.find(p=>p.name===playerName)?.team||'') : '';
+        const playerTeam = playerName ? (
+          PLAYERS.find(p=>p.name===playerName)?.team ||
+          WNBA_PLAYERS.find(p=>p.name===playerName)?.team || ''
+        ) : '';
         const opp = g.teams.find(t=>t!==playerTeam) || g.teams[0];
         oppLabel = opp ? '@'+opp : (g.live ? '🔴' : '—');
       } else if(g.live){
@@ -7023,12 +7027,13 @@ function openPlayerModal(pid){
           <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:${teamColor}">${p.name.toUpperCase()}</div>
           <div style="font-size:13px;color:var(--text3);margin-top:4px">${p.pos} · ${t?.name||p.team}</div>
           ${t?.eliminated?'<span class="badge badge-elim" style="margin-top:4px">ELIMINATED</span>':''}
+          ${isWNBA?'<span style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:#e91e8c;margin-top:4px;display:inline-block">WNBA</span>':''}
           ${live?`<div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--red);margin-top:4px">LIVE: ${live.fp>=0?'+':''}${parseFloat(live.fp).toFixed(1)} FP</div>`:''}
         </div>
         <button class="player-modal-close" onclick="closePlayerModal()">✕</button>
       </div>
       <div style="padding:.75rem">
-        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3);margin-bottom:.5rem">PLAYOFF BOX SCORES</div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3);margin-bottom:.5rem">${isWNBA?'WNBA BOX SCORES':'PLAYOFF BOX SCORES'}</div>
         ${tableHtml}
       </div>
     </div>`;
