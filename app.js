@@ -5110,7 +5110,7 @@ function openCreateRaidModal(){
 
         <div>
           <div style="font-size:6px;color:#888;margin-bottom:4px">BET TYPE</div>
-          <select id="raid-type" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px">
+          <select id="raid-type" onchange="const t=this.value;document.getElementById('raid-spread-row').style.display=t==='spread'?'block':'none';document.getElementById('raid-total-row').style.display=t==='total'?'grid':'none';" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px">
             <option value="moneyline">Moneyline</option>
             <option value="spread">Spread</option>
             <option value="total">Total (Over/Under)</option>
@@ -5120,7 +5120,28 @@ function openCreateRaidModal(){
 
         <div>
           <div style="font-size:6px;color:#888;margin-bottom:4px">TEAM / BET DESCRIPTION</div>
-          <input id="raid-team" type="text" placeholder="e.g. MIN, OKC Over 220.5" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+          <input id="raid-team" type="text" placeholder="e.g. MIN, OKC, Lakers" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+        </div>
+
+        <!-- Spread field — shown for spread bets -->
+        <div id="raid-spread-row" style="display:none">
+          <div style="font-size:6px;color:#888;margin-bottom:4px">SPREAD (e.g. -3.5)</div>
+          <input id="raid-spread" type="text" placeholder="-3.5" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+        </div>
+
+        <!-- Total fields — shown for over/under bets -->
+        <div id="raid-total-row" style="display:none;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:6px;color:#888;margin-bottom:4px">TOTAL LINE</div>
+            <input id="raid-total-line" type="number" placeholder="220.5" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px;box-sizing:border-box" />
+          </div>
+          <div>
+            <div style="font-size:6px;color:#888;margin-bottom:4px">OVER / UNDER</div>
+            <select id="raid-over-under" style="width:100%;background:#1a1a2e;border:1px solid #333;color:white;padding:8px;font-size:12px">
+              <option value="over">Over</option>
+              <option value="under">Under</option>
+            </select>
+          </div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -5205,6 +5226,10 @@ function confirmCreateRaid(){
   const reward = calcRaidReward(wager, odds);
   const bossName = getRaidBossName(type, team.toUpperCase());
 
+  const spread = document.getElementById('raid-spread')?.value?.trim() || null;
+  const totalLine = parseFloat(document.getElementById('raid-total-line')?.value) || null;
+  const overUnder = document.getElementById('raid-over-under')?.value || 'over';
+
   const bet = {
     id: 'raid_' + Date.now(),
     book, type,
@@ -5216,10 +5241,12 @@ function confirmCreateRaid(){
     maxHP: hp,
     currentHP: hp,
     reward,
-    status: 'active', // active | won | lost
+    status: 'active',
+    spread,
+    totalLine,
+    overUnder,
     createdAt: new Date().toISOString(),
-    attackLog: [],
-    damage: 0,
+    scoreHistory: [],
   };
 
   const bets = getRaidBets();
@@ -5231,25 +5258,55 @@ function confirmCreateRaid(){
   showToast(`⚔ Raid launched! ${bossName} has appeared!`, 'success');
 }
 
-function raidAttack(betId){
+function updateRaidScore(betId){
   const bets = getRaidBets();
   const bet = bets.find(b => b.id === betId);
   if(!bet || bet.status !== 'active') return;
 
-  // Damage = random 5-20 per "attack" for testing
-  const dmg = Math.floor(Math.random() * 16) + 5;
-  bet.currentHP = Math.max(0, bet.currentHP - dmg);
-  bet.attackLog = bet.attackLog || [];
-  bet.attackLog.push({ dmg, ts: new Date().toISOString() });
+  const myScore  = parseFloat(document.getElementById('raid-score-my-'+betId)?.value) || 0;
+  const oppScore = parseFloat(document.getElementById('raid-score-opp-'+betId)?.value) || 0;
 
-  if(bet.currentHP <= 0){
-    // Don't auto-resolve — commissioner manually marks win/loss
-    bet.currentHP = 0;
+  let hpPct = 1; // 1 = full HP (losing), 0 = empty (winning)
+
+  if(bet.type === 'moneyline'){
+    // Winning if myScore > oppScore — drain proportionally to lead
+    const lead = myScore - oppScore;
+    if(lead <= 0) hpPct = 1;
+    else hpPct = Math.max(0, 1 - (lead / 20)); // 20pt lead = boss dead
+  } else if(bet.type === 'spread'){
+    // bet.spread stored as number e.g. -3.5 means need to win by 3.5
+    const spread = parseFloat(bet.spread) || 0;
+    const needed = Math.abs(spread);
+    const lead = myScore - oppScore;
+    const covering = spread < 0 ? lead - needed : needed - lead; // positive = covering
+    if(covering <= 0) hpPct = 1;
+    else hpPct = Math.max(0, 1 - (covering / (needed + 10)));
+  } else if(bet.type === 'total'){
+    const line = parseFloat(bet.totalLine) || 220;
+    const combined = myScore + oppScore;
+    const isOver = bet.overUnder === 'over';
+    if(isOver){
+      hpPct = Math.max(0, 1 - (combined / line));
+    } else {
+      hpPct = Math.max(0, combined / line);
+    }
+  } else {
+    // Parlay — simple: winning if myScore > oppScore
+    const lead = myScore - oppScore;
+    hpPct = lead <= 0 ? 1 : Math.max(0, 1 - (lead / 20));
   }
+
+  const newHP = Math.round(hpPct * bet.maxHP);
+  const oldHP = bet.currentHP;
+  const dmg = oldHP - newHP;
+
+  bet.currentHP = newHP;
+  bet.scoreHistory = bet.scoreHistory || [];
+  bet.scoreHistory.push({ myScore, oppScore, hp: newHP, ts: new Date().toISOString() });
 
   saveRaidBets(bets);
   renderRaidBets();
-  triggerAttackFX('boss', dmg, '#ff6600');
+  if(dmg > 0) triggerAttackFX('boss', dmg, '#ff6600');
 }
 
 function resolveRaid(betId, outcome){
@@ -5333,17 +5390,40 @@ function renderRaidBets(){
           ).join('')}
         </div>` : ''}
 
-        <!-- Action buttons -->
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${!isDone ? `
-            <button onclick="raidAttack('${bet.id}')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer">⚔ ATTACK</button>
-            <button onclick="resolveRaid('${bet.id}','won')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(0,255,136,.1);border:2px solid #00ff88;color:#00ff88;cursor:pointer">✓ WON</button>
-            <button onclick="resolveRaid('${bet.id}','lost')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,51,68,.1);border:2px solid #ff3344;color:#ff3344;cursor:pointer">✗ LOST</button>
-          ` : `
-            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isWon ? '#00ff88' : '#ff3344'};padding:7px">${isWon ? `🏆 +${bet.reward} COINS EARNED` : '💀 Better luck next time'}</div>
-          `}
+        <!-- Score tracker + action buttons -->
+        ${!isDone ? `
+        <div style="background:#0a0a14;border:1px solid #ff660033;padding:10px;margin-bottom:8px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#ff6600;margin-bottom:8px;letter-spacing:1px">📊 LIVE SCORE TRACKER</div>
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:8px">
+            <div>
+              <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#aaa;margin-bottom:3px">${bet.team}</div>
+              <input id="raid-score-my-${bet.id}" type="number" min="0" placeholder="0"
+                style="width:100%;background:#1a1a2e;border:2px solid #ff6600;color:#ff6600;padding:6px;font-family:'Press Start 2P',monospace;font-size:11px;text-align:center;box-sizing:border-box"
+                value="${bet.scoreHistory?.length ? bet.scoreHistory[bet.scoreHistory.length-1].myScore : ''}" />
+            </div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#555">VS</div>
+            <div>
+              <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#aaa;margin-bottom:3px">OPP</div>
+              <input id="raid-score-opp-${bet.id}" type="number" min="0" placeholder="0"
+                style="width:100%;background:#1a1a2e;border:2px solid #555;color:#aaa;padding:6px;font-family:'Press Start 2P',monospace;font-size:11px;text-align:center;box-sizing:border-box"
+                value="${bet.scoreHistory?.length ? bet.scoreHistory[bet.scoreHistory.length-1].oppScore : ''}" />
+            </div>
+          </div>
+          <button onclick="updateRaidScore('${bet.id}')" style="width:100%;font-family:'Press Start 2P',monospace;font-size:6px;padding:8px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer">
+            ⚔ UPDATE SCORE
+          </button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="resolveRaid('${bet.id}','won')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(0,255,136,.1);border:2px solid #00ff88;color:#00ff88;cursor:pointer">✓ WON</button>
+          <button onclick="resolveRaid('${bet.id}','lost')" style="flex:1;font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,51,68,.1);border:2px solid #ff3344;color:#ff3344;cursor:pointer">✗ LOST</button>
           <button onclick="deleteRaid('${bet.id}')" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,255,255,.05);border:1px solid #333;color:#555;cursor:pointer">🗑</button>
         </div>
+        ` : `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${isWon ? '#00ff88' : '#ff3344'}">${isWon ? `🏆 +${bet.reward} COINS EARNED` : '💀 Better luck next time'}</div>
+          <button onclick="deleteRaid('${bet.id}')" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;background:rgba(255,255,255,.05);border:1px solid #333;color:#555;cursor:pointer">🗑</button>
+        </div>
+        `}
       </div>
     `;
   }
