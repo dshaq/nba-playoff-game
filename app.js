@@ -3989,8 +3989,9 @@ function renderTeams(){
     }
     if(sortMode==='team') return a.team.localeCompare(b.team);
     if(sortMode==='pos') return a.pos.localeCompare(b.pos);
-    // Default: FPPG (best per-game performers first)
-    return playerFPPG(b.id) - playerFPPG(a.id);
+    // Default: FPPG
+    const fppgFn = league==='wnba' ? wnbaPlayerFPPG : playerFPPG;
+    return fppgFn(b.id) - fppgFn(a.id);
   });
 
   const cardHtml = sorted.map(p=>{
@@ -3999,9 +4000,9 @@ function renderTeams(){
     const hasPortrait = getActivePortrait(p.name);
     const logo = activeLogos[p.team];
     const owner = ownerMap[p.id];
-    const statScore = playerStatScore(p.id);
-    const fppg = playerFPPG(p.id);
-    const isLive = isPlayerLive(p.id);
+    const statScore = league==='wnba' ? wnbaPlayerStatScore(p.id) : playerStatScore(p.id);
+    const fppg = league==='wnba' ? wnbaPlayerFPPG(p.id) : playerFPPG(p.id);
+    const isLive = league==='wnba' ? false : isPlayerLive(p.id);
     const elim = t?.eliminated;
 
     const cardW = IS_MOBILE ? 88 : 110;
@@ -7869,12 +7870,185 @@ async function backfillMissingStats(){
     }
   }catch(e){ console.warn('backfillMissingStats error:', e); }
 }
+
+// ── WNBA STATS ───────────────────────────────────────────────────
+
+async function fetchWNBAGameBoxScore(eventId, dateStr){
+  try{
+    const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/summary?event=${eventId}`);
+    const data = await res.json();
+    const boxscore = data?.boxscore;
+    if(!boxscore) return {};
+
+    const stats = {};
+    for(const teamData of (boxscore.players||[])){
+      const espnAbbr = teamData?.team?.abbreviation||'';
+      // Map ESPN WNBA abbreviations to our IDs
+      const teamMap = {
+        'ATL':'ATH','CHI':'CHI','CONN':'CON','DAL':'DAL','GS':'GSV',
+        'IND':'IND','LA':'LAS','LV':'LVA','MIN':'MIN','NY':'NYL',
+        'PHX':'PHO','SEA':'SEA','WSH':'WAS','POR':'POR','TOR':'TOR',
+      };
+      const ourTeam = teamMap[espnAbbr] || espnAbbr;
+
+      for(const grp of (teamData.statistics||[])){
+        for(const athlete of (grp.athletes||[])){
+          const name = athlete?.athlete?.displayName||'';
+          const s = athlete?.stats||[];
+          if(!s.length||s[0]==='DNP'||s[0]==='DND') continue;
+
+          // Same ESPN stat order as NBA
+          const pts = parseInt(s[1])||0;
+          const [fgm,fga] = (s[2]||'0-0').split('-').map(Number);
+          const [tpm,tpa] = (s[3]||'0-0').split('-').map(Number);
+          const [ftm,fta] = (s[4]||'0-0').split('-').map(Number);
+          const reb = parseInt(s[5])||0;
+          const ast = parseInt(s[6])||0;
+          const to  = parseInt(s[7])||0;
+          const stl = parseInt(s[8])||0;
+          const blk = parseInt(s[9])||0;
+          const oreb = parseInt(s[10])||0;
+          const dreb = parseInt(s[11])||0;
+          const pf  = parseInt(s[12])||0;
+          const plusMinus = parseInt(s[13])||0;
+          const min = s[0]||'0';
+          const fp = pts + reb + ast + stl + blk - (fga-fgm) - (fta-ftm) - to;
+
+          const nameLower = name.toLowerCase();
+          // Match against WNBA_PLAYERS
+          const matched =
+            WNBA_PLAYERS.find(p=>p.team===ourTeam && p.name.toLowerCase()===nameLower) ||
+            WNBA_PLAYERS.find(p=>{
+              if(p.team!==ourTeam) return false;
+              const pFirst = p.name.split(' ')[0].toLowerCase();
+              const pLast = p.name.split(' ').pop().toLowerCase();
+              const espnFirst = nameLower.split(' ')[0];
+              const espnLast = nameLower.split(' ').pop();
+              return pFirst===espnFirst && pLast===espnLast;
+            }) ||
+            WNBA_PLAYERS.find(p=>{
+              if(p.team!==ourTeam) return false;
+              const pLast = p.name.split(' ').pop().toLowerCase();
+              const espnLast = nameLower.split(' ').pop();
+              const sameTeamSameLast = WNBA_PLAYERS.filter(x=>x.team===ourTeam && x.name.split(' ').pop().toLowerCase()===pLast);
+              return pLast===espnLast && sameTeamSameLast.length===1;
+            });
+
+          if(matched){
+            stats[matched.id] = {fp,pts,reb,ast,stl,blk,fgm,fga,ftm,fta,to,pf,min,
+              tpm,tpa,oreb,dreb,plusMinus,name:matched.name,league:'wnba'};
+          }
+        }
+      }
+    }
+    return stats;
+  }catch(e){ console.warn('fetchWNBAGameBoxScore error:', e); return {}; }
+}
+
+async function refreshWNBAStats(){
+  try{
+    if(!S.wnbaPlayerStats) S.wnbaPlayerStats = {};
+    const today = new Date();
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+    const fmt = d => d.toISOString().split('T')[0].replace(/-/g,'');
+    const WNBA_START = '20260508';
+
+    for(const dateStr of [fmt(today), fmt(yesterday)]){
+      if(dateStr < WNBA_START) continue;
+      try{
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=${dateStr}`);
+        const data = await res.json();
+        for(const ev of (data.events||[])){
+          if(!ev.status?.type?.completed) continue;
+          const existingGameIds = new Set(Object.values(S.wnbaPlayerStats).map(s=>s.gameId).filter(Boolean));
+          if(existingGameIds.has(ev.id)) continue;
+          const stats = await fetchWNBAGameBoxScore(ev.id, dateStr);
+          for(const [pid, stat] of Object.entries(stats)){
+            const key = `${pid}_${dateStr}_${ev.id}`;
+            if(!S.wnbaPlayerStats[key]){
+              S.wnbaPlayerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:ev.id};
+            }
+          }
+        }
+      }catch(e){}
+    }
+    await saveState();
+    render();
+  }catch(e){ console.warn('refreshWNBAStats error:', e); }
+}
+
+async function backfillWNBAStats(){
+  try{
+    if(!S.wnbaPlayerStats) S.wnbaPlayerStats = {};
+    const WNBA_START = new Date('2026-05-08');
+    const today = new Date();
+    const fmt = d => d.toISOString().split('T')[0].replace(/-/g,'');
+    const existingGameIds = new Set(Object.values(S.wnbaPlayerStats).map(s=>s.gameId).filter(Boolean));
+
+    const dates = [];
+    const d = new Date(WNBA_START);
+    while(d < today){
+      dates.push(fmt(new Date(d)));
+      d.setDate(d.getDate()+1);
+    }
+
+    let totalNew = 0;
+    for(const dateStr of dates){
+      try{
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=${dateStr}`);
+        const data = await res.json();
+        for(const ev of (data.events||[])){
+          if(!ev.status?.type?.completed) continue;
+          if(existingGameIds.has(ev.id)) continue;
+          const stats = await fetchWNBAGameBoxScore(ev.id, dateStr);
+          for(const [pid, stat] of Object.entries(stats)){
+            const key = `${pid}_${dateStr}_${ev.id}`;
+            if(!S.wnbaPlayerStats[key]){
+              S.wnbaPlayerStats[key] = {...stat, pid:parseInt(pid), date:dateStr, gameId:ev.id};
+              totalNew++;
+            }
+          }
+        }
+      }catch(e){}
+    }
+
+    if(totalNew > 0){
+      await saveState();
+      render();
+      console.log('Backfilled', totalNew, 'WNBA stat entries');
+    } else {
+      console.log('WNBA stats: no new entries to backfill');
+    }
+  }catch(e){ console.warn('backfillWNBAStats error:', e); }
+}
+
+// Helper: get total FP for a WNBA player
+function wnbaPlayerStatScore(pid){
+  if(!S.wnbaPlayerStats) return 0;
+  return +Object.values(S.wnbaPlayerStats)
+    .filter(s=>s.pid===pid)
+    .reduce((sum,s)=>sum+(s.fp||0),0)
+    .toFixed(1);
+}
+
+// Helper: WNBA FP per game
+function wnbaPlayerFPPG(pid){
+  if(!S.wnbaPlayerStats) return 0;
+  const games = Object.values(S.wnbaPlayerStats).filter(s=>s.pid===pid);
+  if(!games.length) return 0;
+  const total = games.reduce((sum,s)=>sum+(s.fp||0),0);
+  return +(total/games.length).toFixed(1);
+}
+
 async function boot(){
   initSupabase();
   try{ const s=localStorage.getItem('nba_mgr_2026'); if(s!==null) currentManagerId=s==='viewer'?'viewer':parseInt(s); }catch(e){}
   const hasState=await loadState();
   // Backfill any missing playoff game stats in background
   backfillMissingStats();
+  backfillWNBAStats();
+  refreshWNBAStats();
+  setInterval(refreshWNBAStats, 300000); // refresh every 5 mins
   // Fetch ESPN injury report
   fetchInjuryReport();
   // Load player animations
