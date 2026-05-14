@@ -493,6 +493,53 @@ const TEAM_COLORS = {
   PHX:"#e56020", CHA:"#00788c", LAC:"#c8102e",
 };
 
+// ── WNBA TEAMS & LOGOS ───────────────────────────────────────────
+const WNBA_TEAMS = [
+  {id:'ATH', name:'Atlanta Dream',        eliminated:false, survivedRounds:0},
+  {id:'CHI', name:'Chicago Sky',          eliminated:false, survivedRounds:0},
+  {id:'CON', name:'Connecticut Sun',      eliminated:false, survivedRounds:0},
+  {id:'DAL', name:'Dallas Wings',         eliminated:false, survivedRounds:0},
+  {id:'GSV', name:'Golden State Valkyries',eliminated:false, survivedRounds:0},
+  {id:'IND', name:'Indiana Fever',        eliminated:false, survivedRounds:0},
+  {id:'LAS', name:'LA Sparks',            eliminated:false, survivedRounds:0},
+  {id:'LVA', name:'Las Vegas Aces',       eliminated:false, survivedRounds:0},
+  {id:'MIN', name:'Minnesota Lynx',       eliminated:false, survivedRounds:0},
+  {id:'NYL', name:'New York Liberty',     eliminated:false, survivedRounds:0},
+  {id:'PHO', name:'Phoenix Mercury',      eliminated:false, survivedRounds:0},
+  {id:'SEA', name:'Seattle Storm',        eliminated:false, survivedRounds:0},
+  {id:'WAS', name:'Washington Mystics',   eliminated:false, survivedRounds:0},
+];
+
+const WNBA_TEAM_LOGOS = {
+  // Atlanta Dream — pink/red dream cloud with star
+  'ATH': { color:'#e91e8c', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Dream cloud shape --><rect x='8' y='14' width='16' height='10' fill='#e91e8c'/><rect x='6' y='16' width='20' height='8' fill='#e91e8c'/><rect x='8' y='12' width='6' height='6' fill='#e91e8c'/><rect x='16' y='10' width='8' height='8' fill='#e91e8c'/><rect x='12' y='11' width='6' height='4' fill='#e91e8c'/><!-- ATL star --><rect x='14' y='16' width='4' height='4' fill='#fff'/><rect x='13' y='17' width='6' height='2' fill='#fff'/><rect x='15' y='15' width='2' height='6' fill='#fff'/><!-- shimmer --><rect x='9' y='13' width='2' height='2' fill='#ff88cc' opacity='.7'/><rect x='22' y='12' width='2' height='2' fill='#ff88cc' opacity='.5'/></svg>` },
+  // Chicago Sky — blue/orange sky with sun rays
+  'CHI': { color:'#418fde', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Sky gradient bands --><rect x='0' y='4' width='32' height='6' fill='#f47920'/><rect x='0' y='10' width='32' height='6' fill='#418fde'/><rect x='0' y='16' width='32' height='6' fill='#002147'/><rect x='0' y='22' width='32' height='6' fill='#000'/><!-- Sun rising --><rect x='12' y='4' width='8' height='8' fill='#ffd700'/><rect x='10' y='6' width='12' height='6' fill='#ffd700'/><rect x='13' y='2' width='6' height='4' fill='#fff99a'/><!-- rays --><rect x='10' y='3' width='2' height='3' fill='#ffd700'/><rect x='20' y='3' width='2' height='3' fill='#ffd700'/><rect x='7' y='5' width='3' height='2' fill='#ffd700'/><rect x='22' y='5' width='3' height='2' fill='#ffd700'/></svg>` },
+  // Connecticut Sun — orange/navy sun
+  'CON': { color:'#f05023', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Sun core --><rect x='11' y='11' width='10' height='10' fill='#f05023'/><rect x='12' y='12' width='8' height='8' fill='#ff8050'/><rect x='13' y='13' width='6' height='6' fill='#ffe0a0'/><!-- rays --><rect x='15' y='3' width='2' height='6' fill='#f05023'/><rect x='15' y='23' width='2' height='6' fill='#f05023'/><rect x='3' y='15' width='6' height='2' fill='#f05023'/><rect x='23' y='15' width='6' height='2' fill='#f05023'/><rect x='6' y='6' width='3' height='3' fill='#f05023'/><rect x='23' y='6' width='3' height='3' fill='#f05023'/><rect x='6' y='23' width='3' height='3' fill='#f05023'/><rect x='23' y='23' width='3' height='3' fill='#f05023'/><!-- navy ring --><rect x='9' y='9' width='14' height='2' fill='#002147'/><rect x='9' y='21' width='14' height='2' fill='#002147'/><rect x='9' y='9' width='2' height='14' fill='#002147'/><rect x='21' y='9' width='2' height='14' fill='#002147'/></svg>` },
+  // Dallas Wings — purple wings spread
+  'DAL': { color:'#c4d600', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Left wing --><rect x='2' y='12' width='12' height='4' fill='#c4d600'/><rect x='2' y='10' width='8' height='4' fill='#c4d600'/><rect x='2' y='8' width='5' height='4' fill='#c4d600'/><rect x='4' y='16' width='10' height='4' fill='#9eb300'/><!-- Right wing --><rect x='18' y='12' width='12' height='4' fill='#c4d600'/><rect x='22' y='10' width='8' height='4' fill='#c4d600'/><rect x='25' y='8' width='5' height='4' fill='#c4d600'/><rect x='18' y='16' width='10' height='4' fill='#9eb300'/><!-- body center --><rect x='13' y='13' width='6' height='8' fill='#003da5'/><rect x='14' y='11' width='4' height='4' fill='#003da5'/><!-- star --><rect x='15' y='15' width='2' height='4' fill='#fff'/><rect x='14' y='16' width='4' height='2' fill='#fff'/></svg>` },
+  // Golden State Valkyries — gold/blue valkyrie helmet
+  'GSV': { color:'#ffc72c', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Valkyrie helmet dome --><rect x='10' y='8' width='12' height='10' fill='#ffc72c'/><rect x='8' y='10' width='16' height='8' fill='#ffc72c'/><rect x='11' y='6' width='10' height='4' fill='#ffc72c'/><!-- nose guard --><rect x='14' y='14' width='4' height='8' fill='#1d428a'/><rect x='15' y='12' width='2' height='12' fill='#ffc72c'/><!-- wing crests --><rect x='2' y='8' width='8' height='4' fill='#ffc72c'/><rect x='2' y='6' width='6' height='4' fill='#ffc72c'/><rect x='2' y='4' width='4' height='4' fill='#e0a800'/><rect x='22' y='8' width='8' height='4' fill='#ffc72c'/><rect x='24' y='6' width='6' height='4' fill='#ffc72c'/><rect x='26' y='4' width='4' height='4' fill='#e0a800'/><!-- chin strap --><rect x='10' y='18' width='4' height='4' fill='#1d428a'/><rect x='18' y='18' width='4' height='4' fill='#1d428a'/><rect x='12' y='20' width='8' height='3' fill='#1d428a'/><!-- visor shine --><rect x='9' y='9' width='4' height='2' fill='#ffe580' opacity='.6'/></svg>` },
+  // Indiana Fever — red/gold fever thermometer/flame
+  'IND': { color:'#e03a3e', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Flame shape --><rect x='13' y='24' width='6' height='6' fill='#e03a3e'/><rect x='12' y='20' width='8' height='6' fill='#e03a3e'/><rect x='11' y='16' width='10' height='6' fill='#ff6040'/><rect x='12' y='12' width='8' height='6' fill='#ff8030'/><rect x='13' y='8' width='6' height='6' fill='#ffc000'/><rect x='14' y='4' width='4' height='6' fill='#fff099'/><rect x='15' y='2' width='2' height='4' fill='#fff'/><!-- inner glow --><rect x='14' y='18' width='4' height='8' fill='#ff9060' opacity='.7'/><rect x='15' y='14' width='2' height='6' fill='#ffe080' opacity='.6'/><!-- spark tips --><rect x='10' y='14' width='2' height='3' fill='#ff4020' opacity='.8'/><rect x='20' y='14' width='2' height='3' fill='#ff4020' opacity='.8'/><rect x='11' y='10' width='2' height='3' fill='#ffb000' opacity='.7'/><rect x='19' y='10' width='2' height='3' fill='#ffb000' opacity='.7'/></svg>` },
+  // LA Sparks — gold spark/lightning
+  'LAS': { color:'#702f8a', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Spark burst --><rect x='14' y='2' width='4' height='8' fill='#ffd700'/><rect x='14' y='22' width='4' height='8' fill='#ffd700'/><rect x='2' y='14' width='8' height='4' fill='#ffd700'/><rect x='22' y='14' width='8' height='4' fill='#ffd700'/><!-- diagonal sparks --><rect x='5' y='5' width='3' height='3' fill='#ffd700'/><rect x='7' y='7' width='3' height='3' fill='#ffd700'/><rect x='9' y='9' width='3' height='3' fill='#ffd700'/><rect x='22' y='5' width='3' height='3' fill='#ffd700'/><rect x='20' y='7' width='3' height='3' fill='#ffd700'/><rect x='18' y='9' width='3' height='3' fill='#ffd700'/><rect x='5' y='24' width='3' height='3' fill='#702f8a'/><rect x='7' y='22' width='3' height='3' fill='#702f8a'/><rect x='22' y='24' width='3' height='3' fill='#702f8a'/><rect x='20' y='22' width='3' height='3' fill='#702f8a'/><!-- center gem --><rect x='12' y='12' width='8' height='8' fill='#702f8a'/><rect x='13' y='13' width='6' height='6' fill='#9b59c0'/><rect x='14' y='14' width='4' height='4' fill='#ffd700'/></svg>` },
+  // Las Vegas Aces — red ace/card suit
+  'LVA': { color:'#c8102e', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Card outline --><rect x='4' y='4' width='24' height='24' fill='#1a1a2e'/><rect x='5' y='5' width='22' height='22' fill='#111122'/><!-- Ace of spades shape --><rect x='14' y='7' width='4' height='4' fill='#c8102e'/><rect x='12' y='9' width='8' height='4' fill='#c8102e'/><rect x='10' y='11' width='12' height='6' fill='#c8102e'/><rect x='8' y='13' width='16' height='4' fill='#c8102e'/><!-- stem --><rect x='14' y='19' width='4' height='3' fill='#c8102e'/><rect x='12' y='21' width='8' height='3' fill='#c8102e'/><!-- corner A marks --><rect x='6' y='6' width='4' height='2' fill='#c8102e'/><rect x='6' y='8' width='2' height='2' fill='#c8102e'/><rect x='6' y='10' width='4' height='2' fill='#c8102e'/><rect x='22' y='22' width='4' height='2' fill='#c8102e'/><rect x='24' y='20' width='2' height='2' fill='#c8102e'/><rect x='22' y='18' width='4' height='2' fill='#c8102e'/></svg>` },
+  // Minnesota Lynx — green/silver lynx paw
+  'MIN': { color:'#236192', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Lynx paw print --><rect x='9' y='14' width='14' height='12' fill='#236192'/><rect x='7' y='16' width='18' height='8' fill='#236192'/><rect x='9' y='26' width='3' height='4' fill='#236192'/><rect x='13' y='27' width='3' height='4' fill='#236192'/><rect x='17' y='27' width='3' height='4' fill='#236192'/><!-- toe beans --><rect x='6' y='10' width='5' height='5' fill='#78c93c'/><rect x='13' y='8' width='5' height='6' fill='#78c93c'/><rect x='21' y='10' width='5' height='5' fill='#78c93c'/><!-- paw pad center --><rect x='12' y='17' width='8' height='6' fill='#1a3a6e'/><!-- claw marks --><rect x='10' y='22' width='2' height='5' fill='#78c93c' opacity='.8'/><rect x='14' y='23' width='2' height='5' fill='#78c93c' opacity='.8'/><rect x='18' y='22' width='2' height='5' fill='#78c93c' opacity='.8'/><rect x='22' y='21' width='2' height='5' fill='#78c93c' opacity='.8'/></svg>` },
+  // New York Liberty — teal/gold liberty torch
+  'NYL': { color:'#6eceb2', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Torch handle --><rect x='14' y='18' width='4' height='12' fill='#6eceb2'/><rect x='12' y='22' width='8' height='6' fill='#4aaa90'/><!-- torch cup --><rect x='11' y='16' width='10' height='4' fill='#6eceb2'/><rect x='12' y='14' width='8' height='4' fill='#4aaa90'/><!-- flame --><rect x='13' y='8' width='6' height='8' fill='#ffc72c'/><rect x='14' y='4' width='4' height='6' fill='#ffaa00'/><rect x='15' y='2' width='2' height='4' fill='#fff099'/><!-- flame wings --><rect x='10' y='10' width='4' height='5' fill='#ffd700' opacity='.8'/><rect x='18' y='10' width='4' height='5' fill='#ffd700' opacity='.8'/><rect x='9' y='12' width='3' height='4' fill='#ff9900' opacity='.6'/><rect x='20' y='12' width='3' height='4' fill='#ff9900' opacity='.6'/><!-- shine --><rect x='14' y='5' width='2' height='4' fill='#fff' opacity='.5'/></svg>` },
+  // Phoenix Mercury — orange/purple mercury planet
+  'PHO': { color:'#e56020', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Planet/orbit ring --><rect x='2' y='14' width='28' height='4' fill='#5c2d82' opacity='.6'/><rect x='4' y='13' width='24' height='2' fill='#5c2d82' opacity='.4'/><!-- Mercury circle --><rect x='8' y='8' width='16' height='16' fill='#e56020'/><rect x='6' y='10' width='20' height='12' fill='#e56020'/><rect x='10' y='6' width='12' height='20' fill='#e56020'/><!-- surface detail --><rect x='10' y='10' width='5' height='4' fill='#ff8040' opacity='.6'/><rect x='18' y='16' width='4' height='4' fill='#c04010' opacity='.5'/><rect x='12' y='18' width='3' height='3' fill='#ff6020' opacity='.4'/><!-- shine --><rect x='11' y='9' width='5' height='3' fill='#ffb080' opacity='.5'/><rect x='12' y='9' width='3' height='2' fill='#fff' opacity='.3'/></svg>` },
+  // Seattle Storm — green/yellow lightning storm
+  'SEA': { color:'#2c5234', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Storm clouds --><rect x='4' y='6' width='12' height='6' fill='#2c5234'/><rect x='2' y='8' width='14' height='4' fill='#2c5234'/><rect x='14' y='4' width='14' height='8' fill='#1e3d25'/><rect x='16' y='2' width='12' height='6' fill='#2c5234'/><!-- lightning bolt --><rect x='17' y='12' width='4' height='2' fill='#c5b900'/><rect x='15' y='14' width='4' height='2' fill='#c5b900'/><rect x='13' y='16' width='6' height='2' fill='#c5b900'/><rect x='15' y='18' width='4' height='2' fill='#c5b900'/><rect x='13' y='20' width='4' height='2' fill='#c5b900'/><rect x='11' y='22' width='4' height='2' fill='#c5b900'/><!-- rain drops --><rect x='6' y='16' width='2' height='4' fill='#4a90d9' opacity='.7'/><rect x='10' y='18' width='2' height='4' fill='#4a90d9' opacity='.6'/><rect x='24' y='14' width='2' height='4' fill='#4a90d9' opacity='.7'/><rect x='28' y='16' width='2' height='4' fill='#4a90d9' opacity='.5'/><!-- glow --><rect x='16' y='14' width='2' height='2' fill='#fff' opacity='.4'/></svg>` },
+  // Washington Mystics — red/gold mystic eye
+  'WAS': { color:'#e03a3e', svg:`<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;image-rendering:pixelated'><rect width='32' height='32' fill='#020c18'/><!-- Mystic eye outline --><rect x='4' y='13' width='24' height='6' fill='#e03a3e'/><rect x='6' y='11' width='20' height='10' fill='#e03a3e'/><rect x='10' y='9' width='12' height='14' fill='#e03a3e'/><!-- iris --><rect x='11' y='11' width='10' height='10' fill='#ffd700'/><rect x='12' y='12' width='8' height='8' fill='#e0a800'/><!-- pupil --><rect x='13' y='13' width='6' height='6' fill='#020c18'/><rect x='14' y='14' width='4' height='4' fill='#1a0a30'/><!-- inner glow --><rect x='15' y='15' width='2' height='2' fill='#6a30ff' opacity='.9'/><!-- lashes top --><rect x='10' y='7' width='2' height='3' fill='#e03a3e'/><rect x='14' y='6' width='2' height='3' fill='#e03a3e'/><rect x='18' y='6' width='2' height='3' fill='#e03a3e'/><rect x='22' y='7' width='2' height='3' fill='#e03a3e'/><!-- highlight --><rect x='12' y='12' width='3' height='2' fill='#fff' opacity='.3'/></svg>` },
+};
+
+
 function getTeamLogo(team){ return TEAM_LOGOS[team] || null; }
 
 function playerLogoHtml(team, size=36, playerName=''){
@@ -3867,8 +3914,20 @@ function renderTeams(){
     }
   }
 
+  const league = window._playerLeague || 'nba';
   const teamFilter = window._teamGalleryFilter || null;
   const sortMode = window._playerSortMode || 'fp';
+
+  // League toggle highlight
+  const nbaBtn = document.getElementById('league-toggle-nba');
+  const wnbaBtn = document.getElementById('league-toggle-wnba');
+  if(nbaBtn){ nbaBtn.style.background = league==='nba'?'rgba(255,204,0,.15)':'transparent'; nbaBtn.style.borderColor = league==='nba'?'var(--accent2)':'var(--border)'; nbaBtn.style.color = league==='nba'?'var(--accent2)':'var(--text3)'; }
+  if(wnbaBtn){ wnbaBtn.style.background = league==='wnba'?'rgba(233,30,140,.15)':'transparent'; wnbaBtn.style.borderColor = league==='wnba'?'#e91e8c':'var(--border)'; wnbaBtn.style.color = league==='wnba'?'#e91e8c':'var(--text3)'; }
+
+  // Pick the right data source
+  const activeTeams = league === 'wnba' ? WNBA_TEAMS : TEAMS;
+  const activeLogos = league === 'wnba' ? WNBA_TEAM_LOGOS : TEAM_LOGOS;
+  const activePlayers = league === 'wnba' ? (WNBA_PLAYERS||[]) : PLAYERS;
 
   // Highlight active sort button
   ['fp','name','team','pos'].forEach(s=>{
@@ -3877,19 +3936,17 @@ function renderTeams(){
     if(btn) btn.style.color = s===sortMode ? 'var(--accent2)' : 'var(--text2)';
   });
 
-  // Team selector chips
   const showAvailable = window._showAvailableOnly || false;
 
-  // Count available players
   const allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
-  const availableCount = PLAYERS.filter(p=>!allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)&&!getTeam(p.team)?.eliminated).length;
+  const availableCount = activePlayers.filter(p=>!allRosteredIds.has(p.id)&&activeTeams.some(t=>t.id===p.team)&&!activeTeams.find(t=>t.id===p.team)?.eliminated).length;
 
-  const availChip = `<button onclick="window._showAvailableOnly=!window._showAvailableOnly;window._teamGalleryFilter=null;renderTeams()" style="
+  const availChip = league==='nba' ? `<button onclick="window._showAvailableOnly=!window._showAvailableOnly;window._teamGalleryFilter=null;renderTeams()" style="
     padding:4px 10px;border:2px solid ${showAvailable?'var(--green)':'var(--border)'};
     background:${showAvailable?'rgba(0,255,136,.15)':'transparent'};
     color:${showAvailable?'var(--green)':'var(--text3)'};
     font-family:'VT323',monospace;font-size:14px;cursor:pointer;font-weight:${showAvailable?'bold':'normal'}
-  ">🟢 AVAILABLE (${availableCount})</button>`;
+  ">🟢 AVAILABLE (${availableCount})</button>` : '';
 
   const allChip = `<button onclick="window._showAvailableOnly=false;window._teamGalleryFilter=null;renderTeams()" style="
     padding:4px 10px;border:2px solid ${!teamFilter&&!showAvailable?'var(--accent2)':'var(--border)'};
@@ -3898,8 +3955,8 @@ function renderTeams(){
     font-family:'VT323',monospace;font-size:14px;cursor:pointer;
   ">ALL</button>`;
 
-  const chipHtml = allChip + availChip + TEAMS.map(t=>{
-    const tc = (TEAM_LOGOS[t.id]?.color)||'#4a9eff';
+  const chipHtml = allChip + availChip + activeTeams.map(t=>{
+    const tc = (activeLogos[t.id]?.color)||'#4a9eff';
     const active = teamFilter===t.id && !showAvailable;
     return `<button onclick="window._showAvailableOnly=false;setTeamGalleryFilter('${t.id}')" style="
       padding:4px 10px;border:2px solid ${active?tc:'var(--border)'};
@@ -3912,10 +3969,10 @@ function renderTeams(){
   // Players to show
   const _allRosteredIds = new Set(Object.values(S.rosters||{}).flat());
   const playersToShow = showAvailable
-    ? PLAYERS.filter(p=>!_allRosteredIds.has(p.id)&&TEAMS.some(t=>t.id===p.team)&&!getTeam(p.team)?.eliminated)
+    ? activePlayers.filter(p=>!_allRosteredIds.has(p.id)&&activeTeams.some(t=>t.id===p.team)&&!activeTeams.find(t=>t.id===p.team)?.eliminated)
     : teamFilter
-      ? PLAYERS.filter(p=>p.team===teamFilter)
-      : PLAYERS.filter(p=>TEAMS.some(t=>t.id===p.team));
+      ? activePlayers.filter(p=>p.team===teamFilter)
+      : activePlayers.filter(p=>activeTeams.some(t=>t.id===p.team));
 
   // Sort
   const sorted = [...playersToShow].sort((a,b)=>{
@@ -3931,10 +3988,10 @@ function renderTeams(){
   });
 
   const cardHtml = sorted.map(p=>{
-    const t = TEAMS.find(t=>t.id===p.team);
-    const tc = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+    const t = activeTeams.find(t=>t.id===p.team);
+    const tc = (activeLogos[p.team]?.color)||'#4a9eff';
     const hasPortrait = getActivePortrait(p.name);
-    const logo = TEAM_LOGOS[p.team];
+    const logo = activeLogos[p.team];
     const owner = ownerMap[p.id];
     const statScore = playerStatScore(p.id);
     const fppg = playerFPPG(p.id);
@@ -4019,9 +4076,11 @@ function renderTeams(){
 
   document.getElementById('teams-chips').innerHTML = chipHtml;
   document.getElementById('teams-injury-alert').innerHTML = injAlertHtml;
-  document.getElementById('teams-gallery').innerHTML = sorted.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">${cardHtml}</div>`
-    : `<div style="color:var(--text3);padding:1rem">No players found.</div>`;
+  document.getElementById('teams-gallery').innerHTML = league === 'wnba' && activePlayers.length === 0
+    ? `<div style="text-align:center;padding:3rem 1rem;font-family:'Press Start 2P',monospace;font-size:8px;color:#555;line-height:2.5">🏀 WNBA SEASON<br>COMING SOON<br><span style="font-size:6px;color:#333">Players will appear here when rosters are loaded</span></div>`
+    : sorted.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">${cardHtml}</div>`
+      : `<div style="color:var(--text3);padding:1rem">No players found.</div>`;
 }
 
 function setTeamGalleryFilter(teamId){
@@ -5030,6 +5089,9 @@ function renderBossBattleScene(){
 }
 
 function renderBossBattle(){ renderBossBattleScene(); }
+
+// WNBA players — populated when season begins
+const WNBA_PLAYERS = [];
 
 // ── RAID BETS ─────────────────────────────────────────────────────
 
