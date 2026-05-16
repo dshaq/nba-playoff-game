@@ -1337,6 +1337,7 @@ function triggerAttackFX(target, damage, aColor){
 
 // ── Boss Battle Announcement Banner ─────────────────────────────
 function renderBossAnnounceBanner(){
+  return; // Banner removed — boss battle accessible via tab
   const el = document.getElementById('boss-announce-bar');
   if(!el) return;
   const bb = getBossBattle();
@@ -2314,7 +2315,7 @@ function selectManager(id){
   render();
   // Default to My Team tab if logged in as a real manager
   if(currentManagerId !== null && currentManagerId !== 'viewer'){
-    showTab('my-team');
+    showTab('rosters');
     // Update topbar user identity
     const m = S.managers.find(x=>x.id===currentManagerId);
     const topbarUser = document.getElementById('topbar-user');
