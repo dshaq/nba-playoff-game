@@ -2124,7 +2124,7 @@ function showMainScreen(){
   render();
   // Default to My Team tab if logged in as a real manager
   if(currentManagerId !== null && currentManagerId !== 'viewer'){
-    showTab(getBossBattle()?.active ? 'boss' : 'my-team');
+    showTab('rosters');
     // Update topbar user identity
     const m = S.managers.find(x=>x.id===currentManagerId);
     const topbarUser = document.getElementById('topbar-user');
@@ -2291,11 +2291,12 @@ function selectManager(id){
     if(topbarName) topbarName.textContent = m?.name?.toUpperCase()||'';
     topbarUser.style.opacity = '1';
     topbarUser.style.pointerEvents = 'auto';
-    // Default to MY TEAM tab if logged in as manager
-    showTab('my-team');
+    // Default to Rosters tab if logged in as manager
+    showTab('rosters');
   } else if(topbarUser){
     topbarUser.style.opacity = '0';
     topbarUser.style.pointerEvents = 'none';
+    showTab('rosters');
   }
   const leagueSubEl = document.getElementById('league-sub'); if(leagueSubEl) leagueSubEl.textContent = `2026 PLAYOFFS`;
   const roundSelEl = document.getElementById('round-sel'); if(roundSelEl) roundSelEl.value = S.round||1;

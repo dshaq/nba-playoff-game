@@ -847,12 +847,9 @@ select{padding:6px 10px;font-size:14px;border:2px solid var(--border);background
 
   <!-- STANDINGS -->
   <div id="tab-standings">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
-      <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent3);letter-spacing:.05em">🏆 LIVE LEADERBOARD</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div id="live-stats-indicator" style="font-size:12px;color:var(--text3)"></div>
-        <button class="btn-ghost" onclick="showTab('manage-names')" style="font-size:14px">✏ EDIT</button>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+      <div id="live-stats-indicator" style="font-size:12px;color:var(--text3)"></div>
+      <button class="btn-ghost" onclick="showTab('manage-names')" style="font-size:14px">✏ EDIT</button>
     </div>
     <div id="standings-list"></div>
   </div>
