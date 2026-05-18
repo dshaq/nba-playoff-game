@@ -1337,9 +1337,77 @@ function triggerAttackFX(target, damage, aColor){
 
 // ── Boss Battle Announcement Banner ─────────────────────────────
 function renderBossAnnounceBanner(){
-  return; // Banner removed — boss battle accessible via tab
-  const el = document.getElementById('boss-announce-bar');
+  return; // old banner disabled
+}
+
+function renderBossRecruitBanner(){
+  const el = document.getElementById('boss-recruit-banner');
   if(!el) return;
+
+  // Only show if S.bossRecruitActive is set by commissioner
+  if(!S.bossRecruitActive){ el.style.display='none'; return; }
+
+  const mid = currentManagerId;
+  const isLoggedIn = mid !== null && mid !== 'viewer';
+  const bb = S.bossBattle || {};
+  const hasChamp = bb.champions?.[mid];
+  const champName = hasChamp ? (getPlayer(hasChamp)?.name || '?') : null;
+  const participants = Object.keys(bb.champions||{}).length;
+
+  // Manager colors
+  const joined = Object.keys(bb.champions||{}).map(id=>{
+    const m = S.managers.find(x=>x.id===parseInt(id));
+    return `<span style="color:${getAvatarColor(parseInt(id))};font-family:'Press Start 2P',monospace;font-size:6px">${m?.name||'?'}</span>`;
+  }).join(' · ');
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="
+      background:linear-gradient(135deg,#0a0014,#14000a,#0a0a00);
+      border-bottom:3px solid #ff6600;
+      padding:10px 14px;
+      position:relative;
+      overflow:hidden;
+    ">
+      <!-- Animated glow -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(255,102,0,0.12),transparent 70%);pointer-events:none"></div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative">
+
+        <!-- Icon + title -->
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="font-size:22px;animation:pulse 2s ease-in-out infinite">⚔️</div>
+          <div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff6600;line-height:1.6">BOSS BATTLE</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#ffd700;line-height:1.8">STARTING TONIGHT!</div>
+          </div>
+        </div>
+
+        <!-- Game info -->
+        <div style="border-left:1px solid #333;padding-left:12px;flex-shrink:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#666;margin-bottom:2px">CONFERENCE FINALS</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#fff">SAS vs OKC</div>
+        </div>
+
+        <!-- Participants -->
+        <div style="border-left:1px solid #333;padding-left:12px;flex:1;min-width:120px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#666;margin-bottom:4px">${participants} JOINED${participants>0?':':''}</div>
+          <div style="line-height:2">${joined || '<span style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#444">NO ONE YET — BE FIRST!</span>'}</div>
+        </div>
+
+        <!-- CTA -->
+        <div style="flex-shrink:0;margin-left:auto">
+          ${isLoggedIn ? (
+            hasChamp
+            ? `<div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#00ff88;padding:8px 12px;border:1px solid #00ff88">✓ JOINED<br><span style="font-size:5px;color:#555">${champName}</span></div>`
+            : `<button onclick="openChampionPicker(${mid})" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:9px 14px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer;animation:pulse 1.5s ease-in-out infinite">⚔ JOIN BATTLE</button>`
+          ) : `<div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#555;padding:6px">LOG IN TO JOIN</div>`}
+        </div>
+
+      </div>
+    </div>
+  `;
+}
   const bb = getBossBattle();
   const mid = currentManagerId;
   if(!bb?.active || mid===null || mid==='viewer'){ el.style.display='none'; return; }
@@ -2747,7 +2815,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderBossRecruitBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -5929,8 +5997,10 @@ function renderBossCommPanel(bb){
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
         <button onclick="saveBossConfig()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,153,0,.2);border:1px solid #ff9900;color:#ff9900;cursor:pointer">💾 SAVE CONFIG</button>
         <button onclick="giftStarterBalls()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);cursor:pointer">🎁 GIFT STARTER BALLS</button>
+        <button onclick="toggleBossRecruitBanner()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:${S.bossRecruitActive?'rgba(255,102,0,.3)':'rgba(255,102,0,.1)'};border:1px solid #ff6600;color:#ff6600;cursor:pointer">${S.bossRecruitActive?'📣 HIDE BANNER':'📣 SHOW RECRUIT BANNER'}</button>
         <button onclick="startBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(255,51,68,.2);border:1px solid var(--red);color:var(--red);cursor:pointer">⚔ ${activated?'UPDATE':'START'} BATTLE</button>
         ${activated?`<button onclick="endBossBattle()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:5px 10px;background:rgba(100,100,100,.2);border:1px solid #666;color:#666;cursor:pointer">■ END BATTLE</button>`:''}
+      </div>
       </div>
       <!-- Boss Asset Uploader -->
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ff990033">
@@ -6152,6 +6222,13 @@ async function saveBossConfig(){
     minion2Name: document.getElementById('boss-minion2-name')?.value||'RIMREAPER',
   };
   await setBossConfig(config);
+}
+
+async function toggleBossRecruitBanner(){
+  S.bossRecruitActive = !S.bossRecruitActive;
+  await saveStateNow();
+  render();
+  showToast(S.bossRecruitActive ? '📣 Recruit banner is now LIVE' : '📣 Recruit banner hidden', 'info');
 }
 
 async function startBossBattle(){
