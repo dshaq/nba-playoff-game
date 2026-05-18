@@ -932,10 +932,14 @@ function buildChampionList(roster, mid, topPlayer){
 }
 
 function openChampionPicker(mid){
-  // Called from SWAP button — open the champion selection popup for this manager
+  // Called from SWAP button or recruit banner — open the champion selection popup
   const bb = getBossBattle();
-  if(!bb?.active){ showToast('No active battle','error'); return; }
-  const currentPid = bb.champions?.[mid];
+  // Allow during recruitment phase (bossRecruitActive) even if battle not started yet
+  if(!bb?.active && !S.bossRecruitActive){ showToast('No active battle','error'); return; }
+  // During recruitment, initialize champions object if needed
+  if(!S.bossBattle) S.bossBattle = {};
+  if(!S.bossBattle.champions) S.bossBattle.champions = {};
+  const currentPid = bb?.champions?.[mid];
   if(currentPid && (currentManagerId !== mid) && !(isCommissioner || currentManagerId===4)){
     showToast('You can only manage your own champion','error'); return;
   }
@@ -4847,6 +4851,7 @@ function renderBossBattleScene(){
               : `<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`
           }
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
+          ${bb?.scaleFactor && bb.scaleFactor < 1 ? `<div style="font-family:'Press Start 2P',monospace;font-size:4px;color:#555588;margin-top:2px">${bb.participants}/${S.managers?.length||6} PLAYERS · HP ${Math.round(bb.scaleFactor*100)}%</div>` : ''}
           ${bossCurrentHP<=0&&mid!==null&&mid!=='viewer'?`<button onclick="showCatchMenu('boss')" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 6px;background:rgba(255,204,0,.2);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;margin-top:2px">⚾ CATCH</button>`:''}
           <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
@@ -6162,24 +6167,66 @@ async function toggleBossRecruitBanner(){
 
 async function startBossBattle(){
   await saveBossConfig();
-  // No boss player required — pure monster with set HP
   if(!S.bossBattle.champions) S.bossBattle.champions={};
   S.bossBattle.active = true;
   S.bossBattle.defeated = false;
   S.bossBattle.defeatedTs = null;
   S.bossBattle.badgesAwarded = false;
+
+  // ── Participant-based HP scaling ──────────────────────────────
+  // Count managers who have opted in (selected a champion)
+  const totalManagers = S.managers?.length || 6;
+  const participants = Object.keys(S.bossBattle.champions).length || 1;
+  const scaleFactor = Math.max(0.25, participants / totalManagers); // min 25% HP
+
+  // Store base HP (from config) and scaled current HP
+  const bb = S.bossBattle;
+  bb.bossBaseHP   = bb.bossHP;
+  bb.minion1BaseHP = bb.minion1HP || 80;
+  bb.minion2BaseHP = bb.minion2HP || 80;
+
+  bb.bossCurrentHP   = Math.max(1, Math.round(bb.bossHP * scaleFactor));
+  bb.minion1CurrentHP = Math.max(1, Math.round((bb.minion1HP||80) * scaleFactor));
+  bb.minion2CurrentHP = Math.max(1, Math.round((bb.minion2HP||80) * scaleFactor));
+
+  // Update displayed max HP to match scaled values so bars read correctly
+  bb.bossHP     = bb.bossCurrentHP;
+  bb.minion1HP  = bb.minion1CurrentHP;
+  bb.minion2HP  = bb.minion2CurrentHP;
+
+  bb.participants = participants;
+  bb.scaleFactor  = scaleFactor;
+
+  // Auto-gift fresh starter balls to all participants
+  if(!S.inventory) S.inventory = {};
+  for(const mid of Object.keys(S.bossBattle.champions||{})){
+    const m = parseInt(mid);
+    if(!S.inventory[m]) S.inventory[m] = {coins:0, balls:[], caught:[]};
+    const newBalls = [
+      {type:'swish', id:'s3r_'+m+'_1'}, {type:'swish', id:'s3r_'+m+'_2'},
+      {type:'swish', id:'s3r_'+m+'_3'}, {type:'clutch', id:'c3r_'+m+'_1'},
+    ];
+    for(const b of newBalls){
+      if(!S.inventory[m].balls.find(x=>x.id===b.id)) S.inventory[m].balls.push(b);
+    }
+  }
+
   await saveState();
   render();
+
   // Chat announcement
   try{
     const chatState = await loadChatState();
-    const bb = S.bossBattle;
+    const scaleNote = participants < totalManagers
+      ? ` (${participants}/${totalManagers} participants — HP scaled to ${Math.round(scaleFactor*100)}%)`
+      : '';
     chatState.push({id:Date.now(),name:'NBA ARCADE',managerId:'system',avatarIdx:0,
-      text:`⚔ BOSS BATTLE BEGINS! ${bb.bossName} (${bb.bossHP} HP) has appeared! Pick your Champion in the ⚔ BOSS tab. Reward: +${bb.reward} FP + Badge for all participants! 🗡️`,
+      text:`⚔ BOSS BATTLE BEGINS! ${bb.bossLabel||bb.bossName} (${bb.bossCurrentHP} HP${scaleNote}) has appeared! Pick your Champion in the ⚔ BOSS tab. Reward: +${bb.reward} FP for all participants! 🗡️`,
       ts:new Date().toISOString()});
     await db.from('leagues').upsert({id:'nba-chat-2026',state:JSON.stringify(chatState)});
   }catch(e){}
-  showToast('⚔ Boss Battle started!','warn');
+
+  showToast(`⚔ Boss Battle started! ${participants} participant${participants>1?'s':''} · HP scaled to ${Math.round(scaleFactor*100)}%`,'warn');
 }
 
 async function endBossBattle(){
