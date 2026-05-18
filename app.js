@@ -1357,113 +1357,42 @@ function renderBossRecruitBanner(){
   // Manager colors
   const joined = Object.keys(bb.champions||{}).map(id=>{
     const m = S.managers.find(x=>x.id===parseInt(id));
-    return `<span style="color:${getAvatarColor(parseInt(id))};font-family:'Press Start 2P',monospace;font-size:6px">${m?.name||'?'}</span>`;
+    const color = getAvatarColor(parseInt(id));
+    const name = m?.name||'?';
+    return '<span style="color:'+color+';font-family:\'Press Start 2P\',monospace;font-size:6px">'+name+'</span>';
   }).join(' · ');
 
-  el.style.display = 'block';
-  el.innerHTML = `
-    <div style="
-      background:linear-gradient(135deg,#0a0014,#14000a,#0a0a00);
-      border-bottom:3px solid #ff6600;
-      padding:10px 14px;
-      position:relative;
-      overflow:hidden;
-    ">
-      <!-- Animated glow -->
-      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(255,102,0,0.12),transparent 70%);pointer-events:none"></div>
-
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative">
-
-        <!-- Icon + title -->
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <div style="font-size:22px;animation:pulse 2s ease-in-out infinite">⚔️</div>
-          <div>
-            <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#ff6600;line-height:1.6">BOSS BATTLE</div>
-            <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#ffd700;line-height:1.8">STARTING TONIGHT!</div>
-          </div>
-        </div>
-
-        <!-- Game info -->
-        <div style="border-left:1px solid #333;padding-left:12px;flex-shrink:0">
-          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#666;margin-bottom:2px">CONFERENCE FINALS</div>
-          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#fff">SAS vs OKC</div>
-        </div>
-
-        <!-- Participants -->
-        <div style="border-left:1px solid #333;padding-left:12px;flex:1;min-width:120px">
-          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#666;margin-bottom:4px">${participants} JOINED${participants>0?':':''}</div>
-          <div style="line-height:2">${joined || '<span style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#444">NO ONE YET — BE FIRST!</span>'}</div>
-        </div>
-
-        <!-- CTA -->
-        <div style="flex-shrink:0;margin-left:auto">
-          ${isLoggedIn ? (
-            hasChamp
-            ? `<div style="font-family:'Press Start 2P',monospace;font-size:6px;color:#00ff88;padding:8px 12px;border:1px solid #00ff88">✓ JOINED<br><span style="font-size:5px;color:#555">${champName}</span></div>`
-            : `<button onclick="openChampionPicker(${mid})" style="font-family:'Press Start 2P',monospace;font-size:6px;padding:9px 14px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer;animation:pulse 1.5s ease-in-out infinite">⚔ JOIN BATTLE</button>`
-          ) : `<div style="font-family:'Press Start 2P',monospace;font-size:5px;color:#555;padding:6px">LOG IN TO JOIN</div>`}
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-  const bb = getBossBattle();
-  const mid = currentManagerId;
-  if(!bb?.active || mid===null || mid==='viewer'){ el.style.display='none'; return; }
-
-  const hasChamp = !!bb.champions?.[mid];
-  const aColor = getAvatarColor(mid);
+  // Build CTA without nested template literals
+  let ctaHtml = '';
+  if(!isLoggedIn){
+    ctaHtml = '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#555;padding:6px">LOG IN TO JOIN</div>';
+  } else if(hasChamp){
+    ctaHtml = '<div style="font-family:\'Press Start 2P\',monospace;font-size:6px;color:#00ff88;padding:8px 12px;border:1px solid #00ff88">✓ JOINED<br><span style="font-size:5px;color:#555">' + champName + '</span></div>';
+  } else {
+    ctaHtml = '<button onclick="openChampionPicker(' + mid + ')" style="font-family:\'Press Start 2P\',monospace;font-size:6px;padding:9px 14px;background:rgba(255,102,0,.2);border:2px solid #ff6600;color:#ff6600;cursor:pointer">⚔ JOIN BATTLE</button>';
+  }
+  const joinedHtml = joined || '<span style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#444">NO ONE YET — BE FIRST!</span>';
 
   el.style.display = 'block';
-  el.innerHTML = `
-  <div style="
-    background:linear-gradient(135deg,rgba(255,102,0,.18),rgba(255,204,0,.12),rgba(255,51,68,.15));
-    border-bottom:3px solid #ff6600;
-    padding:10px 14px;
-    display:flex;
-    align-items:center;
-    gap:12px;
-    flex-wrap:wrap;
-    position:relative;
-    overflow:hidden;
-  ">
-    <!-- Pulsing glow behind -->
-    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(255,102,0,.08),transparent 70%);pointer-events:none;animation:attack-pulse 3s ease-in-out infinite"></div>
+  el.innerHTML = '<div style="background:linear-gradient(135deg,#0a0014,#14000a,#0a0a00);border-bottom:3px solid #ff6600;padding:10px 14px;position:relative;overflow:hidden">'
+    + '<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(255,102,0,0.12),transparent 70%);pointer-events:none"></div>'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+    + '<div style="font-size:22px">⚔️</div>'
+    + '<div><div style="font-family:\'Press Start 2P\',monospace;font-size:8px;color:#ff6600;line-height:1.6">BOSS BATTLE</div>'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:6px;color:#ffd700;line-height:1.8">STARTING TONIGHT!</div></div>'
+    + '</div>'
+    + '<div style="border-left:1px solid #333;padding-left:12px;flex-shrink:0">'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#666;margin-bottom:2px">CONFERENCE FINALS</div>'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:#fff">SAS vs OKC</div>'
+    + '</div>'
+    + '<div style="border-left:1px solid #333;padding-left:12px;flex:1;min-width:120px">'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#666;margin-bottom:4px">' + participants + ' JOINED' + (participants>0?':':'') + '</div>'
+    + '<div style="line-height:2">' + joinedHtml + '</div>'
+    + '</div>'
+    + '<div style="flex-shrink:0;margin-left:auto">' + ctaHtml + '</div>'
+    + '</div></div>';
 
-    <!-- Boss icon -->
-    <div style="font-size:${IS_MOBILE?20:26}px;flex-shrink:0;animation:boss-float 3s ease-in-out infinite;filter:drop-shadow(0 0 6px #ff6600)">
-      ${CUSTOM_LOGOS.find(l=>l.name==='Boss_Main')
-        ? `<img src="${CUSTOM_LOGOS.find(l=>l.name==='Boss_Main').dataUri}" style="width:${IS_MOBILE?28:38}px;height:${IS_MOBILE?28:38}px;object-fit:contain;image-rendering:pixelated"/>`
-        : '🏀'}
-    </div>
-
-    <!-- Text -->
-    <div style="flex:1;min-width:180px">
-      <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?7:9}px;color:#ffcc00;text-shadow:0 0 10px #ffcc0066;margin-bottom:4px;letter-spacing:.05em">
-        ⚔ BOSS BATTLE IS LIVE!
-      </div>
-      <div style="font-size:${IS_MOBILE?10:12}px;color:#ddd;line-height:1.5">
-        A bonus game — defeat <strong style="color:#ff6600">DUNKMAW</strong> &amp; his minions for rewards! No effect on your main score. Attack daily with your Champion's FP.
-      </div>
-    </div>
-
-    <!-- CTA button -->
-    <button onclick="showTab('boss')" style="
-      font-family:'Press Start 2P',monospace;
-      font-size:${IS_MOBILE?7:8}px;
-      padding:${IS_MOBILE?'8px 12px':'10px 16px'};
-      background:linear-gradient(180deg,rgba(255,204,0,.25),rgba(255,102,0,.2));
-      border:2px solid #ffcc00;
-      color:#ffcc00;
-      cursor:pointer;
-      flex-shrink:0;
-      white-space:nowrap;
-      animation:attack-pulse 1.4s ease-in-out infinite;
-      --ac:#ffcc00;
-      letter-spacing:.03em;
-    ">${hasChamp ? '⚔ ATTACK NOW' : '⚔ PICK CHAMPION'}</button>
-  </div>`;
 }
 
 
