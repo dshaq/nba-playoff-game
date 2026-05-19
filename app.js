@@ -1651,61 +1651,75 @@ async function useInventoryItem(mid, enemyId){
   const inv = getInventory(mid);
   const caught = inv.caught?.find(c=>c.enemyId===enemyId);
   if(!caught){ showToast('You do not have this enemy in your inventory','error'); return; }
-  // Check cooldown — once per battle
+  // Check cooldown — once per battle per caught enemy
   if(!S.bossBattle.itemsUsed) S.bossBattle.itemsUsed = {};
   const key = mid+'_'+enemyId;
   if(S.bossBattle.itemsUsed[key]){ showToast('Already used this battle','error'); return; }
-  const abilities = {
-    boss:    { name:"HE'S HEATING UP", desc:'Burn damage +10 HP each game night', icon:'🔥' },
-    minion1: { name:'DEATH BY MIDRANGE', desc:'Multi-hit: 100% + two bonus hits of 10 or 25%', icon:'🏀' },
-    minion2: { name:'WET SPOT',    desc:'150% dmg (max 75), but 10% chance you slip and miss', icon:'💧' },
+
+  // Abilities tied to caught enemy NAME (not enemyId) so they persist across rounds
+  const ABILITY_BY_NAME = {
+    // Round 2 caught enemies
+    'GUS':       { name:'AREA STRIKE',    desc:'Next attack hits ALL enemies simultaneously', icon:'💥', type:'area' },
+    'RIMREAPER': { name:'SOUL STEAL',     desc:'Next attack deals 2× damage', icon:'👻', type:'soul' },
+    'DUNKMAW':   { name:'SLAM SURGE',     desc:'Next attack deals +50% damage', icon:'🌊', type:'slam' },
+    // Round 3 caught enemies (if caught)
+    'SWISHA SWEET': { name:'DEATH BY MIDRANGE', desc:'Multi-hit: 100% + two bonus rolls of 10 or 25%', icon:'🏀', type:'midrange' },
+    'PLANKSTER':    { name:'WET SPOT',    desc:'150% dmg (max 75) — 10% chance you slip!', icon:'💧', type:'wet' },
+    'SWAMP DRAGON': { name:"HE'S HEATING UP", desc:'Normal dmg + burn status (10 HP/game night)', icon:'🔥', type:'burn' },
   };
-  const ability = abilities[enemyId];
-  if(!ability){ showToast('Unknown ability','error'); return; }
+
+  const enemyName = caught.name?.toUpperCase();
+  const ability = ABILITY_BY_NAME[enemyName];
+  if(!ability){ showToast('Unknown ability for ' + caught.name,'error'); return; }
+
   if(!confirm(`Use ${ability.name}?\n\n${ability.desc}`)) return;
-  S.bossBattle.itemsUsed[key] = { ability:enemyId, ts:new Date().toISOString() };
-  S.bossBattle.activeAbility = { mid, enemyId, name:ability.name };
+  S.bossBattle.itemsUsed[key] = { ability:ability.type, name:ability.name, ts:new Date().toISOString() };
+  S.bossBattle.activeAbility = { mid, enemyId, name:ability.name, type:ability.type };
   await saveStateNow();
   render();
-  showToast(`✨ ${ability.name} activated!`,'warn');
+  showToast(`✨ ${ability.icon} ${ability.name} activated!`,'warn');
 }
 
 // Apply active ability in directAttack
 function applyActiveAbility(mid, target, dmg){
   const bb = getBossBattle();
   if(!bb?.activeAbility || bb.activeAbility.mid !== mid) return {dmg, targets:[target], slipped:false, multiHits:null};
-  const ability = bb.activeAbility.enemyId;
+  const abilityType = bb.activeAbility.type || bb.activeAbility.enemyId;
   S.bossBattle.activeAbility = null; // consume it
 
-  if(ability === 'minion1'){
-    // DEATH BY MIDRANGE — multi-hit: full damage + two bonus hits of randomly 10% or 25%
+  if(abilityType === 'midrange' || abilityType === 'minion1'){
+    // DEATH BY MIDRANGE — multi-hit
     const bonus1 = Math.random() < 0.5 ? Math.round(dmg * 0.25) : Math.round(dmg * 0.10);
     const bonus2 = Math.random() < 0.5 ? Math.round(dmg * 0.25) : Math.round(dmg * 0.10);
-    const totalDmg = dmg + bonus1 + bonus2;
-    return {dmg: totalDmg, targets:[target], slipped:false, multiHits:[dmg, bonus1, bonus2]};
+    return {dmg: dmg + bonus1 + bonus2, targets:[target], slipped:false, multiHits:[dmg, bonus1, bonus2]};
 
-  } else if(ability === 'minion2'){
-    // WET SPOT — 150% damage (max 75 total), but 10% chance you slip and miss
+  } else if(abilityType === 'wet' || abilityType === 'minion2'){
+    // WET SPOT — 150% damage (max 75), 10% slip chance
     const slipped = Math.random() < 0.10;
-    if(slipped){
-      // FP is still spent (handled by attackLog push), but 0 damage dealt
-      return {dmg:0, targets:[target], slipped:true, multiHits:null};
-    }
-    const wetDmg = Math.min(75, Math.round(dmg * 1.5));
-    return {dmg:wetDmg, targets:[target], slipped:false, multiHits:null};
+    if(slipped) return {dmg:0, targets:[target], slipped:true, multiHits:null};
+    return {dmg:Math.min(75, Math.round(dmg * 1.5)), targets:[target], slipped:false, multiHits:null};
 
-  } else if(ability === 'boss'){
-    // HE'S HEATING UP — deals normal damage AND inflicts burn status on boss
-    // Burn ticks 10 HP per game night automatically
+  } else if(abilityType === 'burn' || abilityType === 'boss'){
+    // HE'S HEATING UP — normal dmg + burn status
     if(!S.bossBattle.statusEffects) S.bossBattle.statusEffects = {};
     S.bossBattle.statusEffects['boss_burn'] = {
-      type: 'burn',
-      dmgPerNight: 10,
-      inflictedBy: mid,
-      inflictedAt: new Date().toISOString(),
-      lastTick: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+      type:'burn', dmgPerNight:10, inflictedBy:mid,
+      inflictedAt:new Date().toISOString(),
+      lastTick:new Date().toISOString().split('T')[0],
     };
     return {dmg, targets:['boss'], slipped:false, multiHits:null, burnApplied:true};
+
+  } else if(abilityType === 'area'){
+    // AREA STRIKE (GUS) — hit all enemies
+    return {dmg, targets:['boss','minion1','minion2'], slipped:false, multiHits:null};
+
+  } else if(abilityType === 'soul'){
+    // SOUL STEAL (RIMREAPER) — 2× damage
+    return {dmg:dmg*2, targets:[target], slipped:false, multiHits:null};
+
+  } else if(abilityType === 'slam'){
+    // SLAM SURGE (DUNKMAW) — +50% damage
+    return {dmg:Math.round(dmg*1.5), targets:[target], slipped:false, multiHits:null};
   }
 
   return {dmg, targets:[target], slipped:false, multiHits:null};
@@ -6085,7 +6099,15 @@ function renderBossCommPanel(bb){
                 :`<button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:3px 6px;background:rgba(255,153,0,.1);border:1px solid #ff990066;color:#ff9900;cursor:pointer">📁 Upload</button>`}
             </div>`;
           }).join('')}
-          <div style="font-size:6px;color:#ff990088;margin:8px 0 4px;padding-top:8px;border-top:1px solid #ff990022">HURT FRAMES (on attack)</div>
+          <div style="font-size:6px;color:#4a9eff88;margin:8px 0 4px;padding-top:8px;border-top:1px solid #4a9eff22">ROUND 2 ARCHIVE (Boss Zone)</div>
+          ${['Boss_Main_R2','Boss_Minion1_R2','Boss_Minion2_R2'].map(name=>{
+            const existing = CUSTOM_LOGOS.find(l=>l.name===name);
+            return `<div style="font-size:9px;color:var(--text2)">
+              <div style="color:#4a9eff88;margin-bottom:2px">${name}</div>
+              ${existing?`<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--green)">✓ Uploaded</span><button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:1px 4px;background:none;border:1px solid #555;color:#888;cursor:pointer">Replace</button></div>`
+                :`<button onclick="uploadBossAsset('${name}')" style="font-size:7px;padding:3px 6px;background:rgba(74,158,255,.1);border:1px solid #4a9eff66;color:#4a9eff;cursor:pointer">📁 Upload</button>`}
+            </div>`;
+          }).join('')}
           ${['Boss_Main_hurt','Boss_Minion1_hurt','Boss_Minion2_hurt'].map(name=>{
             const existing = CUSTOM_LOGOS.find(l=>l.name===name);
             return `<div style="font-size:9px;color:var(--text2)">
