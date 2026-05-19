@@ -707,14 +707,27 @@ async function saveState(){
         const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
         if(data?.state){
           const remote = JSON.parse(data.state);
+          // If remote is newer, pull it instead
           if(remote._savedAt && remote._savedAt > S._savedAt){
             console.warn('saveState: remote is newer, pulling instead of overwriting');
-            // Pull remote state instead
             S = remote;
             migrateState();
             render();
             if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
             return;
+          }
+          // Protect boss champions — always use whichever state has fewer participants
+          // (commissioner explicitly reduced from 6 to 2, stale clients shouldn't undo that)
+          const remoteChamps = remote.bossBattle?.champions || {};
+          const localChamps = S.bossBattle?.champions || {};
+          const remoteCount = Object.keys(remoteChamps).length;
+          const localCount = Object.keys(localChamps).length;
+          if(remoteCount < localCount && remote.bossBattle?.participants){
+            // Remote has fewer — commissioner explicitly set this, use it
+            S.bossBattle.champions = remoteChamps;
+            S.bossBattle.championSelectedAt = remote.bossBattle?.championSelectedAt || {};
+            S.bossBattle.participants = remote.bossBattle.participants;
+            S.bossBattle.scaleFactor = remote.bossBattle.scaleFactor;
           }
         }
         const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
