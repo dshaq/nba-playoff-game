@@ -716,19 +716,27 @@ async function saveState(){
             if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
             return;
           }
-          // Protect boss champions — always use whichever state has fewer participants
-          // (commissioner explicitly reduced from 6 to 2, stale clients shouldn't undo that)
-          const remoteChamps = remote.bossBattle?.champions || {};
-          const localChamps = S.bossBattle?.champions || {};
-          const remoteCount = Object.keys(remoteChamps).length;
-          const localCount = Object.keys(localChamps).length;
-          if(remoteCount < localCount && remote.bossBattle?.participants){
-            // Remote has fewer — commissioner explicitly set this, use it
-            S.bossBattle.champions = remoteChamps;
-            S.bossBattle.championSelectedAt = remote.bossBattle?.championSelectedAt || {};
+          // If battle is active and locked, ALWAYS preserve remote's champion list
+          // Stale clients cannot modify who's in an active battle
+          if(remote.bossBattle?.active && remote.bossBattle?.lockedChampions){
+            S.bossBattle.champions = remote.bossBattle.champions;
+            S.bossBattle.championSelectedAt = remote.bossBattle.championSelectedAt;
             S.bossBattle.participants = remote.bossBattle.participants;
             S.bossBattle.scaleFactor = remote.bossBattle.scaleFactor;
+            S.bossBattle.lockedChampions = true;
           }
+        }
+        // Final safety: if battle is locked, always restore champion list from remote
+        if(S.bossBattle?.lockedChampions && data?.state){
+          try{
+            const remote2 = JSON.parse(data.state);
+            if(remote2.bossBattle?.lockedChampions){
+              S.bossBattle.champions = remote2.bossBattle.champions;
+              S.bossBattle.championSelectedAt = remote2.bossBattle.championSelectedAt;
+              S.bossBattle.participants = remote2.bossBattle.participants;
+              S.bossBattle.scaleFactor = remote2.bossBattle.scaleFactor;
+            }
+          }catch(e2){}
         }
         const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
         await db.from('leagues').upsert(payload);
@@ -6316,6 +6324,7 @@ async function startBossBattle(){
 
   bb.participants = participants;
   bb.scaleFactor  = scaleFactor;
+  bb.lockedChampions = true; // prevents stale clients from modifying participant list
 
   // Auto-gift fresh starter balls to all participants
   if(!S.inventory) S.inventory = {};
