@@ -4849,9 +4849,12 @@ function renderBossBattleScene(){
     const pid = bb?.champions?.[m.id];
     const p = pid ? getPlayer(pid) : null;
     const portrait = p ? getActivePortrait(p.name) : null;
-    // Only count Round 2 FP (May 5 onward)
-    const R2_START = '20260504';
-    const fp = p ? Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=R2_START).reduce((sum,s)=>{
+    // Only count FP earned after champion was selected (and after R3 start)
+    const R3_START = '20260519';
+    const selAt = bb?.championSelectedAt?.[m.id];
+    const selDate = selAt ? selAt.slice(0,10).replace(/-/g,'') : R3_START;
+    const fpStartDate = selDate > R3_START ? selDate : R3_START;
+    const fp = p ? Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=fpStartDate).reduce((sum,s)=>{
       const acq=S.waiverAcquisitions?.[m.id+'_'+pid];
       return sum+((!acq||s.date>=acq)?s.fp||0:0);
     },0) : 0;
