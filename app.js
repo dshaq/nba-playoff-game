@@ -1620,9 +1620,9 @@ async function useInventoryItem(mid, enemyId){
   const key = mid+'_'+enemyId;
   if(S.bossBattle.itemsUsed[key]){ showToast('Already used this battle','error'); return; }
   const abilities = {
-    boss:    { name:'SLAM SURGE',   desc:'+50% bonus on next attack', icon:'🏀' },
-    minion1: { name:'AREA STRIKE',  desc:'Next attack hits ALL enemies', icon:'👹' },
-    minion2: { name:'SOUL STEAL',   desc:'Next attack deals 2× damage', icon:'💀' },
+    boss:    { name:"HE'S HEATING UP", desc:'Burn damage +10 HP each game night', icon:'🔥' },
+    minion1: { name:'DEATH BY MIDRANGE', desc:'Multi-hit: 100% + two bonus hits of 10 or 25%', icon:'🏀' },
+    minion2: { name:'WET SPOT',    desc:'150% dmg (max 75), but 10% chance you slip and miss', icon:'💧' },
   };
   const ability = abilities[enemyId];
   if(!ability){ showToast('Unknown ability','error'); return; }
@@ -1637,17 +1637,42 @@ async function useInventoryItem(mid, enemyId){
 // Apply active ability in directAttack
 function applyActiveAbility(mid, target, dmg){
   const bb = getBossBattle();
-  if(!bb?.activeAbility || bb.activeAbility.mid !== mid) return {dmg, targets:[target]};
+  if(!bb?.activeAbility || bb.activeAbility.mid !== mid) return {dmg, targets:[target], slipped:false, multiHits:null};
   const ability = bb.activeAbility.enemyId;
   S.bossBattle.activeAbility = null; // consume it
-  if(ability==='minion1'){ // AREA STRIKE — hit all
-    return {dmg, targets:['boss','minion1','minion2']};
-  } else if(ability==='minion2'){ // SOUL STEAL — 2x
-    return {dmg:dmg*2, targets:[target]};
-  } else if(ability==='boss'){ // SLAM SURGE — +50%
-    return {dmg:Math.round(dmg*1.5), targets:[target]};
+
+  if(ability === 'minion1'){
+    // DEATH BY MIDRANGE — multi-hit: full damage + two bonus hits of randomly 10% or 25%
+    const bonus1 = Math.random() < 0.5 ? Math.round(dmg * 0.25) : Math.round(dmg * 0.10);
+    const bonus2 = Math.random() < 0.5 ? Math.round(dmg * 0.25) : Math.round(dmg * 0.10);
+    const totalDmg = dmg + bonus1 + bonus2;
+    return {dmg: totalDmg, targets:[target], slipped:false, multiHits:[dmg, bonus1, bonus2]};
+
+  } else if(ability === 'minion2'){
+    // WET SPOT — 150% damage (max 75 total), but 10% chance you slip and miss
+    const slipped = Math.random() < 0.10;
+    if(slipped){
+      // FP is still spent (handled by attackLog push), but 0 damage dealt
+      return {dmg:0, targets:[target], slipped:true, multiHits:null};
+    }
+    const wetDmg = Math.min(75, Math.round(dmg * 1.5));
+    return {dmg:wetDmg, targets:[target], slipped:false, multiHits:null};
+
+  } else if(ability === 'boss'){
+    // HE'S HEATING UP — deals normal damage AND inflicts burn status on boss
+    // Burn ticks 10 HP per game night automatically
+    if(!S.bossBattle.statusEffects) S.bossBattle.statusEffects = {};
+    S.bossBattle.statusEffects['boss_burn'] = {
+      type: 'burn',
+      dmgPerNight: 10,
+      inflictedBy: mid,
+      inflictedAt: new Date().toISOString(),
+      lastTick: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    };
+    return {dmg, targets:['boss'], slipped:false, multiHits:null, burnApplied:true};
   }
-  return {dmg, targets:[target]};
+
+  return {dmg, targets:[target], slipped:false, multiHits:null};
 }
 
 
@@ -1718,9 +1743,9 @@ function showInventoryItems(mid){
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
   const abilities = {
-    boss:    {name:'SLAM SURGE',  desc:'Next attack +50% damage',        icon:'🏀', color:'#ff6600'},
-    minion1: {name:'AREA STRIKE', desc:'Next attack hits ALL enemies',    icon:'👹', color:'#aa44ff'},
-    minion2: {name:'SOUL STEAL',  desc:'Next attack deals 2× damage',    icon:'💀', color:'#ffffff'},
+    boss:    {name:"HE'S HEATING UP", desc:'Ignite boss — burns 10 HP each game night',        icon:'🔥', color:'#ff6600'},
+    minion1: {name:'DEATH BY MIDRANGE', desc:'Multi-hit: full dmg + two bonus rolls of 10 or 25%', icon:'🏀', color:'#aa44ff'},
+    minion2: {name:'WET SPOT',    desc:'150% dmg (max 75) — but 10% chance you slip!',    icon:'💧', color:'#4a9eff'},
   };
   const div = document.createElement('div');
   div.style.cssText = 'background:var(--panel);border:2px solid #aa44ff;width:100%;max-width:380px;font-family:var(--font-pixel),monospace;padding:16px';
@@ -1819,7 +1844,7 @@ function openBossZoneModal(mid){
     </div>
     ${caught.map(c=>{
       const color=colors[c.enemyId]||'#ffcc00';
-      const abilities={boss:'SLAM SURGE — next attack +50%',minion1:'AREA STRIKE — hit all enemies',minion2:'SOUL STEAL — 2× damage'};
+      const abilities={boss:"HE'S HEATING UP — burn status inflicted",minion1:'DEATH BY MIDRANGE — multi-hit attack',minion2:'WET SPOT — 150% dmg, 10% slip chance'};
       const caughtDate=new Date(c.caughtAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
       return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #0a0a1a">
         <div style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 4px ${color}"></div>
@@ -4642,6 +4667,8 @@ async function directAttack(mid, target){
   if(!S.bossBattle.attackLog) S.bossBattle.attackLog = [];
   S.bossBattle.attackLog.push({mid, pid:champPid, fp:availableFP, target, ts:new Date().toISOString()});
 
+  const _aColor = getAvatarColor(mid);
+
   // Apply active ability FIRST (AREA STRIKE, SOUL STEAL, SLAM SURGE)
   const dmg = availableFP;
   const abilityResult = applyActiveAbility(mid, target, dmg);
@@ -4673,14 +4700,67 @@ async function directAttack(mid, target){
 
   await saveStateNow();
   render();
-  showToast(`⚔ ${p?.name} deals ${finalDmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
 
-  // Trigger full attack FX
-  const _aColor = getAvatarColor(mid);
-  triggerAttackFX(target, dmg, _aColor);
+  // Toast and FX based on ability result
+  if(abilityResult.slipped){
+    showToast(`💧 WET SPOT — ${p?.name} slipped! 0 DMG dealt (FP still spent)`,'error');
+    triggerAttackFX(target, 0, '#4a9eff');
+  } else if(abilityResult.multiHits){
+    const [h1,h2,h3] = abilityResult.multiHits;
+    showToast(`🏀 DEATH BY MIDRANGE! ${h1}+${h2}+${h3} = ${finalDmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
+    triggerAttackFX(target, finalDmg, _aColor);
+  } else if(abilityResult.burnApplied){
+    showToast(`🔥 HE'S HEATING UP! ${finalDmg.toFixed(0)} DMG + BURN STATUS on ${targetLabels[target]}!`,'warn');
+    triggerAttackFX(target, finalDmg, '#ff4400');
+  } else {
+    showToast(`⚔ ${p?.name} deals ${finalDmg.toFixed(0)} DMG to ${targetLabels[target]}!`,'warn');
+    triggerAttackFX(target, finalDmg, _aColor);
+  }
 
   // Check if boss/minions defeated
   await checkBossVictoryV2();
+}
+
+// ── BURN STATUS TICK ─────────────────────────────────────────────
+// Called after stats refresh — ticks burn damage once per game night
+async function tickBurnStatus(){
+  const bb = S.bossBattle;
+  if(!bb?.active || !bb?.statusEffects?.boss_burn) return;
+  const burn = bb.statusEffects.boss_burn;
+  const today = new Date().toISOString().split('T')[0];
+  if(burn.lastTick === today) return; // already ticked today
+
+  // Check if any NBA game was played today
+  const todayStr = today.replace(/-/g,'');
+  const gamesPlayedToday = Object.values(S.playerStats||{}).some(s => s.date === todayStr);
+  if(!gamesPlayedToday) return; // no games, no tick
+
+  // Apply burn damage
+  const burnDmg = burn.dmgPerNight || 10;
+  bb.bossCurrentHP = Math.max(0, (bb.bossCurrentHP || 0) - burnDmg);
+  burn.lastTick = today;
+
+  // Log it
+  if(!bb.attackLog) bb.attackLog = [];
+  bb.attackLog.push({
+    mid: burn.inflictedBy,
+    pid: bb.champions?.[burn.inflictedBy],
+    fp: burnDmg,
+    target: 'boss',
+    ts: new Date().toISOString(),
+    burnTick: true,
+  });
+
+  await saveStateNow();
+  render();
+  showToast(`🔥 BAYOU FEVER ticks! ${burnDmg} burn damage to ${bb.bossLabel||'DUNKMAW'}!`, 'warn');
+
+  // If boss dies from burn, check victory
+  if(bb.bossCurrentHP <= 0){
+    if(!bb.finalBlows) bb.finalBlows = {};
+    if(!bb.finalBlows.boss) bb.finalBlows.boss = {mid: burn.inflictedBy, ts: new Date().toISOString(), burnKill: true};
+    await checkBossVictoryV2();
+  }
 }
 
 async function checkBossVictoryV2(){
@@ -4856,7 +4936,8 @@ function renderBossBattleScene(){
           <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
           </div>
-          <div style="font-size:5px;color:#ff660088;margin-top:1px">${bossCurrentHP<=0?'DEFEATED':bossCurrentHP+'/'+bossMaxHP}</div>
+          <div style="font-size:5px;color:#ff660088;margin-top:1px">${bossCurrentHP<=0?(Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId==='boss'&&c.battleRound===bb.round))?'DEFEATED & CAUGHT':'DEFEATED'):bossCurrentHP+'/'+bossMaxHP}</div>
+          ${bb?.statusEffects?.boss_burn ? `<div style="font-family:'Press Start 2P',monospace;font-size:4px;color:#ff4400;margin-top:2px">🔥 BURNING (-${bb.statusEffects.boss_burn.dmgPerNight}/night)</div>` : ''}
         </div>
       </div>
 
@@ -5069,6 +5150,14 @@ function renderBossBattleScene(){
         const p=getPlayer(a.pid);
         const target={boss:'🏀 '+(bb?.bossLabel||'DUNKMAW'),minion1:'👹 '+(bb?.minion1Name||'GUS'),minion2:'👹 '+(bb?.minion2Name||'RIMREAPER')}[a.target]||a.target;
         const ts=new Date(a.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        if(a.burnTick){
+          return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
+            <span style="color:#ff4400">🔥 BURN</span>
+            <span style="color:#ff4400">-${a.fp} HP</span>
+            <span>→ ${target}</span>
+            <span style="margin-left:auto;font-size:8px">${ts}</span>
+          </div>`;
+        }
         if(a.catchEvent){
           const ballIcon=a.ballType?BALL_TYPES[a.ballType]?.icon||'⚾':'⚾';
           return `<div style="display:flex;gap:6px;font-size:9px;padding:2px 0;border-bottom:1px solid #0a0a1a;color:var(--text3)">
@@ -8106,6 +8195,7 @@ async function boot(){
   const hasState=await loadState();
   // Backfill any missing playoff game stats in background
   backfillMissingStats();
+  tickBurnStatus(); // check burn on load
   backfillWNBAStats();
   refreshWNBAStats();
   setInterval(refreshWNBAStats, 300000); // refresh every 5 mins
