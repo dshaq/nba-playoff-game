@@ -694,15 +694,29 @@ let _pendingSave = null;
 
 async function saveState(){
   if(!S) return;
-  // Immediate local backup
+  // Stamp with version timestamp so stale clients don't overwrite newer saves
+  S._savedAt = Date.now();
   try{ localStorage.setItem('nba_playoff_2026',JSON.stringify(S)); }catch(e){}
   if(!db) return;
-  // Return a promise that resolves when the debounced save completes
   return new Promise(resolve => {
     _savePromiseResolve = resolve;
     if(_saveTimer) clearTimeout(_saveTimer);
     _saveTimer = setTimeout(async()=>{
       try{
+        // Check we're not overwriting a newer save
+        const {data} = await db.from('leagues').select('state').eq('id',LEAGUE_ID).single();
+        if(data?.state){
+          const remote = JSON.parse(data.state);
+          if(remote._savedAt && remote._savedAt > S._savedAt){
+            console.warn('saveState: remote is newer, pulling instead of overwriting');
+            // Pull remote state instead
+            S = remote;
+            migrateState();
+            render();
+            if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
+            return;
+          }
+        }
         const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
         await db.from('leagues').upsert(payload);
       }catch(e){ console.warn('saveState error:',e.message); }
@@ -710,7 +724,7 @@ async function saveState(){
         _saveTimer = null;
         if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
       }
-    }, 3000); // 3 second debounce — batches rapid saves
+    }, 3000);
   });
 }
 
@@ -718,6 +732,7 @@ async function saveState(){
 async function saveStateNow(){
   if(!S) return;
   if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; }
+  S._savedAt = Date.now();
   try{ localStorage.setItem('nba_playoff_2026',JSON.stringify(S)); }catch(e){}
   if(!db) return;
   const payload = {id:LEAGUE_ID, state:JSON.stringify(S), updated_at:new Date().toISOString()};
@@ -4830,7 +4845,7 @@ function renderBossBattleScene(){
   const minion2CurrentHP = S.bossBattle?.minion2CurrentHP ?? minion2MaxHP;
 
   // Champion data
-  const champions = S.managers.map(m=>{
+  const champions = S.managers.filter(m=>bb?.champions?.[m.id]).map(m=>{
     const pid = bb?.champions?.[m.id];
     const p = pid ? getPlayer(pid) : null;
     const portrait = p ? getActivePortrait(p.name) : null;
