@@ -583,7 +583,7 @@ function getAcquiredRound(mid, pid){
   // Date string — convert to round number
   const d = parseInt(val);
   if(d >= 20260604) return 4;
-  if(d >= 20260519) return 3;
+  if(d >= 20260518) return 3;
   if(d >= 20260504) return 2;
   if(d >= 20260418) return 1;
   return 0;
@@ -1452,7 +1452,7 @@ function getChampionAvailFP(mid){
   const pid = bb.champions?.[mid];
   if(!pid) return 0;
   const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
-  const ROUND_START = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   // Sum current round stats earned on or after selection date
   const earned = Object.values(S.playerStats||{})
@@ -2946,7 +2946,7 @@ function renderMyTeam(){
     const t=getTeam(p.team); if(!t) return;
     // approximate round by game date vs round start dates
     const d=parseInt(s.date||0);
-    const r = d>=20260604?4:d>=20260519?3:d>=20260504?2:1;
+    const r = d>=20260604?4:d>=20260518?3:d>=20260504?2:1;
     if(!roundDates[r]) roundDates[r]=[];
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(!acqDate||s.date>=acqDate) roundDates[r].push(s.fp||0);
@@ -4895,7 +4895,7 @@ function renderBossBattleScene(){
     const portrait = p ? getActivePortrait(p.name) : null;
     // Only count FP earned after champion was selected
     const selAt = bb?.championSelectedAt?.[m.id];
-    const fpStartDate = selAt ? selAt.slice(0,10).replace(/-/g,'') : '20260519';
+    const fpStartDate = selAt ? selAt.slice(0,10).replace(/-/g,'') : '20260518';
     const fp = p ? Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=fpStartDate).reduce((sum,s)=>{
       const acq=S.waiverAcquisitions?.[m.id+'_'+pid];
       return sum+((!acq||s.date>=acq)?s.fp||0:0);
@@ -6142,7 +6142,7 @@ function openChampionDetail(mid, pid){
   const attacks = (bb?.attackLog||[]).filter(a=>a.mid===mid).reverse();
   const totalDmg = attacks.reduce((s,a)=>s+a.fp,0);
   const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
-  const ROUND_START = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   const existing = document.getElementById('champion-detail-modal');
   if(existing) existing.remove();
@@ -6241,7 +6241,7 @@ function openChampionDetail(mid, pid){
   function renderBoxScores(){
     btnBox.style.borderBottomColor = aColor; btnBox.style.background = aColor+'11'; btnBox.style.color = aColor;
     btnAtk.style.borderBottomColor = 'transparent'; btnAtk.style.background = 'transparent'; btnAtk.style.color = 'var(--text3)';
-    const roundStart = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
+    const roundStart = S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
     const r2stats = Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=roundStart).sort((a,b)=>b.date.localeCompare(a.date));
     content_el.innerHTML = r2stats.length ? r2stats.map(s=>{
       const d=s.date; const dateStr=d.slice(4,6)+'/'+d.slice(6,8);
