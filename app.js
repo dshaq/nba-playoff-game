@@ -574,10 +574,19 @@ function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUppe
 function buildSnake(n,picks){const o=[];for(let r=0;r<picks;r++){const row=Array.from({length:n},(_,i)=>i);o.push(...(r%2===0?row:[...row].reverse()));}return o;}
 function getAcquiredRound(mid, pid){
   // Returns the round AFTER which the player was acquired (0 = drafted before playoffs)
-  // Bonuses only count for rounds survived AFTER acquisition
   if(!S.waiverAcquisitions) return 0;
   const key = mid+'_'+pid;
-  return S.waiverAcquisitions[key] || 0;
+  const val = S.waiverAcquisitions[key];
+  if(!val) return 0;
+  // Handle both formats: round number (legacy) or date string e.g. '20260510'
+  if(typeof val === 'number') return val;
+  // Date string — convert to round number
+  const d = parseInt(val);
+  if(d >= 20260604) return 4;
+  if(d >= 20260519) return 3;
+  if(d >= 20260504) return 2;
+  if(d >= 20260418) return 1;
+  return 0;
 }
 
 function bonusForPlayer(pid, mid){
@@ -1443,15 +1452,15 @@ function getChampionAvailFP(mid){
   const pid = bb.champions?.[mid];
   if(!pid) return 0;
   const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
-  const R2_START = '20260504';
+  const ROUND_START = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
 
-  // Sum R2 stats earned on or after selection date
+  // Sum current round stats earned on or after selection date
   const earned = Object.values(S.playerStats||{})
-    .filter(s => s.pid===pid && s.date >= R2_START)
+    .filter(s => s.pid===pid && s.date >= ROUND_START)
     .reduce((sum,s)=>{
       // Only exclude dates STRICTLY BEFORE selection date
       // Same-day games count since the game was likely played after selection
-      const cutoff = selectedAt ? selectedAt.slice(0,10).replace(/-/g,'') : R2_START;
+      const cutoff = selectedAt ? selectedAt.slice(0,10).replace(/-/g,'') : ROUND_START;
       if(s.date < cutoff) return sum;
       const acq = S.waiverAcquisitions?.[mid+'_'+pid];
       return sum + ((!acq||s.date>=acq) ? (s.fp||0) : 0);
@@ -6133,7 +6142,7 @@ function openChampionDetail(mid, pid){
   const attacks = (bb?.attackLog||[]).filter(a=>a.mid===mid).reverse();
   const totalDmg = attacks.reduce((s,a)=>s+a.fp,0);
   const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
-  const R2_START = '20260504';
+  const ROUND_START = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
 
   const existing = document.getElementById('champion-detail-modal');
   if(existing) existing.remove();
@@ -6144,7 +6153,7 @@ function openChampionDetail(mid, pid){
   modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
 
   const r2FP = Object.values(S.playerStats||{})
-    .filter(s=>s.pid===pid&&s.date>=R2_START)
+    .filter(s=>s.pid===pid&&s.date>=ROUND_START)
     .reduce((sum,s)=>{const acq=S.waiverAcquisitions?.[mid+'_'+pid];return sum+((!acq||s.date>=acq)?(s.fp||0):0);},0);
 
   const div = document.createElement('div');
@@ -6232,7 +6241,8 @@ function openChampionDetail(mid, pid){
   function renderBoxScores(){
     btnBox.style.borderBottomColor = aColor; btnBox.style.background = aColor+'11'; btnBox.style.color = aColor;
     btnAtk.style.borderBottomColor = 'transparent'; btnAtk.style.background = 'transparent'; btnAtk.style.color = 'var(--text3)';
-    const r2stats = Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=R2_START).sort((a,b)=>b.date.localeCompare(a.date));
+    const roundStart = S.round>=3 ? '20260519' : S.round>=2 ? '20260504' : '20260418';
+    const r2stats = Object.values(S.playerStats||{}).filter(s=>s.pid===pid&&s.date>=roundStart).sort((a,b)=>b.date.localeCompare(a.date));
     content_el.innerHTML = r2stats.length ? r2stats.map(s=>{
       const d=s.date; const dateStr=d.slice(4,6)+'/'+d.slice(6,8);
       return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border2);font-size:10px">
@@ -6901,7 +6911,7 @@ async function refreshLiveStats(){
     for(const dateStr of [fmt(today), fmt(yesterday)]){
       if(dateStr < PLAYOFFS_START) continue; // skip play-in dates
       try{
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3&dates=${dateStr}`);
         const data = await res.json();
         allEvents = allEvents.concat((data?.events||[]).map(e=>({...e,_dateStr:dateStr})));
       }catch(e){}
