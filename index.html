@@ -1153,20 +1153,48 @@ function getTokenImg(size){
   return '<span style="font-size:'+(size-4)+'px">🏀</span>';
 }
 
+const LOGOS_CACHE_KEY = 'nba_custom_logos_cache';
+const LOGOS_CACHE_TS_KEY = 'nba_custom_logos_cache_ts';
+const LOGOS_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+
+function loadLogosFromLocalStorage(){
+  try{
+    const ts = parseInt(localStorage.getItem(LOGOS_CACHE_TS_KEY)||'0');
+    if(Date.now() - ts > LOGOS_CACHE_TTL) return false;
+    const raw = localStorage.getItem(LOGOS_CACHE_KEY);
+    if(!raw) return false;
+    CUSTOM_LOGOS = JSON.parse(raw);
+    const _tl = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()==='token');
+    if(_tl) TOKEN_IMG = _tl.dataUri;
+    console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos from cache');
+    return true;
+  }catch(e){ return false; }
+}
+
+function saveLogosToLocalStorage(){
+  try{
+    localStorage.setItem(LOGOS_CACHE_KEY, JSON.stringify(CUSTOM_LOGOS));
+    localStorage.setItem(LOGOS_CACHE_TS_KEY, Date.now().toString());
+  }catch(e){ console.warn('Could not cache logos to localStorage:', e); }
+}
+
 async function loadCustomLogos(){
+  if(loadLogosFromLocalStorage()) return;
   try{
     const {data} = await db.from('leagues').select('state').eq('id','nba-custom-logos-2026').single();
     if(data?.state){
       CUSTOM_LOGOS = JSON.parse(data.state);
-      console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos');
+      console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos from Supabase');
       const _tl = CUSTOM_LOGOS.find(l=>l.name.toLowerCase()==='token');
       if(_tl) TOKEN_IMG = _tl.dataUri;
+      saveLogosToLocalStorage();
     }
   }catch(e){ /* none yet */ }
 }
 
 async function saveCustomLogos(){
   await db.from('leagues').upsert({id:'nba-custom-logos-2026', state:JSON.stringify(CUSTOM_LOGOS)});
+  saveLogosToLocalStorage();
 }
 
 // Combined: index 0-11 = ball themes, 12+ = custom logos

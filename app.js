@@ -4940,7 +4940,7 @@ function renderBossBattleScene(){
     </div>
 
     <!-- ══ BATTLE ARENA ══ -->
-    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?220:280}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:0">
+    <div id="boss-arena" style="position:relative;width:100%;height:${IS_MOBILE?220:360}px;overflow:hidden;border:3px solid #2a1a0a;margin-bottom:0">
       <!-- Background: custom image if uploaded, else canvas animation -->
       ${(()=>{
         const bg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Background');
@@ -4961,15 +4961,15 @@ function renderBossBattleScene(){
                   const hurtImg = CUSTOM_LOGOS.find(l=>l.name===hurtName)?.dataUri;
                   const showImg = hurtImg || mn.img;
                   return showImg
-                    ? `<img id="enemy-sprite-${mn.key}" src="${showImg}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;opacity:.5;filter:grayscale(.7)"/>`
+                    ? `<img id="enemy-sprite-${mn.key}" src="${showImg}" style="width:${IS_MOBILE?52:100}px;height:${IS_MOBILE?52:100}px;object-fit:contain;image-rendering:pixelated;opacity:.5;filter:grayscale(.7)"/>`
                     : `<div style="font-size:24px;opacity:.4">💀</div>`;
                 })()
               : mn.img
-                ? `<img id="enemy-sprite-${mn.key}" src="${mn.img}" style="width:${IS_MOBILE?52:68}px;height:${IS_MOBILE?52:68}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`
-                : `<div id="enemy-sprite-${mn.key}" style="font-size:${IS_MOBILE?36:48}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`
+                ? `<img id="enemy-sprite-${mn.key}" src="${mn.img}" style="width:${IS_MOBILE?52:100}px;height:${IS_MOBILE?52:100}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 2.8s ease-in-out infinite .3s"/>`
+                : `<div id="enemy-sprite-${mn.key}" style="font-size:${IS_MOBILE?36:72}px;animation:boss-float 2.8s ease-in-out infinite .3s">👹</div>`
             }
             <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};margin-top:2px">${mn.label}</div>
-            <div style="height:4px;width:${IS_MOBILE?52:68}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
+            <div style="height:4px;width:${IS_MOBILE?52:100}px;background:#0a0a0a;border:1px solid #33333355;margin-top:2px">
               <div style="height:100%;width:${Math.max(0,Math.round(mn.hp/mn.max*100))}%;background:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff':'#aa44ff'};transition:width .5s;box-shadow:0 0 4px ${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff88':'#aa44ff88'}"></div>
             </div>
             <div style="font-size:5px;color:${mn.label===(bb?.minion2Name||'RIMREAPER')?'#ffffff77':'#aa44ff99'};margin-top:1px;text-align:center">${mn.hp<=0?(Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId===mn.key&&c.battleRound===bb.round))?'DEFEATED & CAUGHT':'DEFEATED'):mn.hp+'/'+mn.max}</div>
@@ -4983,17 +4983,17 @@ function renderBossBattleScene(){
                 const hurtImg = CUSTOM_LOGOS.find(l=>l.name==='Boss_Main_hurt')?.dataUri;
                 const showImg = hurtImg || bossSunImg;
                 return showImg
-                  ? `<img id="enemy-sprite-boss" src="${showImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;opacity:.55;filter:grayscale(.6)"/>`
+                  ? `<img id="enemy-sprite-boss" src="${showImg}" style="width:${IS_MOBILE?90:180}px;height:${IS_MOBILE?90:180}px;object-fit:contain;image-rendering:pixelated;opacity:.55;filter:grayscale(.6)"/>`
                   : `<div style="font-size:${IS_MOBILE?56:72}px;opacity:.4">💀</div>`;
               })()
             : bossSunImg
-              ? `<img id="enemy-sprite-boss" src="${bossSunImg}" style="width:${IS_MOBILE?90:120}px;height:${IS_MOBILE?90:120}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
-              : `<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:84}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`
+              ? `<img id="enemy-sprite-boss" src="${bossSunImg}" style="width:${IS_MOBILE?90:180}px;height:${IS_MOBILE?90:180}px;object-fit:contain;image-rendering:pixelated;animation:boss-float 3s ease-in-out infinite${bossCurrentHP/bossMaxHP<.3?',boss-shake .12s infinite':''}"/>`
+              : `<div id="enemy-sprite-boss" style="font-size:${IS_MOBILE?64:120}px;animation:boss-float 3s ease-in-out infinite">🏀</div>`
           }
           <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff6600;margin-top:3px;text-shadow:0 0 8px #ff660088">${(bb?.bossLabel||'DUNKMAW').toUpperCase()}</div>
           ${bb?.scaleFactor && bb.scaleFactor < 1 ? `<div style="font-family:'Press Start 2P',monospace;font-size:4px;color:#555588;margin-top:2px">${bb.participants}/${S.managers?.length||6} PLAYERS · HP ${Math.round(bb.scaleFactor*100)}%</div>` : ''}
           ${bossCurrentHP<=0&&mid!==null&&mid!=='viewer'?`<button onclick="showCatchMenu('boss')" style="font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 6px;background:rgba(255,204,0,.2);border:1px solid #ffcc00;color:#ffcc00;cursor:pointer;margin-top:2px">⚾ CATCH</button>`:''}
-          <div style="height:5px;width:${IS_MOBILE?90:120}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
+          <div style="height:5px;width:${IS_MOBILE?90:180}px;background:#0a0a0a;border:1px solid #ff660033;margin-top:3px;overflow:hidden">
             <div style="height:100%;width:${Math.max(0,Math.round(bossCurrentHP/bossMaxHP*100))}%;background:${bossCurrentHP/bossMaxHP>.5?'#ff6600':bossCurrentHP/bossMaxHP>.25?'#ff9900':'#ff3344'};transition:width .6s;box-shadow:0 0 6px #ff660088"></div>
           </div>
           <div style="font-size:5px;color:#ff660088;margin-top:1px">${bossCurrentHP<=0?(Object.values(S.inventory||{}).some(inv=>(inv.caught||[]).some(c=>c.enemyId==='boss'&&c.battleRound===bb.round))?'DEFEATED & CAUGHT':'DEFEATED'):bossCurrentHP+'/'+bossMaxHP}</div>
@@ -5018,10 +5018,10 @@ function renderBossBattleScene(){
       <div style="font-size:6px;color:#666;text-align:center;letter-spacing:.1em;margin-bottom:5px">⚔ CHAMPIONS</div>
       <div style="display:flex;justify-content:center;align-items:flex-start;gap:${champions.length<=2?'20px':champions.length<=3?'12px':'4px'};flex-wrap:wrap">
         ${champions.map(c=>`
-        <div style="text-align:center;width:${champions.length===1?'60%':champions.length===2?(IS_MOBILE?'40%':'35%'):champions.length===3?(IS_MOBILE?'28%':'26%'):champions.length<=4?(IS_MOBILE?'22%':'20%'):(IS_MOBILE?'15%':'16%')};opacity:${c.isElim?.4:1}">
+        <div style="text-align:center;width:${champions.length===1?(IS_MOBILE?'60%':'22%'):champions.length===2?(IS_MOBILE?'40%':'22%'):champions.length===3?(IS_MOBILE?'28%':'20%'):champions.length<=4?(IS_MOBILE?'22%':'18%'):(IS_MOBILE?'15%':'14%')};opacity:${c.isElim?.4:1}">
           <!-- Portrait — click opens attack log or box scores -->
           <div onclick="${c.p?'openChampionDetail('+c.m.id+','+c.p.id+')':''}"
-            style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${(()=>{const inj=c.p?getESPNInjury(c.p.name):null;const isOut=inj&&(inj.status==='Out'||inj.status==='Day-To-Day');return isOut?'#ff3344':c.p?c.aColor:'#333';})()};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
+            style="width:100%;aspect-ratio:1;max-height:${IS_MOBILE?'none':'180px'};overflow:hidden;border:2px solid ${(()=>{const inj=c.p?getESPNInjury(c.p.name):null;const isOut=inj&&(inj.status==='Out'||inj.status==='Day-To-Day');return isOut?'#ff3344':c.p?c.aColor:'#333';})()};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
             ${c.portrait?`<img src="${c.portrait}" style="width:100%;height:100%;object-fit:cover;object-position:center top;image-rendering:pixelated"/>`
               :c.p?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;color:${c.aColor}">${c.p.team}</div>`
               :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#444">?</div>`}
@@ -6277,16 +6277,40 @@ async function handleBossAssetUpload(input){
   const status = document.getElementById('boss-asset-status');
   if(status) status.textContent = 'Reading '+file.name+'...';
 
-  // Read as raw base64 — preserves GIF animation, no canvas conversion
-  const dataUri = await new Promise(resolve=>{
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.readAsDataURL(file);
-  });
+  const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+  const isBg = _pendingBossAssetName === 'Boss_Background' || _pendingBossAssetName === 'Boss_Zone_bg';
 
-  // Store in CUSTOM_LOGOS (replace existing with same name)
+  let dataUri;
+  if(isGif || isBg){
+    // GIFs and backgrounds: keep raw — canvas kills animation
+    dataUri = await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  } else {
+    // PNG/JPEG sprites: compress to max 400x400 at 85% quality
+    dataUri = await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const maxSize = 400;
+          const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/png')); // PNG for sprites to keep transparency
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   CUSTOM_LOGOS = CUSTOM_LOGOS.filter(l=>l.name!==_pendingBossAssetName);
-  // For background, detect dominant color; for sprites use a default
   const color = _pendingBossAssetName==='Boss_Background'?'#8b3a00':'#ff6600';
   CUSTOM_LOGOS.push({name:_pendingBossAssetName, dataUri, color});
 
@@ -7766,20 +7790,20 @@ async function recompressAllPortraits(){
 }
 
 async function resizePortrait(file){
-  // Resize to 200x200 at 72% quality — sharp enough for thumbnails, much smaller
+  // Resize to 320x320 at 82% quality — good balance of quality and size
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 200; canvas.height = 200;
+        canvas.width = 320; canvas.height = 320;
         const ctx = canvas.getContext('2d');
         const size = Math.min(img.width, img.height);
         const sx = (img.width - size) / 2;
         const sy = 0;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 320, 320);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
       };
       img.src = e.target.result;
     };
