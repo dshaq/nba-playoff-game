@@ -7726,22 +7726,60 @@ async function handleAnimationUpload(input){
   input.value = '';
 }
 
+async function recompressAllPortraits(){
+  if(!isCommissioner && currentManagerId !== 4){ showToast('Commissioner only','error'); return; }
+  const names = Object.keys(PLAYER_PORTRAITS);
+  if(!names.length){ showToast('No portraits to compress','error'); return; }
+
+  showToast(`Recompressing ${names.length} portraits...`, 'info');
+  let count = 0;
+  let savedBytes = 0;
+
+  for(const name of names){
+    const portraits = Array.isArray(PLAYER_PORTRAITS[name])
+      ? PLAYER_PORTRAITS[name] : [PLAYER_PORTRAITS[name]];
+
+    const compressed = await Promise.all(portraits.map(src => new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 300; canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+        const size = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width-size)/2, 0, size, size, 0, 0, 300, 300);
+        const newUri = canvas.toDataURL('image/jpeg', 0.70);
+        savedBytes += (src.length - newUri.length);
+        resolve(newUri);
+      };
+      img.onerror = () => resolve(src); // keep original if fails
+      img.src = src;
+    })));
+
+    PLAYER_PORTRAITS[name] = compressed.length === 1 ? compressed[0] : compressed;
+    count++;
+  }
+
+  // Save
+  await savePortraits();
+  const savedKB = Math.round(savedBytes / 1024);
+  showToast(`✓ Recompressed ${count} portraits, saved ~${savedKB}KB`, 'success');
+}
+
 async function resizePortrait(file){
-  // Resize to 300x300 at 70% quality — keeps total DB size manageable
+  // Resize to 200x200 at 72% quality — sharp enough for thumbnails, much smaller
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 300; canvas.height = 300;
+        canvas.width = 200; canvas.height = 200;
         const ctx = canvas.getContext('2d');
-        // Crop to square from center-top
         const size = Math.min(img.width, img.height);
         const sx = (img.width - size) / 2;
-        const sy = 0; // top-aligned
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 300, 300);
-        resolve(canvas.toDataURL('image/jpeg', 0.70));
+        const sy = 0;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
       };
       img.src = e.target.result;
     };
@@ -7786,7 +7824,7 @@ function openPortraitManager(){
     +'<span style="font-family:var(--font-pixel),monospace;font-size:9px;color:var(--accent3)">🖼 PORTRAIT MANAGER</span>'
     +"<button onclick=\"document.getElementById('portrait-mgr-modal').remove()\" style=\"background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1\">×</button>"
     +'</div>'
-    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center">Click ✕ to delete. Portraits left to right.<button onclick="forceRefreshPortraits().then(()=>{document.getElementById(\'portrait-mgr-modal\')?.remove();openPortraitManager();})" style="font-family:var(--font-pixel),monospace;font-size:7px;padding:3px 7px;background:rgba(74,158,255,.15);border:1px solid #4a9eff;color:#4a9eff;cursor:pointer">↺ REFRESH</button></div>'
+    +'<div style="font-size:12px;color:var(--text3);padding:.5rem .875rem;border-bottom:1px solid var(--border2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center">Click ✕ to delete. Portraits left to right.<div style="display:flex;gap:6px"><button onclick="recompressAllPortraits().then(()=>{document.getElementById(\'portrait-mgr-modal\')?.remove();openPortraitManager();})" style="font-family:var(--font-pixel),monospace;font-size:7px;padding:3px 7px;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);cursor:pointer">⚡ COMPRESS</button><button onclick="forceRefreshPortraits().then(()=>{document.getElementById(\'portrait-mgr-modal\')?.remove();openPortraitManager();})" style="font-family:var(--font-pixel),monospace;font-size:7px;padding:3px 7px;background:rgba(74,158,255,.15);border:1px solid #4a9eff;color:#4a9eff;cursor:pointer">↺ REFRESH</button></div></div>'
     +'<div id="portrait-mgr-grid" style="overflow-y:auto;flex:1;padding:.5rem .875rem">'+buildGrid()+'</div>'
     +'</div>';
 
