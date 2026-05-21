@@ -5016,9 +5016,9 @@ function renderBossBattleScene(){
     <!-- ══ CHAMPIONS ROW — below arena ══ -->
     <div style="background:#08040f;border:3px solid #2a1a0a;border-top:none;padding:8px 4px 6px;margin-bottom:8px">
       <div style="font-size:6px;color:#666;text-align:center;letter-spacing:.1em;margin-bottom:5px">⚔ CHAMPIONS</div>
-      <div style="display:flex;justify-content:space-around;align-items:flex-start">
+      <div style="display:flex;justify-content:center;align-items:flex-start;gap:${champions.length<=2?'20px':champions.length<=3?'12px':'4px'};flex-wrap:wrap">
         ${champions.map(c=>`
-        <div style="text-align:center;width:${IS_MOBILE?'15':'16'}%;opacity:${c.isElim?.4:1}">
+        <div style="text-align:center;width:${champions.length===1?'60%':champions.length===2?(IS_MOBILE?'40%':'35%'):champions.length===3?(IS_MOBILE?'28%':'26%'):champions.length<=4?(IS_MOBILE?'22%':'20%'):(IS_MOBILE?'15%':'16%')};opacity:${c.isElim?.4:1}">
           <!-- Portrait — click opens attack log or box scores -->
           <div onclick="${c.p?'openChampionDetail('+c.m.id+','+c.p.id+')':''}"
             style="width:100%;aspect-ratio:1;overflow:hidden;border:2px solid ${(()=>{const inj=c.p?getESPNInjury(c.p.name):null;const isOut=inj&&(inj.status==='Out'||inj.status==='Day-To-Day');return isOut?'#ff3344':c.p?c.aColor:'#333';})()};background:#0a0510;position:relative;cursor:${c.p?'pointer':'default'}">
@@ -5036,7 +5036,7 @@ function renderBossBattleScene(){
             })()}
           </div>
           <!-- Manager name -->
-          <div style="font-size:5px;color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
+          <div style="font-size:${champions.length<=2?'8px':champions.length<=3?'6px':'5px'};color:${c.aColor};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.m.name.toUpperCase()}</div>
           <!-- HP bar -->
           <div style="height:6px;background:#0a0a1a;margin-top:2px;border-radius:1px;overflow:hidden" title="HP: ${c.hp}%">
             <div style="height:100%;width:${c.hp}%;background:${c.aColor};opacity:${c.isElim?.3:1};transition:width .5s;box-shadow:0 0 6px ${c.aColor}99"></div>
@@ -5046,7 +5046,7 @@ function renderBossBattleScene(){
             <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:${c.aColor};opacity:.6;transition:width .5s"></div>
           </div>
           <!-- Available FP -->
-          ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:5px;color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
+          ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:${champions.length<=2?'8px':'5px'};color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
           ${(()=>{
             if(!c.isMe || bb?.defeated || !c.p) return '';
             const inj = getESPNInjury(c.p.name);
@@ -6325,11 +6325,32 @@ async function toggleBossRecruitBanner(){
 
 async function startBossBattle(){
   await saveBossConfig();
-  if(!S.bossBattle.champions) S.bossBattle.champions={};
-  S.bossBattle.active = true;
+  if(!S.bossBattle) S.bossBattle = {};
+
+  // Only keep champions who explicitly opted in via recruit banner (have a selectedAt timestamp)
+  // This prevents ANY Round N-1 carryover
+  const cleanChampions = {};
+  const cleanSelectedAt = {};
+  for(const [mid, pid] of Object.entries(S.bossBattle.champions||{})){
+    if(S.bossBattle.championSelectedAt?.[mid]){
+      cleanChampions[mid] = pid;
+      cleanSelectedAt[mid] = S.bossBattle.championSelectedAt[mid];
+    }
+  }
+  S.bossBattle.champions = cleanChampions;
+  S.bossBattle.championSelectedAt = cleanSelectedAt;
+
+  // Wipe all previous battle logs
+  S.bossBattle.attackLog = [];
+  S.bossBattle.finalBlows = {};
+  S.bossBattle.catchAttempts = {};
+  S.bossBattle.itemsUsed = {};
+  S.bossBattle.activeAbility = null;
+  S.bossBattle.statusEffects = {};
   S.bossBattle.defeated = false;
   S.bossBattle.defeatedTs = null;
   S.bossBattle.badgesAwarded = false;
+  S.bossBattle.active = true;
 
   // ── Participant-based HP scaling ──────────────────────────────
   // Count managers who have opted in (selected a champion)
@@ -6390,11 +6411,42 @@ async function startBossBattle(){
 
 async function endBossBattle(){
   if(!isCommissioner) return;
-  if(!confirm('End the Boss Battle?')) return;
-  S.bossBattle.active = false;
-  await saveState();
+  if(!confirm('End the Boss Battle? This will fully reset all battle state.')) return;
+
+  // Full wipe — no carryover to next battle
+  S.bossBattle = {
+    active: false,
+    defeated: false,
+    round: S.round || 3,
+    // Preserve names/HP config so commissioner can reuse/edit
+    bossLabel: S.bossBattle.bossLabel,
+    minion1Name: S.bossBattle.minion1Name,
+    minion2Name: S.bossBattle.minion2Name,
+    bossHP: S.bossBattle.bossHP,
+    minion1HP: S.bossBattle.minion1HP,
+    minion2HP: S.bossBattle.minion2HP,
+    bossCurrentHP: 0,
+    minion1CurrentHP: 0,
+    minion2CurrentHP: 0,
+    reward: S.bossBattle.reward,
+    // Everything else wiped clean
+    champions: {},
+    championSelectedAt: {},
+    attackLog: [],
+    finalBlows: {},
+    catchAttempts: {},
+    itemsUsed: {},
+    activeAbility: null,
+    lockedChampions: false,
+    participants: 0,
+    scaleFactor: null,
+    statusEffects: {},
+  };
+  S.bossRecruitActive = false;
+
+  await saveStateNow();
   render();
-  showToast('Boss Battle ended','info');
+  showToast('Boss Battle ended — fully reset for next battle', 'info');
 }
 
 
