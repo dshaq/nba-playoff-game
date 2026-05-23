@@ -1007,109 +1007,107 @@ function openChampionPicker(mid){
 function showBossChampionPopup(forceMid){
   if(document.getElementById('boss-champion-popup')) return;
   const mid = forceMid !== undefined ? forceMid : currentManagerId;
-  const bb = getBossBattle();
   const m = S.managers.find(x=>x.id===mid);
   const roster = (S.rosters[mid]||[]).map(pid=>getPlayer(pid)).filter(Boolean);
   const aColor = getAvatarColor(mid);
 
-  // Auto-select candidate = highest FP earner on roster
-  const topPlayer = roster.map(p=>({p, fp:playerStatScore(p.id,mid)}))
-    .sort((a,b)=>b.fp-a.fp)[0];
-
-  // Deadline countdown
-  const deadline = new Date(BOSS_DEADLINE+'-04:00'); // ET
-  const now = new Date();
-  const hoursLeft = Math.max(0, Math.round((deadline-now)/36e5));
+  // Sort by total FP desc
+  const sortedRoster = [...roster].map(p=>({p, fp:playerStatScore(p.id,mid)})).sort((a,b)=>b.fp-a.fp);
+  let hoveredPid = sortedRoster[0]?.p?.id || null;
 
   const modal = document.createElement('div');
   modal.id = 'boss-champion-popup';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem;font-family:\'Press Start 2P\',monospace';
 
-  // Medieval pixel font styling
+  function buildGrid(){
+    return sortedRoster.map(({p, fp}) => {
+      const portrait = getActivePortrait(p.name);
+      const isHovered = p.id === hoveredPid;
+      const teamColor = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+      return `<div onclick="window._bossHover(${p.id})" ondblclick="window._bossSelect(${p.id})" style="
+        cursor:pointer;position:relative;overflow:hidden;
+        border:2px solid ${isHovered?teamColor:teamColor+'44'};
+        background:${isHovered?teamColor+'22':'#0a0a1a'};
+        aspect-ratio:1;transition:border-color 0.1s;
+      ">
+        ${portrait
+          ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;image-rendering:auto">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:${teamColor}">${p.name.split(' ').map(w=>w[0]).join('')}</div>`
+        }
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.75);font-size:4px;color:${isHovered?teamColor:'#aaa'};text-align:center;padding:2px 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ').pop()}</div>
+        ${isHovered?`<div style="position:absolute;inset:0;border:2px solid ${teamColor};pointer-events:none"></div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  function buildFeatured(){
+    const entry = sortedRoster.find(x=>x.p.id===hoveredPid);
+    if(!entry) return '';
+    const {p, fp} = entry;
+    const portrait = getActivePortrait(p.name);
+    const teamColor = (TEAM_LOGOS[p.team]?.color)||'#4a9eff';
+    const t = getTeam(p.team);
+    return `
+      <div style="width:100%;aspect-ratio:1;border:2px solid ${teamColor};background:#0a0a1a;overflow:hidden;position:relative">
+        ${portrait
+          ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:${teamColor}">${p.name.split(' ').map(w=>w[0]).join('')}</div>`
+        }
+        <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:8px 6px 6px">
+          <div style="font-size:8px;color:${teamColor}">${p.name.split(' ').pop().toUpperCase()}</div>
+          <div style="font-size:5px;color:#666;margin-top:2px">${p.team} · ${p.pos||''}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:7px;color:#ffd700;text-align:center">${fp.toFixed(0)} FP</div>
+      <div style="font-size:5px;color:#444466;text-align:center;margin-top:3px">${t?.survivedRounds>=3?'CONF FINALS':'ACTIVE'}</div>
+    `;
+  }
+
   modal.innerHTML = `
-  <div style="
-    background:#0a0510;
-    border:4px solid #8b6914;
-    box-shadow:0 0 0 2px #000,0 0 0 4px #8b6914,0 0 30px rgba(139,105,20,.4),inset 0 0 30px rgba(0,0,0,.8);
-    max-width:480px;width:100%;
-    font-family:'Press Start 2P',monospace;
-    image-rendering:pixelated;
-    position:relative;
-    overflow:hidden;
-  ">
-    <!-- Corner decorations -->
-    <div style="position:absolute;top:4px;left:4px;width:12px;height:12px;border-top:3px solid #c8a020;border-left:3px solid #c8a020"></div>
-    <div style="position:absolute;top:4px;right:4px;width:12px;height:12px;border-top:3px solid #c8a020;border-right:3px solid #c8a020"></div>
-    <div style="position:absolute;bottom:4px;left:4px;width:12px;height:12px;border-bottom:3px solid #c8a020;border-left:3px solid #c8a020"></div>
-    <div style="position:absolute;bottom:4px;right:4px;width:12px;height:12px;border-bottom:3px solid #c8a020;border-right:3px solid #c8a020"></div>
+  <div style="background:#07070f;border:3px solid #1a1a3a;max-width:500px;width:100%;overflow:hidden">
 
-    <!-- Header -->
-    <div style="background:linear-gradient(180deg,#3a1f00,#1a0a00);border-bottom:3px solid #8b6914;padding:12px;text-align:center">
-      <div style="font-size:clamp(8px,2vw,11px);color:#ffcc00;text-shadow:2px 2px 0 #000,0 0 20px #ffcc0088;letter-spacing:.1em;margin-bottom:4px">⚔ BOSS BATTLE BEGINS ⚔</div>
-      <div style="font-size:clamp(6px,1.5vw,8px);color:#c8a020;animation:blink .8s step-end infinite">ROUND 2 · THE BASKETBALL MONSTER AWAKENS</div>
+    <div style="background:#04040c;border-bottom:2px solid #1a1a3a;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:8px;color:#ff6600;letter-spacing:2px">SELECT YOUR CHAMPION</div>
+      <button onclick="dismissBossPopup()" style="background:none;border:none;color:#444466;font-size:18px;cursor:pointer;line-height:1">×</button>
     </div>
 
-    <!-- Story text box (FF style) -->
-    <div style="background:#050210;border:2px solid #3a2a5a;margin:12px;padding:10px;position:relative">
-      <div style="position:absolute;top:-8px;left:10px;background:#050210;padding:0 6px;font-size:7px;color:#8866cc">MESSAGE</div>
-      <div style="font-size:clamp(6px,1.5vw,8px);color:#ccbbee;line-height:2;letter-spacing:.05em" id="boss-story-text"></div>
-    </div>
+    <div style="display:flex;gap:0">
 
-    <!-- Champion selection -->
-    <div style="margin:0 12px 8px;background:#050210;border:2px solid #8b6914">
-      <div style="background:#1a0f00;border-bottom:2px solid #8b6914;padding:6px 10px;font-size:7px;color:#c8a020">⚔ CHOOSE YOUR CHAMPION</div>
-      <div style="max-height:200px;overflow-y:auto;padding:6px" id="boss-champion-list">
-        ${buildChampionList(roster, mid, topPlayer)}
+      <div style="width:130px;flex-shrink:0;background:#06060e;border-right:2px solid #1a1a3a;padding:10px;display:flex;flex-direction:column">
+        <div id="bcp-featured" style="flex:1">${buildFeatured()}</div>
+        <button id="bcp-lock-btn" onclick="window._bossSelect(window._bossHoveredPid)" style="
+          margin-top:10px;width:100%;
+          font-family:'Press Start 2P',monospace;font-size:6px;
+          padding:8px 4px;background:rgba(255,102,0,0.2);
+          border:2px solid #ff6600;color:#ff6600;cursor:pointer;
+          letter-spacing:1px
+        ">LOCK IN ▶</button>
       </div>
+
+      <div style="flex:1;padding:8px">
+        <div style="font-size:5px;color:#333366;letter-spacing:2px;margin-bottom:6px">YOUR ROSTER</div>
+        <div id="bcp-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">${buildGrid()}</div>
+        <div style="margin-top:8px;font-size:5px;color:#333366;text-align:center">TAP TO PREVIEW · TAP LOCK IN TO CONFIRM</div>
       </div>
-    </div>
 
-    <!-- Deadline warning -->
-    <div style="margin:0 12px;background:rgba(255,51,68,.1);border:1px solid #ff334455;padding:6px 10px;font-size:6px;color:#ff6666;text-align:center">
-      ⏰ DEADLINE: MAY 4 AT 8PM ET (${hoursLeft}h remaining)
-      <br><span style="color:#888;margin-top:3px;display:block">If you don't choose, your top scorer (${topPlayer?.p?.name?.split(' ').pop()||'?'}) is auto-selected</span>
-    </div>
-
-    <!-- Buttons -->
-    <div style="display:flex;gap:8px;margin:12px;padding-top:8px;border-top:1px solid #3a2a1a">
-      <button onclick="dismissBossPopup()" style="flex:1;background:#0a0510;border:2px solid #444;color:#666;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;cursor:pointer">LATER</button>
-      <button onclick="goToBossTab()" style="flex:2;background:linear-gradient(180deg,#2a1500,#1a0a00);border:2px solid #ffcc00;color:#ffcc00;font-family:'Press Start 2P',monospace;font-size:7px;padding:8px;cursor:pointer;text-shadow:0 0 10px #ffcc0088">⚔ OPEN BOSS TAB</button>
     </div>
   </div>`;
 
-  document.body.appendChild(modal);
+  // Wire up hover/select
+  window._bossHoveredPid = hoveredPid;
+  window._bossHover = (pid) => {
+    hoveredPid = pid;
+    window._bossHoveredPid = pid;
+    document.getElementById('bcp-featured').innerHTML = buildFeatured();
+    document.getElementById('bcp-grid').innerHTML = buildGrid();
+  };
+  window._bossSelect = (pid) => {
+    selectBossChampion(mid, pid);
+  };
 
-  // Typewriter story text
-  const storyLines = [
-    'A terrible monster has awakened...',
-    '',
-    `${m?.name?.toUpperCase()}, your team is called to battle!`,
-    '',
-    'Choose your champion wisely.',
-    'Their FP becomes your weapon.',
-  ];
-  let charIdx = 0, lineIdx = 0;
-  const textEl = document.getElementById('boss-story-text');
-  let fullText = '';
-  function typeNext(){
-    if(!document.getElementById('boss-champion-popup')) return;
-    if(lineIdx >= storyLines.length) return;
-    const line = storyLines[lineIdx];
-    if(charIdx < line.length){
-      fullText += line[charIdx];
-      charIdx++;
-      if(textEl) textEl.innerHTML = fullText.replace(/\n/g,'<br>') + '<span style="animation:blink .5s step-end infinite">▋</span>';
-      setTimeout(typeNext, line[charIdx-1]==='.'?80:35);
-    } else {
-      fullText += '<br>';
-      lineIdx++;
-      charIdx = 0;
-      if(textEl) textEl.innerHTML = fullText + '<span style="animation:blink .5s step-end infinite">▋</span>';
-      setTimeout(typeNext, lineIdx===1?50:200);
-    }
-  }
-  setTimeout(typeNext, 500);
+  document.body.appendChild(modal);
 }
+
 
 function selectBossChampion(mid, pid){
   if(!S.bossBattle) return;
@@ -1385,9 +1383,83 @@ function triggerAttackFX(target, damage, aColor){
 
 
 // ── Boss Battle Announcement Banner ─────────────────────────────
-function renderBossAnnounceBanner(){
-  return; // old banner disabled
+function renderConfFinalsSpotlight(){
+  const el = document.getElementById('conf-finals-spotlight');
+  if(!el) return;
+
+  // Only show during Round 3
+  if((S.round||1) < 3){ el.style.display='none'; return; }
+
+  const R3_START = '20260518';
+
+  // West: OKC vs SAS — East: NYK vs CLE
+  const WEST_TEAMS = ['OKC','SAS'];
+  const EAST_TEAMS = ['NYK','CLE'];
+
+  // Find top performer per conference in R3
+  function getTopPlayer(teamIds){
+    let best = null, bestFP = -Infinity;
+    for(const [key, stat] of Object.entries(S.playerStats||{})){
+      if(stat.date < R3_START) continue;
+      const p = getPlayer(stat.pid);
+      if(!p || !teamIds.includes(p.team)) continue;
+      const totalFP = Object.values(S.playerStats||{})
+        .filter(s=>s.pid===stat.pid && s.date>=R3_START)
+        .reduce((sum,s)=>sum+(s.fp||0),0);
+      if(totalFP > bestFP){ bestFP = totalFP; best = p; }
+    }
+    return best ? {p:best, fp:bestFP} : null;
+  }
+
+  const west = getTopPlayer(WEST_TEAMS);
+  const east = getTopPlayer(EAST_TEAMS);
+
+  if(!west && !east){ el.style.display='none'; return; }
+
+  function card(entry, conf, confColor){
+    if(!entry) return `<div style="flex:1;opacity:.3;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:6px;color:#333">NO DATA</div>`;
+    const {p, fp} = entry;
+    const portrait = getActivePortrait(p.name);
+    const teamColor = TEAM_LOGOS[p.team]?.color || confColor;
+    const owner = Object.entries(S.rosters||{}).find(([mid,pids])=>pids.includes(p.id));
+    const ownerName = owner ? S.managers.find(m=>m.id===parseInt(owner[0]))?.name : null;
+    return `
+      <div style="flex:1;display:flex;align-items:center;gap:10px;padding:8px 14px;min-width:0">
+        <div style="flex-shrink:0;position:relative">
+          <div style="width:${IS_MOBILE?36:48}px;height:${IS_MOBILE?36:48}px;border:2px solid ${teamColor};overflow:hidden;background:#0a0a1a">
+            ${portrait
+              ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block">`
+              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:8px;color:${teamColor}">${p.name.split(' ').map(w=>w[0]).join('')}</div>`
+            }
+          </div>
+          <div style="position:absolute;top:-6px;left:-4px;background:${confColor};color:#000;font-family:'Press Start 2P',monospace;font-size:4px;padding:2px 4px">${conf}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?6:7}px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ').pop().toUpperCase()}</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${teamColor};margin-top:2px">${p.team} · ${fp.toFixed(0)} FP</div>
+          ${ownerName ? `<div style="font-family:'Press Start 2P',monospace;font-size:4px;color:#444466;margin-top:2px">📋 ${ownerName}</div>` : ''}
+        </div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?14:18}px;color:${teamColor};flex-shrink:0">${fp.toFixed(0)}</div>
+      </div>`;
+  }
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:#08080f;border-bottom:2px solid #1a1a3a;display:flex;align-items:stretch">
+      <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:6px;color:#ffd700;padding:0 10px;border-right:2px solid #1a1a3a;display:flex;align-items:center;background:#06060c;white-space:nowrap">
+        ★ R3 LEADERS
+      </div>
+      <div style="flex:1;display:flex;align-items:stretch;min-width:0">
+        ${card(west, 'WEST', '#ff6600')}
+        <div style="width:1px;background:#1a1a3a;flex-shrink:0"></div>
+        ${card(east, 'EAST', '#4a9eff')}
+      </div>
+    </div>
+  `;
 }
+
+
+function renderBossAnnounceBanner(){ return; }
 
 function renderBossRecruitBanner(){
   const el = document.getElementById('boss-recruit-banner');
@@ -2832,7 +2904,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderBossRecruitBanner();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderBossRecruitBanner();renderConfFinalsSpotlight();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
