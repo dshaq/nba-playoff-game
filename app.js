@@ -725,14 +725,21 @@ async function saveState(){
             if(_savePromiseResolve){ _savePromiseResolve(); _savePromiseResolve=null; }
             return;
           }
-          // If battle is active and locked, ALWAYS preserve remote's champion list
-          // Stale clients cannot modify who's in an active battle
-          if(remote.bossBattle?.active && remote.bossBattle?.lockedChampions){
-            S.bossBattle.champions = remote.bossBattle.champions;
-            S.bossBattle.championSelectedAt = remote.bossBattle.championSelectedAt;
-            S.bossBattle.participants = remote.bossBattle.participants;
-            S.bossBattle.scaleFactor = remote.bossBattle.scaleFactor;
-            S.bossBattle.lockedChampions = true;
+          // Always trust remote for critical fields — prevents stale overwrites
+          if(remote.bossBattle){
+            // Always take the higher round number
+            if((remote.round||1) > (S.round||1)) S.round = remote.round;
+            // If battle is locked, preserve champion list
+            if(remote.bossBattle.lockedChampions){
+              S.bossBattle.champions = remote.bossBattle.champions;
+              S.bossBattle.championSelectedAt = remote.bossBattle.championSelectedAt;
+              S.bossBattle.participants = remote.bossBattle.participants;
+              S.bossBattle.scaleFactor = remote.bossBattle.scaleFactor;
+              S.bossBattle.lockedChampions = true;
+            }
+            // Never let stale clients undo defeated=false or active=true
+            if(remote.bossBattle.active && !S.bossBattle.active) S.bossBattle.active = true;
+            if(!remote.bossBattle.defeated && S.bossBattle.defeated) S.bossBattle.defeated = false;
           }
         }
         // Final safety: if battle is locked, always restore champion list from remote
