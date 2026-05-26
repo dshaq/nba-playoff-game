@@ -1268,7 +1268,7 @@ function showBossModeHelp(){
       rewards: [
         {label:'DEFEAT THE BOSS', desc:'All Champions earn +25 Champion FP added to their total score.'},
         {label:'FINAL BLOW', desc:'Deliver the killing hit on a Boss or Minion to receive a commemorative badge displayed on My Team.'},
-        {label:'CATCH', desc:'When an enemy reaches 0 HP you can attempt to catch it with a ball from your inventory. The final-blow dealer gets a 10-minute exclusive window before others can try. Each manager gets ONE attempt per enemy per battle. Success depends on your ball rarity and the enemy rarity. A failed catch consumes the ball. If nobody catches it, the enemy fizzles away forever. Caught enemies live in your Boss Zone.'},
+        {label:'CATCH', desc:'When an enemy reaches 0 HP you can attempt to catch it with a ball from your inventory. Any manager can try — use as many balls as you like until you succeed or run out. Each ball consumed on a failed attempt is gone forever. Caught enemies live in your Boss Zone.'},
       ]
     }
   ];
@@ -1639,18 +1639,6 @@ function canAttemptCatch(mid, target){
     (inv.caught||[]).some(c=>c.enemyId===target && c.battleRound===bb.round)
   );
   if(caught) return {ok:false, reason:`${enemyName} has already been caught this battle!`};
-  // Check 10-minute final blow exclusivity
-  const finalBlow = bb.finalBlows?.[target]; // {mid, ts}
-  if(finalBlow && finalBlow.mid !== mid){
-    const elapsed = (Date.now() - new Date(finalBlow.ts).getTime()) / 60000;
-    if(elapsed < 10){
-      const remaining = Math.ceil(10 - elapsed);
-      return {ok:false, reason:`${S.managers.find(m=>m.id===finalBlow.mid)?.name} delivered the final blow — they have ${remaining} min exclusive window to catch first!`};
-    }
-  }
-  // Check hasn't already attempted this battle
-  const attempts = bb.catchAttempts || {};
-  if(attempts[mid+'_'+target]) return {ok:false, reason:'You already used your catch attempt on '+enemyName};
   // Check has at least one ball
   const inv = getInventory(mid);
   if(!inv.balls?.length) return {ok:false, reason:'You have no balls in your inventory!'};
@@ -1661,9 +1649,6 @@ async function attemptCatch(mid, target, ballType){
   const check = canAttemptCatch(mid, target);
   if(!check.ok){ showToast(check.reason,'error'); return; }
   if(!removeBall(mid, ballType)){ showToast(`No ${BALL_TYPES[ballType]?.name} in inventory`,'error'); return; }
-  // Record attempt
-  if(!S.bossBattle.catchAttempts) S.bossBattle.catchAttempts = {};
-  S.bossBattle.catchAttempts[mid+'_'+target] = { ballType, ts:new Date().toISOString() };
   // Calculate catch rate
   const bb = getBossBattle();
   const enemyRarity = ENEMY_RARITIES[target] || 'common';
