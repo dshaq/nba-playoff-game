@@ -4655,7 +4655,7 @@ function getBossPortrait(){
 
 async function checkBossVictory(){
   const bb = getBossBattle();
-  if(!bb||!bb.active||bb.defeated) return;
+  if(!bb||!bb.active||isBossDefeated()) return;
   const damage = getBossDamage();
   if(damage >= bb.bossHP){
     // VICTORY!
@@ -4699,7 +4699,7 @@ async function selectChampion(mid, pid){
   if(currentManagerId !== mid && !isCommissioner){showToast('You can only pick your own champion','error');return;}
   const bb = getBossBattle();
   if(!bb||!bb.active){showToast('No active Boss Battle','error');return;}
-  if(bb.defeated){showToast('Battle is already over!','error');return;}
+  if(isBossDefeated()){showToast('Battle is already over!','error');return;}
   if(!(S.rosters[mid]||[]).includes(pid)){showToast('Player must be on your roster','error');return;}
   const p = getPlayer(pid);
   const m = S.managers.find(x=>x.id===mid);
@@ -4920,6 +4920,14 @@ async function checkBossVictoryV2(){
 }
 
 // ── Main Render ──────────────────────────────────────────────────
+
+// Boss Battle R3 expires at Finals start — defeated flag ignored after that
+function isBossDefeated(){
+  const FINALS_START = new Date('2026-06-03');
+  if(new Date() >= FINALS_START) return false;
+  return !!S.bossBattle?.defeated;
+}
+
 function renderBossBattleScene(){
   const el = document.getElementById('boss-battle-content');
   if(!el) return;
@@ -5110,7 +5118,7 @@ function renderBossBattleScene(){
             <div style="height:100%;width:${Math.min(100,c.availFP/(bossMaxHP/6)*100)}%;background:${c.aColor};opacity:.6;transition:width .5s"></div>
           </div>
           <!-- Available FP -->
-          ${c.availFP>0&&c.isMe&&!bb?.defeated?`<div style="font-size:${champions.length<=2?'8px':'5px'};color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
+          ${c.availFP>0&&c.isMe&&!isBossDefeated()?`<div style="font-size:${champions.length<=2?'8px':'5px'};color:#ffcc00">⚔${c.availFP.toFixed(0)}</div>`:''}
           ${(()=>{
             if(!c.isMe || bb?.defeated || !c.p) return '';
             const inj = getESPNInjury(c.p.name);
@@ -6044,10 +6052,15 @@ function _oldRenderBossBattle_unused(){
         </div>
       </div>
 
-      ${bb.defeated?`
-      <div style="text-align:center;padding:.75rem;background:rgba(0,255,136,.1);border:2px solid var(--green);font-family:'Press Start 2P',monospace;font-size:10px;color:var(--green)">
-        🏆 BOSS DEFEATED! +${bb.reward} FP AWARDED!
-      </div>`:''}
+      ${(()=>{
+        // Boss Battle R3 expires when Finals begin June 3
+        const FINALS_START = new Date('2026-06-03');
+        const isExpired = new Date() >= FINALS_START;
+        return (!isExpired && bb.defeated) ? `
+        <div style="text-align:center;padding:.75rem;background:rgba(0,255,136,.1);border:2px solid var(--green);font-family:'Press Start 2P',monospace;font-size:10px;color:var(--green)">
+          🏆 BOSS DEFEATED! +${bb.reward} FP AWARDED!
+        </div>` : '';
+      })()}
     </div>
 
     <!-- Champions section -->
