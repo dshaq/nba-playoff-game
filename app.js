@@ -3666,6 +3666,7 @@ function renderRosters(){
           <option value="1" ${(t.survivedRounds||0)===1?'selected':''}>R1✓</option>
           <option value="2" ${(t.survivedRounds||0)===2?'selected':''}>R2✓</option>
           <option value="3" ${(t.survivedRounds||0)===3?'selected':''}>R3✓</option>
+          <option value="4" ${(t.survivedRounds||0)===4?'selected':''}>FINALS✓</option>
         </select>`;
         return t.eliminated
           ? `<span style="display:inline-flex;align-items:center;gap:2px;opacity:.5"><span style="font-size:11px;color:#555">${t.id}</span><span style="font-size:9px;color:var(--red)">OUT</span></span>`
@@ -3829,6 +3830,8 @@ function renderRosters(){
               <option value="0" ${(t.survivedRounds||0)===0?'selected':''}>R0</option>
               <option value="1" ${(t.survivedRounds||0)===1?'selected':''}>R1✓</option>
               <option value="2" ${(t.survivedRounds||0)===2?'selected':''}>R2✓</option>
+              <option value="3" ${(t.survivedRounds||0)===3?'selected':''}>R3✓</option>
+              <option value="4" ${(t.survivedRounds||0)===4?'selected':''}>FINALS✓</option>
               <option value="3" ${(t.survivedRounds||0)===3?'selected':''}>R3✓</option>
               <option value="4" ${(t.survivedRounds||0)===4?'selected':''}>R4✓</option>
             </select>`:'<span style="font-size:11px;color:var(--red)">OUT</span>'}
