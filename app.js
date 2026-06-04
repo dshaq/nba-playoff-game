@@ -1393,74 +1393,71 @@ function triggerAttackFX(target, damage, aColor){
 function renderConfFinalsSpotlight(){
   const el = document.getElementById('conf-finals-spotlight');
   if(!el) return;
-
-  // Show during Round 3+ 
   if((S.round||1) < 3){ el.style.display='none'; return; }
 
   const isFinals = (S.round||1) >= 4;
-  const R3_START = isFinals ? '20260604' : '20260518';
+  const ROUND_START = isFinals ? '20260604' : '20260518';
+  const FINALS_TEAMS = isFinals ? ['NYK','SAS'] : ['OKC','SAS','NYK','CLE'];
 
-  // Finals: SAS vs NYK — Conf Finals: OKC vs SAS / NYK vs CLE
-  const WEST_TEAMS = isFinals ? ['SAS'] : ['OKC','SAS'];
-  const EAST_TEAMS = isFinals ? ['NYK'] : ['NYK','CLE'];
-
-  // Find top performer per conference in R3
-  function getTopPlayer(teamIds){
-    let best = null, bestFP = -Infinity;
-    for(const [key, stat] of Object.entries(S.playerStats||{})){
-      if(stat.date < R3_START) continue;
-      const p = getPlayer(stat.pid);
-      if(!p || !teamIds.includes(p.team)) continue;
-      const totalFP = Object.values(S.playerStats||{})
-        .filter(s=>s.pid===stat.pid && s.date>=R3_START)
-        .reduce((sum,s)=>sum+(s.fp||0),0);
-      if(totalFP > bestFP){ bestFP = totalFP; best = p; }
-    }
-    return best ? {p:best, fp:bestFP} : null;
+  // Find THE best player of this round across all teams
+  const fpByPlayer = {};
+  for(const stat of Object.values(S.playerStats||{})){
+    if(stat.date < ROUND_START) continue;
+    const p = getPlayer(stat.pid);
+    if(!p || !FINALS_TEAMS.includes(p.team)) continue;
+    fpByPlayer[stat.pid] = (fpByPlayer[stat.pid]||0) + (stat.fp||0);
   }
 
-  const west = getTopPlayer(WEST_TEAMS);
-  const east = getTopPlayer(EAST_TEAMS);
+  const topPid = Object.entries(fpByPlayer).sort((a,b)=>b[1]-a[1])[0];
+  if(!topPid){ el.style.display='none'; return; }
 
-  if(!west && !east){ el.style.display='none'; return; }
+  const pid = parseInt(topPid[0]);
+  const fp = topPid[1];
+  const p = getPlayer(pid);
+  if(!p){ el.style.display='none'; return; }
 
-  function card(entry, conf, confColor){
-    if(!entry) return `<div style="flex:1;opacity:.3;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:6px;color:#333">NO DATA</div>`;
-    const {p, fp} = entry;
-    const portrait = getActivePortrait(p.name);
-    const teamColor = TEAM_LOGOS[p.team]?.color || confColor;
-    const owner = Object.entries(S.rosters||{}).find(([mid,pids])=>pids.includes(p.id));
-    const ownerName = owner ? S.managers.find(m=>m.id===parseInt(owner[0]))?.name : null;
-    return `
-      <div style="flex:1;display:flex;align-items:center;gap:10px;padding:8px 14px;min-width:0">
-        <div style="flex-shrink:0;position:relative">
-          <div style="width:${IS_MOBILE?36:48}px;height:${IS_MOBILE?36:48}px;border:2px solid ${teamColor};overflow:hidden;background:#0a0a1a">
-            ${portrait
-              ? `<img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block">`
-              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:8px;color:${teamColor}">${p.name.split(' ').map(w=>w[0]).join('')}</div>`
-            }
-          </div>
-          <div style="position:absolute;top:-6px;left:-4px;background:${confColor};color:#000;font-family:'Press Start 2P',monospace;font-size:4px;padding:2px 4px">${conf}</div>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?6:7}px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ').pop().toUpperCase()}</div>
-          <div style="font-family:'Press Start 2P',monospace;font-size:5px;color:${teamColor};margin-top:2px">${p.team} · ${fp.toFixed(0)} FP</div>
-          ${ownerName ? `<div style="font-family:'Press Start 2P',monospace;font-size:4px;color:#444466;margin-top:2px">📋 ${ownerName}</div>` : ''}
-        </div>
-        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?14:18}px;color:${teamColor};flex-shrink:0">${fp.toFixed(0)}</div>
-      </div>`;
-  }
+  const portrait = getActivePortrait(p.name);
+  const teamColor = TEAM_LOGOS[p.team]?.color || '#ffd700';
+  const owner = Object.entries(S.rosters||{}).find(([mid,pids])=>pids.includes(pid));
+  const ownerMgr = owner ? S.managers.find(m=>m.id===parseInt(owner[0])) : null;
+  const ownerColor = ownerMgr ? getAvatarColor(ownerMgr.id) : null;
+  const label = isFinals ? 'NBA FINALS LEADER' : 'CONF FINALS LEADER';
 
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:#08080f;border-bottom:2px solid #1a1a3a;display:flex;align-items:stretch">
-      <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:6px;color:#ffd700;padding:0 10px;border-right:2px solid #1a1a3a;display:flex;align-items:center;background:#06060c;white-space:nowrap">
-        ${(S.round||1)>=4?'🏆 FINALS':'★ R3 LEADERS'}
+    <div style="
+      background:linear-gradient(135deg, #08080f 0%, ${teamColor}18 50%, #08080f 100%);
+      border-bottom:2px solid ${teamColor}66;
+      display:flex;align-items:center;gap:0;overflow:hidden;position:relative;
+    ">
+      <!-- Glow effect -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at ${portrait?'18%':'50%'} 50%,${teamColor}22,transparent 60%);pointer-events:none"></div>
+
+      <!-- Portrait -->
+      ${portrait ? `
+      <div style="flex-shrink:0;width:${IS_MOBILE?52:72}px;height:${IS_MOBILE?52:72}px;overflow:hidden;position:relative;border-right:2px solid ${teamColor}44">
+        <img src="${portrait}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block">
+        <div style="position:absolute;inset:0;background:linear-gradient(to right,transparent 60%,${teamColor}22)"></div>
+      </div>` : ''}
+
+      <!-- Content -->
+      <div style="flex:1;padding:${IS_MOBILE?'7px 10px':'8px 14px'};min-width:0;position:relative;z-index:1">
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'5px':'6px'};color:${teamColor};letter-spacing:2px;margin-bottom:${IS_MOBILE?'3px':'4px'};opacity:.8">
+          ${isFinals?'🏆':'⭐'} ${label}
+        </div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'8px':'11px'};color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:1px">
+          ${p.name.toUpperCase()}
+        </div>
+        <div style="display:flex;align-items:center;gap:${IS_MOBILE?'8px':'12px'};margin-top:${IS_MOBILE?'3px':'4px'}">
+          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'5px':'6px'};color:${teamColor}">${p.team}</div>
+          ${ownerMgr ? `<div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'4px':'5px'};color:${ownerColor};opacity:.8">📋 ${ownerMgr.name}</div>` : ''}
+        </div>
       </div>
-      <div style="flex:1;display:flex;align-items:stretch;min-width:0">
-        ${card(west, isFinals?'SAS':'WEST', isFinals?'#c0c0c0':'#ff6600')}
-        <div style="width:1px;background:#1a1a3a;flex-shrink:0"></div>
-        ${card(east, isFinals?'NYK':'EAST', isFinals?'#006bb6':'#4a9eff')}
+
+      <!-- Big FP number -->
+      <div style="flex-shrink:0;padding:${IS_MOBILE?'0 12px':'0 20px'};text-align:center;position:relative;z-index:1;border-left:1px solid ${teamColor}22">
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'22px':'32px'};color:${teamColor};line-height:1;text-shadow:0 0 20px ${teamColor}88">${fp.toFixed(0)}</div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'5px':'6px'};color:${teamColor};opacity:.6;margin-top:3px;letter-spacing:1px">FP</div>
       </div>
     </div>
   `;
@@ -7073,6 +7070,16 @@ async function refreshLiveStats(){
         allEvents = allEvents.concat((data?.events||[]).map(e=>({...e,_dateStr:dateStr})));
       }catch(e){}
     }
+    // Also fetch undated endpoint to catch any live/today games not returned by date filter
+    try{
+      const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard');
+      const data = await res.json();
+      const todayStr = fmt(today);
+      const liveEvents = (data?.events||[]).map(e=>({...e,_dateStr:todayStr}));
+      // Add any events not already in allEvents
+      const existingIds = new Set(allEvents.map(e=>e.id));
+      liveEvents.forEach(e=>{ if(!existingIds.has(e.id)) allEvents.push(e); });
+    }catch(e){}
 
     const newLive = {};
     let hasLive = false;
