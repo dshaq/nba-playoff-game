@@ -1394,14 +1394,15 @@ function renderConfFinalsSpotlight(){
   const el = document.getElementById('conf-finals-spotlight');
   if(!el) return;
 
-  // Only show during Round 3
+  // Show during Round 3+ 
   if((S.round||1) < 3){ el.style.display='none'; return; }
 
-  const R3_START = '20260518';
+  const isFinals = (S.round||1) >= 4;
+  const R3_START = isFinals ? '20260604' : '20260518';
 
-  // West: OKC vs SAS — East: NYK vs CLE
-  const WEST_TEAMS = ['OKC','SAS'];
-  const EAST_TEAMS = ['NYK','CLE'];
+  // Finals: SAS vs NYK — Conf Finals: OKC vs SAS / NYK vs CLE
+  const WEST_TEAMS = isFinals ? ['SAS'] : ['OKC','SAS'];
+  const EAST_TEAMS = isFinals ? ['NYK'] : ['NYK','CLE'];
 
   // Find top performer per conference in R3
   function getTopPlayer(teamIds){
@@ -1454,12 +1455,12 @@ function renderConfFinalsSpotlight(){
   el.innerHTML = `
     <div style="background:#08080f;border-bottom:2px solid #1a1a3a;display:flex;align-items:stretch">
       <div style="flex-shrink:0;font-family:'Press Start 2P',monospace;font-size:6px;color:#ffd700;padding:0 10px;border-right:2px solid #1a1a3a;display:flex;align-items:center;background:#06060c;white-space:nowrap">
-        ★ R3 LEADERS
+        ${(S.round||1)>=4?'🏆 FINALS':'★ R3 LEADERS'}
       </div>
       <div style="flex:1;display:flex;align-items:stretch;min-width:0">
-        ${card(west, 'WEST', '#ff6600')}
+        ${card(west, isFinals?'SAS':'WEST', isFinals?'#c0c0c0':'#ff6600')}
         <div style="width:1px;background:#1a1a3a;flex-shrink:0"></div>
-        ${card(east, 'EAST', '#4a9eff')}
+        ${card(east, isFinals?'NYK':'EAST', isFinals?'#006bb6':'#4a9eff')}
       </div>
     </div>
   `;
@@ -1511,8 +1512,8 @@ function renderBossRecruitBanner(){
     + '<div style="font-family:\'Press Start 2P\',monospace;font-size:6px;color:#ffd700;line-height:1.8">STARTING TONIGHT!</div></div>'
     + '</div>'
     + '<div style="border-left:1px solid #333;padding-left:12px;flex-shrink:0">'
-    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#666;margin-bottom:2px">CONFERENCE FINALS</div>'
-    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:#fff">SAS vs OKC</div>'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#666;margin-bottom:2px">${(S.round||1)>=4?"NBA FINALS":"CONFERENCE FINALS"}</div>'
+    + '<div style="font-family:\'Press Start 2P\',monospace;font-size:7px;color:#fff">${(S.round||1)>=4?"NYK vs SAS":"SAS vs OKC"}</div>'
     + '</div>'
     + '<div style="border-left:1px solid #333;padding-left:12px;flex:1;min-width:120px">'
     + '<div style="font-family:\'Press Start 2P\',monospace;font-size:5px;color:#666;margin-bottom:4px">' + participants + ' JOINED' + (participants>0?':':'') + '</div>'
@@ -1531,7 +1532,7 @@ function getChampionAvailFP(mid){
   const pid = bb.champions?.[mid];
   if(!pid) return 0;
   const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
-  const ROUND_START = S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=4 ? '20260604' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   // Sum current round stats earned on or after selection date
   const earned = Object.values(S.playerStats||{})
@@ -6222,7 +6223,7 @@ function openChampionDetail(mid, pid){
   const attacks = (bb?.attackLog||[]).filter(a=>a.mid===mid).reverse();
   const totalDmg = attacks.reduce((s,a)=>s+a.fp,0);
   const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
-  const ROUND_START = S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=4 ? '20260604' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   const existing = document.getElementById('champion-detail-modal');
   if(existing) existing.remove();
@@ -6556,9 +6557,9 @@ async function endBossBattle(){
 
 // ── NEWS BANNER ─────────────────────────────────────────────────
 const NEWS_ITEMS = [
-  "🏀 ROUND 2 IS HERE! The second round of the NBA Playoffs has begun — check your roster for eliminated players!",
-  "⚔ BOSS BATTLE IS LIVE! Visit the BOSS tab to pick your Champion and attack DUNKMAW, GUS and RIMREAPER!",
-  "🆕 RULE UPDATE: Players marked DTD (Day-To-Day) can now be dropped — same as OUT! Check your roster for DTD players."
+  "🏆 NBA FINALS ARE HERE! NYK vs SAS — the championship round begins! +50 FP bonus for all drafted Finals players!",
+  "⚔ BOSS BATTLE: SWAMP DRAGON, SWISHA SWEET & PLANKSTER are alive — attack in the BOSS tab!",
+  "🆕 FINALS: Players on NYK and SAS earn +50 FP bonus. Check My Team to see your Finals FP breakdown!"
 ];
 const NEWS_DISMISSED_KEY = 'nba_news_dismissed_r2_2026';
 
