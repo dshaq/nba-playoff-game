@@ -597,15 +597,16 @@ function bonusForPlayer(pid, mid){
   for(let r=1;r<=(t.survivedRounds||0);r++){
     if(r > acquiredAfterRound){
       if(isWaiverPickup){
-        // Waiver pickups: flat +5 per round BUT only if they actually earned FP that round
+        // Waiver pickups: flat +5 per round BUT only if they appeared in at least one game
+        // (has any stat entry for that round — even 0 or negative FP counts as playing)
         const ROUND_DATES = {1:['20260418','20260503'],2:['20260504','20260517'],3:['20260518','20260603'],4:['20260604','20261231']};
         const [start,end] = ROUND_DATES[r]||['99999999','99999999'];
         const acqDate = S.waiverAcquisitions?.[mid+'_'+pid]||null;
-        const earnedFP = Object.values(S.playerStats||{}).some(s=>
+        const appearedInRound = Object.values(S.playerStats||{}).some(s=>
           s.pid===pid && s.date>=start && s.date<=end &&
-          (!acqDate||s.date>=acqDate) && (s.fp||0)>0
+          (!acqDate||s.date>=acqDate) && s.fp !== undefined
         );
-        if(earnedFP) b += 5;
+        if(appearedInRound) b += 5;
       } else {
         b += ROUND_BONUS[r];
       }
