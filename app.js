@@ -592,12 +592,23 @@ function getAcquiredRound(mid, pid){
 function bonusForPlayer(pid, mid){
   const t=getTeam(getPlayer(pid).team);
   const acquiredAfterRound = mid !== undefined ? getAcquiredRound(mid, pid) : 0;
-  const isWaiverPickup = acquiredAfterRound > 0; // picked up after draft = waiver acquisition
+  const isWaiverPickup = acquiredAfterRound > 0;
   let b=0;
   for(let r=1;r<=(t.survivedRounds||0);r++){
     if(r > acquiredAfterRound){
-      // Waiver pickups only earn flat +5 per round survived (not escalating)
-      b += isWaiverPickup ? 5 : ROUND_BONUS[r];
+      if(isWaiverPickup){
+        // Waiver pickups: flat +5 per round BUT only if they actually earned FP that round
+        const ROUND_DATES = {1:['20260418','20260503'],2:['20260504','20260517'],3:['20260518','20260603'],4:['20260604','20261231']};
+        const [start,end] = ROUND_DATES[r]||['99999999','99999999'];
+        const acqDate = S.waiverAcquisitions?.[mid+'_'+pid]||null;
+        const earnedFP = Object.values(S.playerStats||{}).some(s=>
+          s.pid===pid && s.date>=start && s.date<=end &&
+          (!acqDate||s.date>=acqDate) && (s.fp||0)>0
+        );
+        if(earnedFP) b += 5;
+      } else {
+        b += ROUND_BONUS[r];
+      }
     }
   }
   return b;
