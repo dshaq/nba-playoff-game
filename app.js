@@ -582,7 +582,7 @@ function getAcquiredRound(mid, pid){
   if(typeof val === 'number') return val;
   // Date string — convert to round number
   const d = parseInt(val);
-  if(d >= 20260604) return 4;
+  if(d >= 20260603) return 4;
   if(d >= 20260518) return 3;
   if(d >= 20260504) return 2;
   if(d >= 20260418) return 1;
@@ -599,7 +599,7 @@ function bonusForPlayer(pid, mid){
       if(isWaiverPickup){
         // Waiver pickups: flat +5 per round BUT only if they appeared in at least one game
         // (has any stat entry for that round — even 0 or negative FP counts as playing)
-        const ROUND_DATES = {1:['20260418','20260503'],2:['20260504','20260517'],3:['20260518','20260603'],4:['20260604','20261231']};
+        const ROUND_DATES = {1:['20260418','20260503'],2:['20260504','20260517'],3:['20260518','20260603'],4:['20260603','20261231']};
         const [start,end] = ROUND_DATES[r]||['99999999','99999999'];
         const acqDate = S.waiverAcquisitions?.[mid+'_'+pid]||null;
         const appearedInRound = Object.values(S.playerStats||{}).some(s=>
@@ -1408,7 +1408,7 @@ function renderConfFinalsSpotlight(){
   if((S.round||1) < 3){ el.style.display='none'; return; }
 
   const isFinals = (S.round||1) >= 4;
-  const ROUND_START = isFinals ? '20260604' : '20260518';
+  const ROUND_START = isFinals ? '20260603' : '20260518';
   const FINALS_TEAMS = isFinals ? ['NYK','SAS'] : ['OKC','SAS','NYK','CLE'];
 
   // Find THE best player of this round across all teams
@@ -1541,7 +1541,7 @@ function getChampionAvailFP(mid){
   const pid = bb.champions?.[mid];
   if(!pid) return 0;
   const selectedAt = bb.championSelectedAt?.[mid]; // ISO string
-  const ROUND_START = S.round>=4 ? '20260604' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=4 ? '20260603' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   // Sum current round stats earned on or after selection date
   const earned = Object.values(S.playerStats||{})
@@ -3020,7 +3020,7 @@ function renderMyTeam(){
     const t=getTeam(p.team); if(!t) return;
     // approximate round by game date vs round start dates
     const d=parseInt(s.date||0);
-    const r = d>=20260604?4:d>=20260518?3:d>=20260504?2:1;
+    const r = d>=20260603?4:d>=20260518?3:d>=20260504?2:1;
     if(!roundDates[r]) roundDates[r]=[];
     const acqDate=S.waiverAcquisitions?.[mid+'_'+s.pid]||null;
     if(!acqDate||s.date>=acqDate) roundDates[r].push(s.fp||0);
@@ -6232,7 +6232,7 @@ function openChampionDetail(mid, pid){
   const attacks = (bb?.attackLog||[]).filter(a=>a.mid===mid).reverse();
   const totalDmg = attacks.reduce((s,a)=>s+a.fp,0);
   const targetLabels = {boss:bb?.bossLabel||'DUNKMAW',minion1:bb?.minion1Name||'GUS',minion2:bb?.minion2Name||'RIMREAPER'};
-  const ROUND_START = S.round>=4 ? '20260604' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
+  const ROUND_START = S.round>=4 ? '20260603' : S.round>=3 ? '20260518' : S.round>=2 ? '20260504' : '20260418';
 
   const existing = document.getElementById('champion-detail-modal');
   if(existing) existing.remove();
@@ -8488,7 +8488,13 @@ async function boot(){
   // Load player animations
   loadAnimations();
   // Load custom logos — then re-render and update topbar avatar
-  loadCustomLogos().then(()=>{
+  loadCustomLogos().catch(e=>console.warn('loadCustomLogos failed:',e)).then(()=>{
+    // Retry once if logos didn't load
+    if(!CUSTOM_LOGOS?.length){
+      console.warn('Logos empty after load, retrying...');
+      return loadCustomLogos();
+    }
+  }).then(()=>{
     render();
     // Update topbar avatar now that custom logos are available
     if(currentManagerId !== null && currentManagerId !== 'viewer'){

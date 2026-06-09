@@ -1182,9 +1182,11 @@ function saveLogosToLocalStorage(){
 }
 
 async function loadCustomLogos(){
-  if(loadLogosFromLocalStorage()) return;
+  if(loadLogosFromLocalStorage() && CUSTOM_LOGOS?.length > 0) return;
   try{
-    const {data} = await db.from('leagues').select('state').eq('id','nba-custom-logos-2026').single();
+    if(!db) throw new Error('db not ready');
+    const {data, error} = await db.from('leagues').select('state').eq('id','nba-custom-logos-2026').single();
+    if(error) throw new Error(error.message);
     if(data?.state){
       CUSTOM_LOGOS = JSON.parse(data.state);
       console.log('Loaded', CUSTOM_LOGOS.length, 'custom logos from Supabase');
@@ -1192,7 +1194,7 @@ async function loadCustomLogos(){
       if(_tl) TOKEN_IMG = _tl.dataUri;
       saveLogosToLocalStorage();
     }
-  }catch(e){ /* none yet */ }
+  }catch(e){ console.warn('loadCustomLogos error:', e.message); }
 }
 
 async function saveCustomLogos(){
