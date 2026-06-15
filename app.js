@@ -1405,9 +1405,53 @@ function triggerAttackFX(target, damage, aColor){
 function renderConfFinalsSpotlight(){
   const el = document.getElementById('conf-finals-spotlight');
   if(!el) return;
+
+  // 🏆 CHAMPION BANNER — Jayson wins it all!
+  const winner = S.managers.find(m=>m.name==='Jayson');
+  const winColor = winner ? getAvatarColor(winner.id) : '#ffd700';
+  const winAvatar = winner ? getAvatar(winner.id, 'sm') : '';
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="
+      position:relative;overflow:hidden;
+      background:linear-gradient(135deg, #08080f 0%, ${winColor}22 45%, #08080f 100%);
+      border-bottom:3px solid ${winColor};
+      padding:${IS_MOBILE?'12px 14px':'16px 24px'};
+      display:flex;align-items:center;justify-content:center;gap:${IS_MOBILE?'10px':'16px'};
+    ">
+      <!-- Sparkle/glow layers -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,${winColor}33,transparent 65%);pointer-events:none;animation:champ-pulse 2.5s ease-in-out infinite"></div>
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,${winColor}08 0px,${winColor}08 2px,transparent 2px,transparent 12px);pointer-events:none"></div>
+
+      <div style="font-size:${IS_MOBILE?'22px':'32px'};animation:champ-bounce 1.2s ease-in-out infinite;position:relative;z-index:1">🏆</div>
+
+      <div style="text-align:center;position:relative;z-index:1">
+        <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'5px':'7px'};color:${winColor};letter-spacing:3px;margin-bottom:4px;opacity:.85">
+          NBA ARCADE CHAMPION
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+          ${winAvatar ? `<div style="width:${IS_MOBILE?'28px':'40px'};height:${IS_MOBILE?'28px':'40px'};border:2px solid ${winColor};border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 0 16px ${winColor}88">${winAvatar}</div>` : ''}
+          <div style="font-family:'Press Start 2P',monospace;font-size:${IS_MOBILE?'16px':'26px'};color:#fff;letter-spacing:2px;text-shadow:0 0 20px ${winColor}cc">
+            ${(winner?.name||'JAYSON').toUpperCase()} WINS!
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:${IS_MOBILE?'22px':'32px'};animation:champ-bounce 1.2s ease-in-out infinite .3s;position:relative;z-index:1">🏆</div>
+    </div>
+
+    <style>
+      @keyframes champ-pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+      @keyframes champ-bounce { 0%,100%{transform:translateY(0) rotate(-6deg)} 50%{transform:translateY(-6px) rotate(6deg)} }
+    </style>
+  `;
+  return;
+
   if((S.round||1) < 3){ el.style.display='none'; return; }
 
   const isFinals = (S.round||1) >= 4;
+
   const ROUND_START = isFinals ? '20260603' : '20260518';
   const FINALS_TEAMS = isFinals ? ['NYK','SAS'] : ['OKC','SAS','NYK','CLE'];
 
