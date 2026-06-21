@@ -2950,7 +2950,7 @@ function showTab(name){
 }
 
 function render(){
-  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderBossRecruitBanner();renderConfFinalsSpotlight();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();
+  renderMyTeam();renderBossBattle();renderRaidBets();renderPersonalAlert();renderBossAnnounceBanner();renderBossRecruitBanner();renderConfFinalsSpotlight();renderStandings();try{renderTopLeaderboard();}catch(e){console.warn("renderTopLeaderboard:",e.message);}renderNameEdit();renderDraft();renderWaiver();renderRosters();renderScoring();renderBracket();renderDraftBanner();renderTeams();renderTopPlayersBanner();renderWaiverLog();renderDraftPredictor();
   // Update draft tab appearance
   const draftTab = document.getElementById('draft-tab');
   if(draftTab && S){
@@ -6614,6 +6614,195 @@ const NEWS_ITEMS = [
   "⚔ BOSS BATTLE: SWAMP DRAGON, SWISHA SWEET & PLANKSTER are alive — attack in the BOSS tab!",
   "🆕 FINALS: Players on NYK and SAS earn +50 FP bonus. Check My Team to see your Finals FP breakdown!"
 ];
+
+// ── DRAFT PREDICTOR ─────────────────────────────────────────────
+
+const DRAFT_2026_PROSPECTS = [
+  {id:'dybantsa',   name:'AJ Dybantsa',          school:'BYU',               pos:'SF'},
+  {id:'peterson',   name:'Darryn Peterson',       school:'Kansas',            pos:'SG'},
+  {id:'boozer',     name:'Cameron Boozer',        school:'Duke',              pos:'PF'},
+  {id:'wilson',     name:'Caleb Wilson',          school:'North Carolina',    pos:'PF'},
+  {id:'acuff',      name:'Darius Acuff Jr.',      school:'Arkansas',          pos:'PG'},
+  {id:'flemings',   name:'Kingston Flemings',     school:'Houston',           pos:'PG'},
+  {id:'brown',      name:'Mikel Brown Jr.',       school:'Louisville',        pos:'PG'},
+  {id:'wagler',     name:'Keaton Wagler',         school:'Illinois',          pos:'SG'},
+  {id:'burries',    name:'Brayden Burries',       school:'Arizona',           pos:'SG'},
+  {id:'ament',      name:'Nate Ament',            school:'Tennessee',         pos:'PF'},
+  {id:'okorie',     name:'Ebuka Okorie',          school:'Stanford',          pos:'PG'},
+  {id:'anderson',   name:'Christian Anderson',    school:'Texas Tech',        pos:'SG'},
+  {id:'carr',       name:'Cameron Carr',          school:'Baylor',            pos:'SG'},
+  {id:'quaintance', name:'Jayden Quaintance',     school:'Kentucky',          pos:'C'},
+  {id:'peat',       name:'Koa Peat',              school:'Arizona',           pos:'PF'},
+  {id:'thomas',     name:'Meleek Thomas',         school:'Arkansas',          pos:'SG'},
+  {id:'riley',      name:'Will Riley',            school:'Illinois',          pos:'SF'},
+  {id:'wilcher',    name:'Nolan Wilcher',         school:'USC',               pos:'SF'},
+  {id:'wolf',       name:'Danny Wolf',            school:'Michigan',          pos:'C'},
+  {id:'knueppel',   name:'Kon Knueppel',          school:'Duke',              pos:'SF'},
+  {id:'jakucionis', name:'Kasparas Jakucionis',   school:'Illinois',          pos:'PG'},
+  {id:'mcneeley',   name:'Liam McNeeley',         school:'UConn',             pos:'SF'},
+  {id:'missi',      name:'Yves Missi',            school:'Gonzaga',           pos:'C'},
+  {id:'philon',     name:'Labaron Philon',        school:'Alabama',           pos:'PG'},
+  {id:'veesaar',    name:'Henri Veesaar',         school:'North Carolina',    pos:'C'},
+  {id:'ejiofor',    name:'Zuby Ejiofor',          school:"St. John's",        pos:'PF'},
+  {id:'kayil',      name:'Jack Kayil',            school:'ALBA Berlin',       pos:'SG'},
+  {id:'coward',     name:'Cedric Coward',         school:'Washington State',  pos:'SF'},
+  {id:'thiero',     name:'Adou Thiero',           school:'Arkansas',          pos:'SF'},
+  {id:'mara',       name:'Aday Mara',             school:'International',     pos:'C'},
+];
+
+const DRAFT_LOCK_TIME = new Date('2026-06-23T20:00:00-04:00'); // 8pm ET June 23
+
+function isDraftLocked(){
+  return new Date() >= DRAFT_LOCK_TIME;
+}
+
+async function fetchLiveDraftPicks(){
+  try{
+    const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/draft?year=2026');
+    const data = await res.json();
+    const picks = (data.picks||[]).filter(p=>p.athlete);
+    return picks.map(p=>({
+      overall: p.overall,
+      name: p.athlete?.displayName || p.athlete?.fullName,
+      team: p.team?.abbreviation,
+    }));
+  }catch(e){ return []; }
+}
+
+function scorePredictions(predictions, actualPicks){
+  // predictions: [{overall: 1, prospectId: 'dybantsa'}, ...]
+  // actualPicks: [{overall: 1, name: 'AJ Dybantsa'}, ...]
+  let score = 0;
+  const details = [];
+  for(const pred of predictions){
+    const prospect = DRAFT_2026_PROSPECTS.find(p=>p.id===pred.prospectId);
+    if(!prospect) continue;
+    const actualAtSpot = actualPicks.find(p=>p.overall===pred.overall);
+    const actualSpotForPlayer = actualPicks.find(p=>p.name?.toLowerCase().includes(prospect.name.split(' ').pop().toLowerCase()));
+    let pts = 0, result = 'miss';
+    if(actualAtSpot?.name?.toLowerCase().includes(prospect.name.split(' ').pop().toLowerCase())){
+      pts = 3; result = 'exact';
+    } else if(actualSpotForPlayer && Math.abs(actualSpotForPlayer.overall - pred.overall) <= 2){
+      pts = 1; result = 'close';
+    } else if(actualSpotForPlayer){
+      pts = 1; result = 'found';
+    }
+    score += pts;
+    details.push({pick: pred.overall, prospect: prospect.name, pts, result, actualName: actualAtSpot?.name});
+  }
+  return {score, details};
+}
+
+async function saveDraftPredictions(mid, predictions){
+  if(!S.draftPredictor) S.draftPredictor = {};
+  S.draftPredictor[mid] = { predictions, submittedAt: new Date().toISOString(), score: 0 };
+  await saveStateNow();
+  render();
+  showToast('🏀 Draft picks locked in!', 'success');
+}
+
+function renderDraftPredictor(){
+  const el = document.getElementById('tab-draft-predictor');
+  if(!el) return;
+  const mid = currentManagerId;
+  const isLocked = isDraftLocked();
+  const myPreds = S.draftPredictor?.[mid]?.predictions || [];
+  const allPreds = S.draftPredictor || {};
+
+  // Build leaderboard
+  const scores = S.managers.map(m=>{
+    const preds = allPreds[m.id]?.predictions || [];
+    const actualPicks = S.draftActualPicks || [];
+    const {score, details} = actualPicks.length ? scorePredictions(preds, actualPicks) : {score:0,details:[]};
+    return {m, preds, score, details, submitted:!!allPreds[m.id]};
+  }).sort((a,b)=>b.score-a.score);
+
+  const picksHtml = Array.from({length:10},(_,i)=>{
+    const pick = i+1;
+    const pred = myPreds.find(p=>p.overall===pick);
+    const prospect = pred ? DRAFT_2026_PROSPECTS.find(p=>p.id===pred.prospectId) : null;
+    const actual = (S.draftActualPicks||[]).find(p=>p.overall===pick);
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--text3);width:24px">#${pick}</div>
+        ${isLocked && !mid ? `
+          <div style="flex:1;font-size:12px;color:${prospect?'var(--text)':'var(--text3)'}">
+            ${prospect?.name||'—'}
+            ${actual?`<span style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--green);margin-left:8px">→ ${actual.name}</span>`:''}
+          </div>
+        ` : `
+          <select onchange="window._draftPick[${pick}]=this.value" style="flex:1;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-size:12px;${isLocked?'pointer-events:none;opacity:.5':''}">
+            <option value="">— PICK ${pick} —</option>
+            ${DRAFT_2026_PROSPECTS.map(p=>`<option value="${p.id}" ${pred?.prospectId===p.id?'selected':''}>${p.name} (${p.pos}, ${p.school})</option>`).join('')}
+            <option value="__writein__" ${pred?.prospectId==='__writein__'?'selected':''}>✏️ OTHER (write-in)</option>
+          </select>
+          ${(pred?.prospectId==='__writein__'||window._draftWriteIn?.[pick]) ? `<input type="text" placeholder="Player name..." value="${pred?.writeinName||''}" onchange="window._draftWriteIn=window._draftWriteIn||{};window._draftWriteIn[${pick}]=this.value" style="width:100%;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-size:12px">` : ''}
+        `}
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="max-width:600px;margin:0 auto">
+      <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent3);margin-bottom:4px">🏀 DRAFT PREDICTOR</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text3);margin-bottom:16px">
+        ${isLocked ? 'PICKS LOCKED · DRAFT NIGHT!' : 'LOCKS JUNE 23 @ 8PM ET'}
+      </div>
+
+      ${mid !== null && mid !== 'viewer' ? `
+        <div style="background:var(--panel);border:1px solid var(--border);padding:1rem;margin-bottom:16px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-bottom:12px">YOUR TOP 10 PREDICTIONS</div>
+          ${picksHtml}
+          ${!isLocked ? `
+            <button onclick="window._submitDraftPicks()" style="
+              width:100%;margin-top:12px;
+              font-family:'Press Start 2P',monospace;font-size:8px;
+              padding:10px;background:rgba(0,255,136,.15);
+              border:2px solid var(--green);color:var(--green);cursor:pointer
+            ">💾 SAVE PREDICTIONS</button>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <div style="background:var(--panel);border:1px solid var(--border);padding:1rem">
+        <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text3);margin-bottom:12px">LEADERBOARD</div>
+        ${scores.map((s,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:${i===0?'var(--yellow)':'var(--text3)'};width:24px">#${i+1}</div>
+            <div style="width:8px;height:8px;background:${getAvatarColor(s.m.id)};flex-shrink:0"></div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--text2);flex:1">${s.m.name}</div>
+            ${s.submitted ? `<div style="font-family:'Press Start 2P',monospace;font-size:5px;color:var(--green)">✓ SUBMITTED</div>` : `<div style="font-family:'Press Start 2P',monospace;font-size:5px;color:var(--text3)">NO PICKS</div>`}
+            <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:var(--yellow)">${s.score}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+
+  // Init pick tracker
+  window._draftPick = {};
+  myPreds.forEach(p=>{ window._draftPick[p.overall] = p.prospectId; });
+
+  window._submitDraftPicks = async () => {
+    const preds = Array.from({length:10},(_,i)=>({
+      overall: i+1,
+      prospectId: window._draftPick[i+1]||'',
+      writeinName: window._draftPick[i+1]==='__writein__' ? (window._draftWriteIn?.[i+1]||'') : ''
+    })).filter(p=>p.prospectId);
+    if(preds.length < 10){ showToast('Please fill in all 10 picks!','error'); return; }
+    const missingWriteins = preds.filter(p=>p.prospectId==='__writein__'&&!p.writeinName);
+    if(missingWriteins.length){ showToast('Please fill in your write-in player names!','error'); return; }
+    await saveDraftPredictions(mid, preds);
+  };
+}
+
+async function refreshDraftPicks(){
+  if(!isDraftLocked()) return;
+  const picks = await fetchLiveDraftPicks();
+  if(!picks.length) return;
+  S.draftActualPicks = picks;
+  await saveState();
+  renderDraftPredictor();
+}
+
 const NEWS_DISMISSED_KEY = 'nba_news_dismissed_r2_2026';
 
 function initNewsBanner(){
@@ -7127,15 +7316,20 @@ async function refreshLiveStats(){
       }catch(e){}
     }
     // Also fetch undated endpoint to catch any live/today games not returned by date filter
-    try{
-      const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard');
-      const data = await res.json();
-      const todayStr = fmt(today);
-      const liveEvents = (data?.events||[]).map(e=>({...e,_dateStr:todayStr}));
-      // Add any events not already in allEvents
-      const existingIds = new Set(allEvents.map(e=>e.id));
-      liveEvents.forEach(e=>{ if(!existingIds.has(e.id)) allEvents.push(e); });
-    }catch(e){}
+    // BUT only if we're still within the NBA season window — after Finals end, ESPN's
+    // undated endpoint can return Summer League/preseason/next-season games stamped as "today"
+    const SEASON_HARD_STOP = new Date('2026-06-14'); // day after Finals actually ended (6/13)
+    if(new Date() < SEASON_HARD_STOP){
+      try{
+        const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard');
+        const data = await res.json();
+        const todayStr = fmt(today);
+        const liveEvents = (data?.events||[]).map(e=>({...e,_dateStr:todayStr}));
+        // Add any events not already in allEvents
+        const existingIds = new Set(allEvents.map(e=>e.id));
+        liveEvents.forEach(e=>{ if(!existingIds.has(e.id)) allEvents.push(e); });
+      }catch(e){}
+    }
 
     const newLive = {};
     let hasLive = false;
@@ -8549,6 +8743,7 @@ async function boot(){
     if(document.getElementById('manager-picker') && !document.getElementById('manager-picker').classList.contains('hidden')) showManagerPicker();
   });
   setInterval(fetchInjuryReport, 600000); // refresh every 10 mins
+  setInterval(refreshDraftPicks, 60000); // refresh draft picks every 60s on draft night
   // Hide loading screen immediately — don't wait for portraits (13MB can be slow)
   document.getElementById('loading-overlay').style.display='none';
   // Load portraits in background, re-render when done
